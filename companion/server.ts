@@ -201,9 +201,10 @@ wss.on("connection", (socket, request) => {
   );
 
   socket.on("message", (bytes) => {
+    let incoming: any;
     commandQueue = commandQueue
       .then(async () => {
-        const message = JSON.parse(bytes.toString());
+        const message = incoming = JSON.parse(bytes.toString());
         if (!authenticated) {
           if (
             message.type !== "connect" ||
@@ -412,7 +413,9 @@ wss.on("connection", (socket, request) => {
       .catch((error) => {
         if (socket.readyState === WebSocket.OPEN)
           socket.send(
-            JSON.stringify({ type: "error", message: error.message }),
+            JSON.stringify(incoming?.type === "send" && typeof incoming.command?.requestId === "string"
+              ? {type:"send-rejected",requestId:incoming.command.requestId,message:error.message}
+              : { type: "error", message: error.message }),
           );
       });
   });

@@ -9,8 +9,8 @@ import { ChatGPT } from "./assistant-ui/components/assistant-ui/elements/chatgpt
 import { PortalContainerContext } from "./assistant-ui/lib/portal-container";
 import { attachmentAdapter } from "./runtime/attachments";
 import { isVisibleHomeRequest, rememberHomeRequest, visibleHomeMessages } from "./runtime/home-view";
+import { pageReference } from "./runtime/chat-context";
 import { materialContext } from "./material-sync";
-import { readAssignment, readTodos } from "./canvas";
 import { store, useData } from "./store";
 import type { PageContext, ThreadRecord } from "./types";
 
@@ -41,6 +41,8 @@ export function Conversation({
       ["working", "queued"].includes(run.status),
   );
   const saved = threads[context.threadId];
+  const latestUserId = saved?.messages.filter(message=>message.role==="user").at(-1)?.id;
+  const failedRun = Object.values(connection.runs).find((run:any)=>run.command.requestId===latestUserId && (!home || isVisibleHomeRequest(run.command.requestId)) && run.error);
   const messages = useMemo<ThreadMessageLike[]>(
     () =>
       (home
@@ -86,30 +88,7 @@ export function Conversation({
       });
       try {
         if (!(await savedImmediately)) throw new Error(store.error());
-        let source: string | undefined;
-        if (context.kind === "assignment") {
-          const a = await readAssignment(
-            context.courseId!,
-            context.assignmentId!,
-            controller.signal,
-          );
-          source = JSON.stringify({
-            sourceUrl: location.origin + context.href,
-            fetchedAt: new Date().toISOString(),
-            name: a.name,
-            description: a.description,
-            dueAt: a.due_at,
-            submission: a.submission,
-          });
-        }
-        if (context.kind === "home") {
-          const cached=store.get().canvasCache;
-          source = JSON.stringify({
-            sourceUrl: location.origin + "/",
-            fetchedAt: cached?.fetchedAt || new Date().toISOString(),
-            todos: cached?.todos ?? await readTodos(controller.signal),
-          });
-        }
+        const source = pageReference(location.origin,context);
         const attachmentContext = attachments
           ?.flatMap((a) => a.content)
           .filter((p) => p.type === "text")
@@ -165,7 +144,7 @@ export function Conversation({
         className={`conversation ${home ? "conversation-home" : ""} ${messages.length ? "conversation-active" : ""}`}
       >
         <PortalContainerContext.Provider value={portalContainer}>
-          {sendError && <p className="error" role="alert">{sendError}</p>}
+          {(sendError || failedRun?.error) && <p className="error" role="alert">{sendError || failedRun?.error}</p>}
           <ChatGPT
             workMode={home || workMode}
             connected={connection.status === "connected"}

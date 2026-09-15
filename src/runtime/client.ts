@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { boundedChatContext } from "./chat-context";
 import { store } from "../store";
 import { rememberHomeRequest } from "./home-view";
 import type { PageContext } from "../types";
@@ -205,6 +206,14 @@ function receive(event: { data: string }) {
     if (m.error) request?.reject(new Error(m.error)); else request?.resolve(m.result);
     return;
   }
+  if (m.type === "send-rejected") {
+    const command=store.get().outbox?.[m.requestId];
+    if(command) {
+      void store.acknowledge(m.requestId);
+      update({error:m.message,runs:{...state.runs,[m.requestId]:{command,status:"error",error:m.message,text:"",createdAt:new Date().toISOString()}}});
+    }
+    return;
+  }
   if (m.type === "files-result-chunk") {
     if (!fileRequests.has(m.id) || !Number.isInteger(m.count) || m.count < 1 || m.count > 16 || !Number.isInteger(m.index) || m.index < 0 || m.index >= m.count || typeof m.data !== "string" || m.data.length > 600000) return;
     const chunks=fileChunks.get(m.id) || Array(m.count).fill(null);
@@ -333,6 +342,8 @@ export async function sendMessage(
   attachments?: import("@assistant-ui/react").CompleteAttachment[],
   requestId = crypto.randomUUID(),
 ) {
+  update({error:undefined});
+  if (!text.trim() || text.length > 50000) throw new Error("Messages must contain between 1 and 50,000 characters.");
   if (context.kind === "home") rememberHomeRequest(requestId);
   const command = {
     requestId,
@@ -340,7 +351,7 @@ export async function sendMessage(
     title: context.title,
     href: context.href,
     text,
-    context: canvasContext,
+    context: canvasContext ? boundedChatContext(canvasContext) : undefined,
     model: store.get().model?.id ?? state.currentModel,
     effort: store.get().model?.effort ?? state.currentEffort,
     attachments,

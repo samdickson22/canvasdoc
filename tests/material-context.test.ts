@@ -14,7 +14,7 @@ test('a stalled material collector cannot block a chat context snapshot',async()
   const {materialContext}=await import(pathToFileURL(outfile).href);
   const context=materialContext(1);
   assert.equal(typeof context,'string');
-  assert.match(context,/independently/);
-  assert.match(context,/No local material mirror is confirmed/);
+  assert.match(context,/Use directory listings and search/);
+  assert.match(context,/not confirmed in this browser session/);
  }finally{await rm(directory,{recursive:true,force:true})}
 });
