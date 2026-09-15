@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { Skeleton } from "boneyard-js/react";
 import todoBones from "./todo.bones";
 import {
@@ -11,7 +11,8 @@ import {
   Plus,
   Settings2,
 } from "lucide-react";
-import type { Course, PersonalTask, Todo } from "./types";
+import { assignmentCompleted, setAssignmentCompletion } from "./planner";
+import type { Course, PersonalTask, Todo, PlannerOverride } from "./types";
 import { dueGroup } from "./model";
 import { preferences } from "./preferences";
 import { store } from "./store";
@@ -42,6 +43,73 @@ export function TodoList({
   retry: () => void;
   onAdd: () => void;
 }) {
+  const [overrides, setOverrides] = useState<Record<string, PlannerOverride>>(
+    {},
+  );
+  const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
+  const pending = useRef(new Set<string>());
+  const [completionError, setCompletionError] = useState("");
+  // Fresh Canvas data takes over once the next normal refresh includes our change.
+  useEffect(() => {
+    setOverrides((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(([key, value]) => {
+          const todo = todos.find(
+            (t) =>
+              `assignment:${t.assignment?.course_id}:${t.assignment?.id}` ===
+              key,
+          );
+          return (
+            !todo?.planner_loaded ||
+            pending.current.has(key) ||
+            todo.planner_override?.marked_complete !== value.marked_complete
+          );
+        }),
+      ),
+    );
+  }, [todos]);
+  async function toggleAssignment(id: string, done: boolean) {
+    if (pending.current.has(id)) return;
+    const source = todos.find(
+      (t) => `assignment:${t.assignment?.course_id}:${t.assignment?.id}` === id,
+    );
+    if (!source) return;
+    pending.current.add(id);
+    setCompletionError("");
+    setOptimistic((current) => ({ ...current, [id]: !done }));
+    try {
+      const result = await setAssignmentCompletion(
+        overrides[id]
+          ? { ...source, planner_override: overrides[id], planner_loaded: true }
+          : source,
+        !done,
+      );
+      setOverrides((current) => ({ ...current, [id]: result }));
+      const cache = store.get().canvasCache;
+      if (cache)
+        void store.cacheCanvas({
+          ...cache,
+          todos: cache.todos.map((t) =>
+            t.assignment?.id === source.assignment?.id
+              ? { ...t, planner_override: result, planner_loaded: true }
+              : t,
+          ),
+        });
+    } catch (error) {
+      setCompletionError(
+        error instanceof Error
+          ? error.message
+          : "Could not update this to-do. Try again.",
+      );
+    } finally {
+      pending.current.delete(id);
+      setOptimistic((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+    }
+  }
   const [selected, setSelected] = useState<number | null>(null);
   const [completed, setCompleted] = useState(false);
   const [period, setPeriod] = useState("week");
@@ -66,7 +134,24 @@ export function TodoList({
           due: t.assignment!.due_at,
           href: `/courses/${t.assignment!.course_id}/assignments/${t.assignment!.id}`,
           personal: false,
-          completed: ["submitted", "graded", "pending_review"].includes(
+          completed:
+            optimistic[
+              `assignment:${t.assignment!.course_id}:${t.assignment!.id}`
+            ] ??
+            assignmentCompleted(
+              overrides[
+                `assignment:${t.assignment!.course_id}:${t.assignment!.id}`
+              ]
+                ? {
+                    ...t,
+                    planner_override:
+                      overrides[
+                        `assignment:${t.assignment!.course_id}:${t.assignment!.id}`
+                      ],
+                  }
+                : t,
+            ),
+          submitted: ["submitted", "graded", "pending_review"].includes(
             t.assignment!.submission?.workflow_state || "",
           ),
           points: t.assignment!.points_possible,
@@ -80,11 +165,12 @@ export function TodoList({
         due: t.dueAt,
         href: `/?canvasdoc-task=${encodeURIComponent(t.id)}`,
         personal: true,
+        submitted: false,
         completed: t.completed,
         points: null,
       })),
     ],
-    [todos, tasks, courses],
+    [todos, tasks, courses, overrides, optimistic],
   );
   const inPeriod = (item: (typeof items)[number]) =>
     period === "all" ||
@@ -143,7 +229,19 @@ export function TodoList({
   const labelDate = (d: Date) =>
     d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
   const endLabel = new Date(+end - 1);
-  if (loading && !items.length) return <Skeleton name="canvasdoc-todos" loading initialBones={todoBones} className="bc-loading" color="#edf0e8" animate="pulse"><span /></Skeleton>;
+  if (loading && !items.length)
+    return (
+      <Skeleton
+        name="canvasdoc-todos"
+        loading
+        initialBones={todoBones}
+        className="bc-loading"
+        color="#edf0e8"
+        animate="pulse"
+      >
+        <span />
+      </Skeleton>
+    );
   return (
     <div className="bc-todos">
       <div className="bc-period">
@@ -197,8 +295,8 @@ export function TodoList({
             Include earlier overdue work
           </label>
           <p>
-            Course rings filter the list. Progress comes from Canvas submissions
-            and completed personal tasks.
+            Course rings filter the list. Progress comes from Canvas submissions,
+            planner checkmarks, and completed personal tasks.
           </p>
         </div>
       )}
@@ -278,6 +376,11 @@ export function TodoList({
           <Check size={19} /> Completed
         </button>
       </div>
+      {completionError && (
+        <p className="error" role="alert">
+          {completionError}
+        </p>
+      )}
       {loading ? (
         <p className="loading">Loading coursework…</p>
       ) : error ? (
@@ -347,10 +450,23 @@ export function TodoList({
                       )}
                     </button>
                   ) : (
-                    <span
+                    <button
                       className="bc-check"
+                      disabled={item.submitted || pending.current.has(item.id)}
+                      aria-label={
+                        item.submitted
+                          ? `${item.title}: submitted in Canvas`
+                          : `${item.completed ? "Reopen" : "Complete"} ${item.title}`
+                      }
                       title={
-                        item.completed ? "Submitted in Canvas" : "Not submitted"
+                        item.submitted
+                          ? "Submitted in Canvas"
+                          : item.completed
+                            ? "Move back to To do"
+                            : "Mark done in your Canvas planner"
+                      }
+                      onClick={() =>
+                        void toggleAssignment(item.id, item.completed)
                       }
                     >
                       {item.completed ? (
@@ -358,7 +474,7 @@ export function TodoList({
                       ) : (
                         <Circle size={19} />
                       )}
-                    </span>
+                    </button>
                   )}
                 </div>
               ))}

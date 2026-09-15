@@ -1,4 +1,4 @@
-import type { Assignment, Course, Todo } from "./types";
+import type { Assignment, Course, Todo, PlannerOverride } from "./types";
 
 export async function canvasRead<T>(
   path: string,
@@ -59,12 +59,43 @@ export const readCourses = (signal?: AbortSignal) =>
   );
 export const readTodos = (signal?: AbortSignal) =>
   canvasPages<Todo>("/api/v1/users/self/todo?per_page=100", signal);
-export async function readDashboardWork(signal?: AbortSignal, knownCourses?: Course[]): Promise<Todo[]> {
-  const courses = knownCourses ?? await readCourses(signal);
-  return (await Promise.all(courses.map(async course => {
-    const assignments = await canvasPages<Assignment>(`/api/v1/courses/${course.id}/assignments?include[]=submission&per_page=100`, signal);
-    return assignments.map(assignment => ({ assignment, context_name: course.name, context_short_name: course.course_code, html_url: assignment.html_url, type: "assignment" }));
-  }))).flat();
+export async function readDashboardWork(
+  signal?: AbortSignal,
+  knownCourses?: Course[],
+): Promise<Todo[]> {
+  const courses = knownCourses ?? (await readCourses(signal));
+  const overridesRequest = canvasPages<PlannerOverride>(
+    "/api/v1/planner/overrides?per_page=100",
+    signal,
+  ).catch(() => null);
+  const assignments = (
+    await Promise.all(
+      courses.map(async (course) => {
+        const assignments = await canvasPages<Assignment>(
+          `/api/v1/courses/${course.id}/assignments?include[]=submission&per_page=100`,
+          signal,
+        );
+        return assignments.map((assignment) => ({
+          assignment,
+          context_name: course.name,
+          context_short_name: course.course_code,
+          html_url: assignment.html_url,
+          type: "assignment",
+        }));
+      }),
+    )
+  ).flat();
+  const overrides = await overridesRequest;
+  return assignments.map((todo) => ({
+    ...todo,
+    planner_loaded: overrides !== null,
+    planner_override:
+      overrides?.find(
+        (o) =>
+          o.plannable_type === "assignment" &&
+          o.plannable_id === todo.assignment.id,
+      ) ?? null,
+  }));
 }
 export const readAssignment = (
   course: number,

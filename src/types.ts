@@ -9,7 +9,16 @@ export type Assignment = {
   description?: string;
   submission?: { workflow_state: string; submitted_at: string | null };
 };
+export type PlannerOverride = {
+  id: number;
+  plannable_type: string;
+  plannable_id: number;
+  marked_complete: boolean;
+  dismissed: boolean;
+};
 export type Todo = {
+  planner_override?: PlannerOverride | null;
+  planner_loaded?: boolean;
   assignment?: Assignment;
   context_name?: string;
   context_short_name?: string;
