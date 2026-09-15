@@ -1,0 +1,9 @@
+# Startup and loading
+
+The extension injects bootstrap CSS/JS at document_start. A loading shell covers the initial native layout until React commits; a four-second timeout restores native Canvas if startup fails. The main bundle also starts at document_start and waits for Canvas's content container. The self-hosted dev loader runs from Canvas's head content block with an async app script, avoiding the native deferred-script queue.
+
+The current Canvas user ID comes from the page's ENV data when present, with the authenticated profile endpoint as a fallback. Profile timezone refresh is off the render path. Cached courses and assignments live in the existing account/origin-scoped browser store. The UI reads that cache immediately and refreshes from Canvas in the background; chats, tasks, and preferences remain browser-owned. Invalid cache shape is discarded without discarding chat history.
+
+Boneyard1.10 supplies the cold to-do skeleton. src/todo.bones.ts was generated from the actual synthetic panel in T3 using boneyard-js snapshotBones. It contains geometry, not course text. Capture through T3 when the layout changes; do not run Boneyard's standalone Playwright capture against user Canvas. The early pre-React loading shell is lightweight CSS because a React skeleton cannot cover time before React loads.
+
+Verification: typecheck/build and19tests passed. A warm repeat visit displayed6task cards from9cached assignments and3courses. The latest sample recorded bootstrap at3229ms and React ready at3845ms after navigation; the server/page portion precedes bootstrap and is not eliminated. An earlier load had a24-second gap while Canvas's dashboard request and deferred startup were pending. These samples are observations, not a controlled benchmark or a guarantee of fixed timing. Actual installed-extension startup remains unverified; the self-hosted dev path was exercised.

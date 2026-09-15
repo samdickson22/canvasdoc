@@ -1,0 +1,21 @@
+dev/canvas-lms/
+dev/.state/
+dev/.env
+dev/logs/
+dev/evidence/
+node_modules/
+dist/
+.DS_Store
+
+# Generated packages and private local research/test artifacts
+/release/
+/design/
+/plans/
+/RESEARCH.md
+.canvasdoc/
+.env
+.env.*
+!.env.example
+*.log
+*.tgz
+*.zip

@@ -1,0 +1,1 @@
+Radial geometry helpers adapted from UseBetterCanvas/canvas-task-extension, MIT copyright2020 Jeffrey Cheng. See LICENSE. The Canvasdoc course-filter wheel adapts that project's concentric progress-ring interaction to the semicircle shown in BetterCampus. Task and navigation markup is implemented for Canvasdoc's data model.

@@ -1,0 +1,8 @@
+html.canvasdoc-booting::before {
+  content:"";position:fixed;inset:0;z-index:2147483646;pointer-events:none;
+  background:linear-gradient(#f5f6f2,#f5f6f2) left/220px 100% no-repeat,linear-gradient(#fdfefb,#fdfefb) right/360px 100% no-repeat,#fff;
+}
+html.canvasdoc-booting::after {
+  content:"Loading Canvasdoc…";position:fixed;left:calc(50% - 80px);top:45%;z-index:2147483647;color:#8a9383;font:14px system-ui;pointer-events:none;
+}
+@media(max-width:1000px){html.canvasdoc-booting::before{background:linear-gradient(#f5f6f2,#f5f6f2) left/72px 100% no-repeat,#fff;}}

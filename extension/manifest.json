@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "Canvasdoc",
+  "version": "0.1.8",
+  "description": "Your local coursework agent, with Canvas assignments, course materials, and a persistent workspace.",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://mac-mini.tail39179a.ts.net:3211/*",
+        "http://localhost:3210/*",
+        "https://canvas.calpoly.edu/*"
+      ],
+      "css": [
+        "bootstrap.css"
+      ],
+      "js": [
+        "bootstrap.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://mac-mini.tail39179a.ts.net:3211/*",
+        "http://localhost:3210/*",
+        "https://canvas.calpoly.edu/*"
+      ],
+      "js": [
+        "canvasdoc.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "permissions": [
+    "storage",
+    "nativeMessaging",
+    "unlimitedStorage"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "host_permissions": [
+    "https://mac-mini.tail39179a.ts.net:3211/*",
+    "http://localhost:3210/*",
+    "https://*.instructure.com/*",
+    "https://*.instructureusercontent.com/*",
+    "https://canvas.calpoly.edu/*"
+  ],
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjEij7WeqWxfmACp/BG/sWMzGtUT5y2nG8KOC5NS9c/xJQrlR66VaatgPCvpbQSGyMUsC4A4u5e63n0aoWkEQvnayBRXDjd0CbfQQP0BUFkL6sjaisb0E5Y99hDMS4hdbWDxcN//Ga4CV3iGQepWAczGPfKL2Ow3/9qcQQkjjkkpLbUbAdQ72ve7OYLvSNokZ3Gfha27kTVXKoyUtMHP84grsHkD7DypeRGOVAGfwu4z/YXF0FNXocww1aRcNFHpXKC4u9TmdvVMuznPq/ok+i+zwyKyaxUhq2yURGoZUUuhYypL2WyCf2BH4FZ4izvssgGVYVnyfc6VyUNMNlBzSFwIDAQAB"
+}

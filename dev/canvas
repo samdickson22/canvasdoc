@@ -1,0 +1,4 @@
+#!/bin/bash
+set -euo pipefail
+canvasdoc_dev_dir="$(cd "$(dirname "$0")" && pwd)"
+exec docker --context colima-canvasdoc compose --project-directory "$canvasdoc_dev_dir" -f "$canvasdoc_dev_dir/compose.yaml" "$@"

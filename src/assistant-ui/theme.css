@@ -1,0 +1,55 @@
+@import "tailwindcss" source(none);
+/* Match the surrounding Canvasdoc theme; OS dark mode alone must not recolor chat. */
+@custom-variant dark (&:where(.dark, .dark *));
+@source "./components";
+@source "../conversation.tsx";
+@theme {
+  --color-background: #fff;
+  --color-foreground: #26322b;
+  --color-card: #fff;
+  --color-primary: #234a37;
+  --color-primary-foreground: #fff;
+  --color-muted: #f1f3ef;
+  --color-muted-foreground: #788176;
+  --color-secondary: #edf1eb;
+  --color-secondary-foreground: #26322b;
+  --color-accent: #e9eee6;
+  --color-accent-foreground: #26322b;
+  --color-border: #dce2d8;
+  --color-ring: #839d7c;
+  --color-destructive: #b53535;
+  --color-popover: #fff;
+  --color-popover-foreground: #26322b;
+  --radius-lg: .75rem;
+  --radius-md: .5rem;
+  --radius-sm: .25rem;
+}
+@layer components {
+  .aui-root { min-height: 0; font-size: 14px; }
+  .aui-root [data-slot="aui_thread-viewport"] { min-height: 0; overscroll-behavior: contain; }
+  .aui-root textarea { border: 0; box-shadow: none; font-family: inherit; }
+  .conversation-home .aui-thread-root { height: 100%; }
+}
+/* The dashboard positions the welcome group; avoid the demo's extra bottom offset. */
+.conversation-home .aui-chatgpt-empty { padding-bottom: 0; }
+/* Work surfaces keep assistant-ui behavior and give files/context a visible home. */
+.aui-root[data-work-mode] { padding-inline:24px; }
+.work-composer { border:1px solid #dfdfda; border-radius:18px; background:#f7f7f4; position:relative; margin-bottom:0; box-shadow:0 2px 8px #00000003; }
+.work-composer:focus-within { border-color:#b9c2b6; }
+.work-prompt { width:100%; min-height:76px; max-height:240px; padding:17px 18px 8px; resize:none; outline:0; background:transparent; font-size:15px; line-height:1.65; }
+.work-prompt::placeholder { color:#92958d; }
+.work-composer-toolbar { display:flex; align-items:center; gap:8px; padding:8px 13px 12px; }
+.work-folder { display:flex; align-items:center; gap:6px; font-size:11px; color:#707a68; padding:4px 6px; border-radius:5px; }.work-folder:hover { background:#eceee7; }
+.work-provider { margin-left:auto; font-size:11px; color:#838b7b; }
+.work-attachments { display:flex; gap:8px; padding:12px 14px 0; }.work-attachments:empty { display:none; }
+[data-work-mode] .work-user-bubble { background:#f0f1ec; color:#30372d; border-radius:14px; }
+[data-work-mode] .aui-md { font-size:14px; line-height:1.8; }
+.work-model-selector { margin-left:auto; }
+.codex-model-trigger { max-width:240px; font-size:11px; color:#6e7767; }
+.model-unavailable { font-size:11px; color:#8c9385; }
+
+.chat-dropzone { position: relative; }
+.chat-dropzone[data-dragging="true"]::after { content: "Drop files to attach"; position: absolute; inset: 8px; z-index: 50; display: grid; place-items: center; border: 2px dashed #28765b; border-radius: 20px; background: #f2faf5f2; color: #245b47; pointer-events: none; font-size: 18px; }
+.chat-thinking-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: canvasdoc-thinking 1.2s ease-in-out infinite; }
+@keyframes canvasdoc-thinking { 50% { opacity: .3; transform: scale(.75); } }
+@media (prefers-reduced-motion: reduce) { .chat-thinking-dot { animation: none; } }

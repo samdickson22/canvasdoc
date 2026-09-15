@@ -1,0 +1,24 @@
+#!/bin/bash
+set -euo pipefail
+cd "$(dirname "$0")"
+
+if ! git -C canvas-lms rev-parse HEAD >/dev/null 2>&1; then
+  echo 'Canvas source checkout is not ready.' >&2
+  exit 1
+fi
+
+python3 configure.py
+git -C canvas-lms rev-parse HEAD > .state/canvas-source-commit
+docker --context colima-canvasdoc volume create canvasdoc-dev_gems >/dev/null
+docker --context colima-canvasdoc volume create canvasdoc-dev_bundler >/dev/null
+./canvas build web postgres
+./canvas up -d postgres redis
+./canvas run --rm web ./script/install_assets.sh
+
+if ! ./canvas exec -T postgres psql -U postgres -d canvas_development -Atc 'SELECT count(*) FROM accounts' >/dev/null 2>&1; then
+  ./canvas run --rm web bundle exec rake db:create db:initial_setup
+fi
+
+./canvas run --rm web bundle exec rails runner /opt/canvasdoc/seed.rb
+./canvas up -d web jobs rce
+echo 'Canvas services started. Verify the configured dev origin in the T3 browser.'
