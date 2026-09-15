@@ -848,6 +848,7 @@ select {
 .dashboard-header, .dashboard-footer { flex-shrink: 0; }
 .dashboard:has(.conversation-active) .dashboard-center { display: flex; flex-direction: column; min-height: 0; padding: 0; width: 100%; }
 .dashboard:has(.conversation-active) .recent,
+.dashboard:has(.conversation-active) .recent-empty,
 .dashboard:has(.conversation-active) .dashboard-footer { display: none; }
 
 .dashboard:not(:has(.conversation-active)) .dashboard-center {
