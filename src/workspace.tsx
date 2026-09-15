@@ -1,3 +1,5 @@
+import { useData } from "./store";
+import { belongsToAssignment, isSyncedSource, threadFileReferences } from "./workspace-files";
 import { MaterialStatus } from "./material-status";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -29,13 +31,16 @@ export function Workspace({
   conversationHost,
   onAssignment,
   onConnect,
+  requestedFile,
 }: {
   context: PageContext;
+  requestedFile?: {path:string};
   conversationHost: HTMLElement;
   onAssignment: () => void;
   onConnect: () => void;
 }) {
   const connection = useConnection();
+  const data = useData();
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [files, setFiles] = useState<Entry[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -92,14 +97,16 @@ export function Workspace({
     },
     [conversationHost],
   );
-  const isSource = (file: {path:string}) => file.path.startsWith("uploads/") || /^courses\/[^/]+\/[^/]+\/(materials\/|assignments\/[^/]+\/sources\/)/.test(file.path);
-  const shown = files.filter(
-    (f) =>
-      (tab === "sources"
-        ? isSource(f)
-        : !isSource(f)) &&
-      f.path.toLowerCase().includes(query.toLowerCase()),
-  );
+  const refs = threadFileReferences(data.threads[context.threadId]?.messages ?? [], connection.root);
+  const scoped = files.filter(f => refs.has(f.path) || belongsToAssignment(f.path, context));
+  const isSource = (file: {path:string}) => isSyncedSource(file.path);
+  const shown = scoped.filter(f => (tab === "sources" ? isSource(f) : !isSource(f)) && f.path.toLowerCase().includes(query.toLowerCase()));
+  useEffect(() => {
+    if (!requestedFile) return;
+    setInspectorOpen(true);
+    setTab(isSyncedSource(requestedFile.path) ? "sources" : "outputs");
+    setSelected(requestedFile.path);
+  }, [requestedFile]);
   return (
     <section className="workbench" aria-label={`${context.title} workspace`}>
       <header className="workbench-header">
@@ -150,7 +157,7 @@ export function Workspace({
                 >
                   Outputs{" "}
                   <small>
-                    {files.filter((f) => !isSource(f)).length}
+                    {scoped.filter((f) => !isSource(f)).length}
                   </small>
                 </button>
                 <button
@@ -159,7 +166,7 @@ export function Workspace({
                 >
                   Sources{" "}
                   <small>
-                    {files.filter((f) => isSource(f)).length +
+                    {scoped.filter((f) => isSource(f)).length +
                       1}
                   </small>
                 </button>
@@ -233,8 +240,8 @@ export function Workspace({
                       {query
                         ? "No matching files."
                         : tab === "outputs"
-                          ? "Files the agent creates will appear here."
-                          : "Attach files in chat to add sources."}
+                          ? "Files created or linked in this conversation will appear here."
+                          : "Attach a file or ask the agent to link a source for this assignment."}
                     </p>
                   )}
                 </div>

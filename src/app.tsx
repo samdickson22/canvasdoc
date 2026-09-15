@@ -1,3 +1,4 @@
+import { localFilePath } from "./workspace-files";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -102,6 +103,19 @@ export function App({
   const [revision, setRevision] = useState(0);
   const [open, setOpen] = useState(() => initialContext.kind !== "page" && window.innerWidth > 760);
   const [workspace, setWorkspace] = useState(false);
+  const [requestedFile, setRequestedFile] = useState<{path:string}>();
+  useEffect(() => {
+    const openFile = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if(detail?.threadId !== initialContext.threadId || typeof detail.path !== "string" || !mounts.workspace) return;
+      const path = localFilePath(detail.path);
+      if(!path) return;
+      setRequestedFile({path});
+      setWorkspace(true);
+    };
+    window.addEventListener("canvasdoc:open-file",openFile);
+    return () => window.removeEventListener("canvasdoc:open-file",openFile);
+  }, [initialContext.threadId, mounts.workspace]);
   const [modal, setModal] = useState<"task" | "connection" | null>(null);
   const personal = data.tasks.find((task) => task.id === initialContext.taskId);
   const context = {
@@ -311,7 +325,7 @@ export function App({
         )}
       {mounts.workspace && workspace &&
         createPortal(
-          <Workspace context={context} conversationHost={mounts.conversationHost!} onAssignment={() => setWorkspace(false)} onConnect={onConnect} />,
+          <Workspace requestedFile={requestedFile} context={context} conversationHost={mounts.conversationHost!} onAssignment={() => setWorkspace(false)} onConnect={onConnect} />,
           mounts.workspace,
         )}
       {modal &&

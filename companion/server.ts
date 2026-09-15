@@ -1,3 +1,4 @@
+import { isSyncedSource } from "../src/workspace-files.ts";
 import { applyDisplayEvent, finishDisplayParts, type DisplayPart } from "./message-parts.ts";
 import { createServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
@@ -51,6 +52,7 @@ type Run = {
   turnId?: string;
   text: string;
   parts?: DisplayPart[];
+  files?: string[];
   error?: string;
   createdAt: string;
 };
@@ -83,6 +85,7 @@ const approvals = new Map<
   }
 >();
 let active: Run | undefined;
+let filesBefore = new Map<string, number>();
 let persistence = Promise.resolve();
 function persist() {
   const snapshot = structuredClone({ runs, receipts });
@@ -105,6 +108,7 @@ async function pump() {
   await persist();
   publish(run);
   try {
+    filesBefore = new Map((await listWorkspaceFiles(config.root)).filter(f => !isSyncedSource(f.path)).map(f => [f.path, f.modified]));
     const envelope = JSON.stringify({
       sourceThreadId: run.command.sourceThreadId,
       sourceMessageId: run.command.requestId,
@@ -162,6 +166,7 @@ runtime.subscribe((event: RpcEvent) => {
         publish(run);
       }
       if (event.method === "turn/completed") {
+        run.files = (await listWorkspaceFiles(config.root).catch(() => [])).filter(f => !isSyncedSource(f.path) && filesBefore.get(f.path) !== f.modified).map(f => f.path);
         finishDisplayParts(run);
         run.turnId = event.params.turn.id;
         run.status =

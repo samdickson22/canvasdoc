@@ -1,3 +1,4 @@
+import { FileLinkThread } from "./workspace-link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AssistantRuntimeProvider,
@@ -138,6 +139,7 @@ export function Conversation({
     });
   }, [runtime, context.threadId, context.title, context.href]);
   return (
+    <FileLinkThread.Provider value={context.kind === "assignment" ? context.threadId : ""}>
     <AssistantRuntimeProvider runtime={runtime}>
       <div
         ref={setPortalContainer}
@@ -153,5 +155,6 @@ export function Conversation({
         </PortalContainerContext.Provider>
       </div>
     </AssistantRuntimeProvider>
+    </FileLinkThread.Provider>
   );
 }

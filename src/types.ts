@@ -36,6 +36,7 @@ export type PersonalTask = {
   createdAt: string;
 };
 export type SavedMessage = {
+  files?: string[];
   parts?: import("../companion/message-parts").DisplayPart[];
   attachments?: import("@assistant-ui/react").CompleteAttachment[];
   id: string;

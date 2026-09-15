@@ -1,3 +1,4 @@
+import { WorkspaceLink } from "../../../../workspace-link";
 "use client";
 
 
@@ -141,7 +142,7 @@ const defaultComponents = memoizeMarkdownComponents({
     />
   ),
   a: ({ className, ...props }) => (
-    <a
+    <WorkspaceLink
       className={cn(
         "aui-md-a text-primary hover:text-primary/80 underline underline-offset-2",
         className,
