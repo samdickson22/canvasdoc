@@ -51,7 +51,7 @@ export function Conversation({
       ).map((message) => ({
         id: message.id,
         role: message.role,
-        content: [{ type: "text", text: message.text }],
+        content: message.parts?.length ? message.parts : [{ type: "text", text: message.text }],
         createdAt: new Date(message.createdAt),
         attachments: message.attachments,
       })),

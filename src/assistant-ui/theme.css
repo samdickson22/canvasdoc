@@ -53,3 +53,48 @@
 .chat-thinking-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: canvasdoc-thinking 1.2s ease-in-out infinite; }
 @keyframes canvasdoc-thinking { 50% { opacity: .3; transform: scale(.75); } }
 @media (prefers-reduced-motion: reduce) { .chat-thinking-dot { animation: none; } }
+
+/* Keep the compact composer visible inside Canvas's shadow root as well as on
+   work surfaces. Explicit border styling avoids inherited utility defaults. */
+.aui-root:not([data-work-mode]) .chat-dropzone > form {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #dfdfda;
+  border-radius: 18px;
+  background: #f7f7f4;
+  padding: 12px 10px 10px;
+  box-shadow: 0 2px 8px #00000003;
+}
+.aui-root:not([data-work-mode]) .chat-dropzone > form:focus-within {
+  border-color: #98ad9e;
+  box-shadow: 0 0 0 2px #28765b12;
+}
+.aui-root:not([data-work-mode]) .chat-dropzone textarea {
+  min-width: 0;
+  min-height: 42px;
+  width: 100%;
+  line-height: 1.5;
+  color: #26322b;
+  background: transparent;
+}
+.aui-root:not([data-work-mode]) .chat-dropzone textarea::placeholder {
+  color: #858c82;
+}
+.aui-root:not([data-work-mode]) .aui-chatgpt-empty {
+  padding-inline: 0;
+}
+.aui-root:not([data-work-mode]) .codex-model-trigger {
+  max-width: 100%;
+}
+
+/* Reserve action-row geometry even when the primitive hides during a run.
+   Keep user actions mounted so Tab can reveal them without moving messages. */
+.chat-message-actions { min-height: 36px; flex-shrink: 0; }
+.chat-user-actions { opacity: 0; pointer-events: none; transition: opacity 120ms ease; }
+.chat-user-message:hover .chat-user-actions,
+.chat-user-message:focus-within .chat-user-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+@media (hover: none) { .chat-user-actions { opacity: 1; pointer-events: auto; } }
+@media (prefers-reduced-motion: reduce) { .chat-user-actions { transition: none; } }

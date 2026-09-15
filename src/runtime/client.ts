@@ -100,13 +100,14 @@ async function applyRun(run: any) {
       text: c.text,
       createdAt: run.createdAt,
     });
-  if (run.text) {
+  if (run.text || run.parts?.length) {
     const id = `assistant:${c.requestId}`;
     const index = messages.findIndex((m) => m.id === id);
     const message = {
       id,
       role: "assistant" as const,
       text: run.text,
+      parts: run.parts,
       createdAt: run.createdAt,
     };
     if (index < 0) messages.push(message);
@@ -126,9 +127,9 @@ async function applyRun(run: any) {
   if (
     !["working", "queued"].includes(run.status) &&
     persisted?.messages.some((m) => m.id === c.requestId) &&
-    (!run.text ||
+    (!(run.text || run.parts?.length) ||
       persisted.messages.some(
-        (m) => m.id === `assistant:${c.requestId}` && m.text === run.text,
+        (m) => m.id === `assistant:${c.requestId}` && m.text === run.text && JSON.stringify(m.parts) === JSON.stringify(run.parts),
       ))
   ) {
     try {

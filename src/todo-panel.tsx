@@ -1,6 +1,7 @@
 import { useMemo, useState, useRef, useEffect } from "react";
 import { Skeleton } from "boneyard-js/react";
 import todoBones from "./todo.bones";
+import animationStyles from "./todo-animation.css";
 import {
   Check,
   ChevronDown,
@@ -48,6 +49,44 @@ export function TodoList({
   );
   const [optimistic, setOptimistic] = useState<Record<string, boolean>>({});
   const pending = useRef(new Set<string>());
+  const [departing, setDeparting] = useState<Record<string, boolean>>({});
+  const animationTimers = useRef(
+    new Map<string, ReturnType<typeof setTimeout>>(),
+  );
+  useEffect(
+    () => () => {
+      for (const timer of animationTimers.current.values()) clearTimeout(timer);
+    },
+    [],
+  );
+  function finishAnimation(id: string) {
+    clearTimeout(animationTimers.current.get(id));
+    animationTimers.current.delete(id);
+    setDeparting((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  }
+  function animateCompletion(id: string, wasDone: boolean) {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    setDeparting((current) => ({ ...current, [id]: wasDone }));
+    animationTimers.current.set(
+      id,
+      setTimeout(() => finishAnimation(id), 440),
+    );
+  }
+  async function togglePersonal(id: string, done: boolean) {
+    if (animationTimers.current.has(id)) return;
+    setCompletionError("");
+    animateCompletion(id, done);
+    try {
+      if (!(await store.toggleTask(id))) throw new Error("Task save failed");
+    } catch {
+      finishAnimation(id);
+      setCompletionError("Could not save this task. Try again.");
+    }
+  }
   const [completionError, setCompletionError] = useState("");
   // Fresh Canvas data takes over once the next normal refresh includes our change.
   useEffect(() => {
@@ -75,6 +114,7 @@ export function TodoList({
     );
     if (!source) return;
     pending.current.add(id);
+    animateCompletion(id, done);
     setCompletionError("");
     setOptimistic((current) => ({ ...current, [id]: !done }));
     try {
@@ -96,6 +136,7 @@ export function TodoList({
           ),
         });
     } catch (error) {
+      finishAnimation(id);
       setCompletionError(
         error instanceof Error
           ? error.message
@@ -194,7 +235,7 @@ export function TodoList({
     .filter(
       (i) =>
         (selected === null || i.courseId === selected) &&
-        i.completed === completed &&
+        (departing[i.id] ?? i.completed) === completed &&
         (inPeriod(i) ||
           (!completed &&
             showOverdue &&
@@ -244,6 +285,7 @@ export function TodoList({
     );
   return (
     <div className="bc-todos">
+      <style>{animationStyles}</style>
       <div className="bc-period">
         <select
           aria-label="Task date range"
@@ -295,8 +337,8 @@ export function TodoList({
             Include earlier overdue work
           </label>
           <p>
-            Course rings filter the list. Progress comes from Canvas submissions,
-            planner checkmarks, and completed personal tasks.
+            Course rings filter the list. Progress comes from Canvas
+            submissions, planner checkmarks, and completed personal tasks.
           </p>
         </div>
       )}
@@ -417,65 +459,84 @@ export function TodoList({
               g.items.map((item) => (
                 <div
                   key={item.id}
-                  className="bc-task"
-                  style={
-                    {
-                      "--course-color":
-                        courseColors[item.courseId % courseColors.length],
-                    } as React.CSSProperties
+                  className="bc-task-motion"
+                  data-departing={item.id in departing || undefined}
+                  data-completing={
+                    (item.id in departing && !departing[item.id]) || undefined
                   }
                 >
-                  <a href={item.href}>
-                    <small>{item.course}</small>
-                    <strong>{item.title}</strong>
-                    <span>
-                      {item.due
-                        ? `Due ${new Date(item.due).toLocaleString(undefined, { month: "2-digit", day: "2-digit", hour: "numeric", minute: "2-digit", timeZone: preferences.timeZone })}`
-                        : "No due date"}
-                      <em>
-                        {item.personal ? "Personal" : `${item.points ?? 0} pts`}
-                      </em>
-                    </span>
-                  </a>
-                  {item.personal ? (
-                    <button
-                      className="bc-check"
-                      aria-label={`${item.completed ? "Reopen" : "Complete"} ${item.title}`}
-                      onClick={() => store.toggleTask(item.id)}
-                    >
-                      {item.completed ? (
-                        <Check size={19} />
-                      ) : (
-                        <Circle size={19} />
-                      )}
-                    </button>
-                  ) : (
-                    <button
-                      className="bc-check"
-                      disabled={item.submitted || pending.current.has(item.id)}
-                      aria-label={
-                        item.submitted
-                          ? `${item.title}: submitted in Canvas`
-                          : `${item.completed ? "Reopen" : "Complete"} ${item.title}`
-                      }
-                      title={
-                        item.submitted
-                          ? "Submitted in Canvas"
-                          : item.completed
-                            ? "Move back to To do"
-                            : "Mark done in your Canvas planner"
-                      }
-                      onClick={() =>
-                        void toggleAssignment(item.id, item.completed)
+                  <div className="bc-task-motion-content">
+                    <div
+                      className="bc-task"
+                      style={
+                        {
+                          "--course-color":
+                            courseColors[item.courseId % courseColors.length],
+                        } as React.CSSProperties
                       }
                     >
-                      {item.completed ? (
-                        <Check size={19} />
+                      <a href={item.href}>
+                        <small>{item.course}</small>
+                        <strong>{item.title}</strong>
+                        <span>
+                          {item.due
+                            ? `Due ${new Date(item.due).toLocaleString(undefined, { month: "2-digit", day: "2-digit", hour: "numeric", minute: "2-digit", timeZone: preferences.timeZone })}`
+                            : "No due date"}
+                          <em>
+                            {item.personal
+                              ? "Personal"
+                              : `${item.points ?? 0} pts`}
+                          </em>
+                        </span>
+                      </a>
+                      {item.personal ? (
+                        <button
+                          className="bc-check"
+                          aria-label={`${item.completed ? "Reopen" : "Complete"} ${item.title}`}
+                          disabled={item.id in departing}
+                          onClick={() =>
+                            void togglePersonal(item.id, item.completed)
+                          }
+                        >
+                          {item.completed ? (
+                            <Check size={19} />
+                          ) : (
+                            <Circle size={19} />
+                          )}
+                        </button>
                       ) : (
-                        <Circle size={19} />
+                        <button
+                          className="bc-check"
+                          disabled={
+                            item.submitted ||
+                            pending.current.has(item.id) ||
+                            item.id in departing
+                          }
+                          aria-label={
+                            item.submitted
+                              ? `${item.title}: submitted in Canvas`
+                              : `${item.completed ? "Reopen" : "Complete"} ${item.title}`
+                          }
+                          title={
+                            item.submitted
+                              ? "Submitted in Canvas"
+                              : item.completed
+                                ? "Move back to To do"
+                                : "Mark done in your Canvas planner"
+                          }
+                          onClick={() =>
+                            void toggleAssignment(item.id, item.completed)
+                          }
+                        >
+                          {item.completed ? (
+                            <Check size={19} />
+                          ) : (
+                            <Circle size={19} />
+                          )}
+                        </button>
                       )}
-                    </button>
-                  )}
+                    </div>
+                  </div>
                 </div>
               ))}
           </section>

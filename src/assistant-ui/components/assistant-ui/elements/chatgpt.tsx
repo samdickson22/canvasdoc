@@ -316,7 +316,7 @@ const ThreadScrollToBottom: FC = () => {
 
 const UserMessage: FC = () => {
   return (
-    <MessagePrimitive.Root className="relative mx-auto flex w-full max-w-3xl flex-col items-end gap-1">
+    <MessagePrimitive.Root className="chat-user-message relative mx-auto flex w-full max-w-3xl flex-col items-end gap-1">
       <div className="flex flex-row flex-wrap justify-end gap-2">
         <MessagePrimitive.Attachments
           components={{ Attachment: ChatGPTAttachmentUI }}
@@ -327,12 +327,11 @@ const UserMessage: FC = () => {
         <MessagePrimitive.Parts />
       </div>
 
-      <div className="flex items-center gap-0.5">
+      <div className="chat-message-actions flex items-center gap-0.5">
         <ActionBarPrimitive.Root
           hideWhenRunning
-          autohide="always"
-          autohideFloat="single-branch"
-          className="flex items-center"
+          autohide="never"
+          className="chat-user-actions flex items-center"
         >
           <ActionBarPrimitive.Copy asChild>
             <TooltipIconButton
@@ -405,7 +404,7 @@ const AssistantMessage: FC = () => {
         </MessagePrimitive.Parts>
       </div>
 
-      <div className="-ml-2 flex items-center pt-1">
+      <div className="chat-message-actions -ml-2 flex items-center pt-1">
         <ActionBarPrimitive.Root hideWhenRunning className="flex items-center">
           <ActionBarPrimitive.Copy asChild>
             <TooltipIconButton

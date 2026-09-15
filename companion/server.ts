@@ -1,3 +1,4 @@
+import { applyDisplayEvent, finishDisplayParts, type DisplayPart } from "./message-parts.ts";
 import { createServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
 import { mkdir, readFile, writeFile, rename, unlink } from "node:fs/promises";
@@ -49,6 +50,7 @@ type Run = {
   status: string;
   turnId?: string;
   text: string;
+  parts?: DisplayPart[];
   error?: string;
   createdAt: string;
 };
@@ -64,6 +66,7 @@ try {
 }
 for (const run of runs)
   if (["working", "queued"].includes(run.status)) {
+    finishDisplayParts(run);
     run.status = "interrupted";
     run.error =
       "Connector restarted during this request. Review the partial result before continuing.";
@@ -154,19 +157,12 @@ runtime.subscribe((event: RpcEvent) => {
       )
         return;
       const run = active;
-      if (event.method === "item/agentMessage/delta") {
-        run.text += event.params.delta || "";
-        publish(run);
-      }
-      if (
-        event.method === "item/completed" &&
-        event.params.item?.type === "agentMessage"
-      ) {
-        if (!run.text) run.text = event.params.item.text || "";
-        await persist();
+      if (applyDisplayEvent(run, event.method, event.params)) {
+        if (!event.method.endsWith("/delta")) await persist();
         publish(run);
       }
       if (event.method === "turn/completed") {
+        finishDisplayParts(run);
         run.turnId = event.params.turn.id;
         run.status =
           event.params.turn.status === "completed"
