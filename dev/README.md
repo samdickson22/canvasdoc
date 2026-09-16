@@ -43,3 +43,11 @@ Fixtures include three courses, nine assignments, sample text submissions, and c
 Routine testing, fixture edits, submission tests, and destructive scenarios belong here. Preserve the authenticated production Canvas tab for final read-only checks. Production writes require explicit authorization for the particular action.
 
 The environment is not verified until a real student login, dashboard, and assignment page work in T3. Setup logs alone are not UI proof.
+
+## Preview a separate worktree
+
+Run `npm run build` and `node dev/preview.mjs` from the worktree. The preview listens on `127.0.0.1:3240`, forwards Canvas requests to the existing development server on port 3210, and serves `/canvasdoc/` assets only from that worktree's `dist`. It does not copy over another checkout's build. `CANVASDOC_PREVIEW_PORT` and `CANVASDOC_CANVAS_UPSTREAM` override those local addresses.
+
+For remote T3 preview access, expose this port with a private Tailscale Serve route, then start the CLI with that preview origin. For example, `tailscale serve --bg --https=3241 http://127.0.0.1:3240` makes the preview available on the machine's tailnet hostname at port 3241. Pass that HTTPS origin to `canvasdoc-cli --origin`. Keep the connector's workspace and token when restarting it. Each browser tab still needs its development connection paired.
+
+The asset response includes `X-Canvasdoc-Checkout` and disables caching, so a preview can verify which checkout it is running. The proxy is for the synthetic development Canvas instance only.

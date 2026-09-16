@@ -1,0 +1,24 @@
+{
+  "name": "harness-sdk",
+  "version": "0.3.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./index.ts",
+    "./host": "./host.ts",
+    "./runs": "./runs.ts",
+    "./ui-transport": "./ui-transport.ts"
+  },
+  "dependencies": {
+    "@assistant-ui/tap": "0.9.17",
+    "statewire": "0.19.1"
+  },
+  "peerDependencies": {
+    "react": "^19"
+  },
+  "canvasdocUpstream": {
+    "repository": "https://github.com/assistant-ui/harness-sdk",
+    "commit": "57050022c7317f68921eefd823abe54e5123ce76"
+  }
+}

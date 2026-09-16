@@ -6,12 +6,13 @@ import {
   useExternalStoreRuntime,
   type ThreadMessageLike,
 } from "@assistant-ui/react";
-import { useConnection, sendMessage, stopRun } from "./runtime/client";
+import { useConnection, sendMessage, stopRun, reconnectAgent, answerApproval, answerQuestions, type Approval } from "./runtime/client";
 import { ChatGPT } from "./assistant-ui/components/assistant-ui/elements/chatgpt";
 import { PortalContainerContext } from "./assistant-ui/lib/portal-container";
 import { attachmentAdapter } from "./runtime/attachments";
 import { isVisibleHomeRequest, rememberHomeRequest, visibleHomeMessages } from "./runtime/home-view";
 import { pageReference } from "./runtime/chat-context";
+import { presentMessage } from "./runtime/message-presentation";
 import { materialContext } from "./material-sync";
 import { store, useData } from "./store";
 import type { PageContext, ThreadRecord } from "./types";
@@ -50,13 +51,7 @@ export function Conversation({
       (home
         ? visibleHomeMessages(saved?.messages)
         : (saved?.messages ?? [])
-      ).map((message) => ({
-        id: message.id,
-        role: message.role,
-        content: message.parts?.length ? message.parts : [{ type: "text", text: message.text }],
-        createdAt: new Date(message.createdAt),
-        attachments: message.attachments,
-      })),
+      ).map(presentMessage),
     [saved?.messages, home],
   );
   const runtime = useExternalStoreRuntime({
@@ -148,7 +143,12 @@ export function Conversation({
         className={`conversation ${home ? "conversation-home" : ""} ${messages.length ? "conversation-active" : ""}`}
       >
         <PortalContainerContext.Provider value={portalContainer}>
-          {(sendError || failedRun?.error) && <p className="error" role="alert">{sendError || failedRun?.error}</p>}
+          {(sendError || (failedRun?.error && !saved?.messages.some(m => m.id === `assistant:${failedRun.command.requestId}` && m.run?.error))) && <p className="error" role="alert">{sendError || failedRun?.error}</p>}
+          {connection.approvals.filter(approval => approval.requestId && approval.requestId === active?.command.requestId).map(approval => (
+            <RuntimeApproval key={approval.id} approval={approval} connected={connection.status === "connected"} />
+          ))}
+          {(connection.canReconnectAgent || Object.values(connection.runs).some((run: any) => run.command.sourceThreadId === context.threadId && ["uncertain", "recovering"].includes(run.status))) &&
+            <div className="approval-card"><p>The agent's last result needs to be checked before continuing.</p><button type="button" onClick={() => { try { reconnectAgent(); } catch (error) { setSendError((error as Error).message); } }}>Reconnect agent</button></div>}
           <ChatGPT
             workMode={home || workMode}
             connected={connection.status === "connected"}
@@ -158,5 +158,45 @@ export function Conversation({
       </div>
     </AssistantRuntimeProvider>
     </FileLinkThread.Provider>
+  );
+}
+
+function RuntimeApproval({ approval, connected }: { approval: Approval; connected: boolean }) {
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
+  const questions = approval.method === "item/tool/requestUserInput" ? approval.params.questions ?? [] : [];
+  const canApprove = ["item/commandExecution/requestApproval", "item/fileChange/requestApproval"].includes(approval.method);
+  const respond = (decision: "accept" | "decline") => {
+    try { answerApproval(approval.id, decision); }
+    catch (error) { setError((error as Error).message); }
+  };
+  return (
+    <section className="approval-card" aria-label={questions.length ? "Agent questions" : "Agent approval"}>
+      <strong>{questions.length ? "The agent needs your answer" : canApprove ? "Permission needed" : "The agent needs input"}</strong>
+      {approval.params.reason && <p>{approval.params.reason}</p>}
+      {approval.params.command && <pre>{approval.params.command}</pre>}
+      {approval.params.grantRoot && <p>Folder: {approval.params.grantRoot}</p>}
+      {questions.length > 0 ? (
+        <form onSubmit={event => {
+          event.preventDefault();
+          try { answerQuestions(approval.id, answers); }
+          catch (error) { setError((error as Error).message); }
+        }}>
+          {questions.map((question: { id: string; question: string; isSecret?: boolean; options?: { label: string; description: string }[] }) => (
+            <label key={question.id}>
+              <p>{question.question}</p>
+              {question.options?.map(option => (
+                <button type="button" key={option.label} disabled={!connected} onClick={() => setAnswers(previous => ({ ...previous, [question.id]: option.label }))} title={option.description}>{option.label}</button>
+              ))}
+              <input aria-label={question.question} type={question.isSecret ? "password" : "text"} required maxLength={10000} disabled={!connected} value={answers[question.id] ?? ""} onChange={event => setAnswers(previous => ({ ...previous, [question.id]: event.target.value }))} />
+            </label>
+          ))}
+          <button type="submit" disabled={!connected}>Send answers</button>
+        </form>
+      ) : canApprove ? (
+        <><button type="button" disabled={!connected} onClick={() => respond("decline")}>Decline</button><button type="button" disabled={!connected} onClick={() => respond("accept")}>Allow</button></>
+      ) : <p>This request type is not supported yet. Stop this turn to continue.</p>}
+      {error && <p role="alert">{error}</p>}
+    </section>
   );
 }

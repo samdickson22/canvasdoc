@@ -11,7 +11,7 @@ import {
   MessagePrimitive,
   ThreadPrimitive,
   useAui,
-  groupPartByType,
+
 } from "@assistant-ui/react";
 import { type FC, type PropsWithChildren, useContext, createContext, useEffect, useRef, useState } from "react";
 import { PortalContainerContext } from "../../../lib/portal-container";
@@ -42,8 +42,8 @@ import { hasFileDrop, readDroppedFiles } from "../../../../runtime/dropped-files
 import { CodexModelSelector } from "../../../../model-selector";
 import { ToolFallback } from "./tool-fallback.aui";
 
-import { ToolGroupRoot, ToolGroupTrigger, ToolGroupContent } from "./tool-group.aui";
-import { Reasoning, ReasoningRoot, ReasoningTrigger, ReasoningContent, ReasoningText } from "./reasoning.aui";
+import { WorkHistory, ActivityGroup, ActivityTool, RunData, RunOutcome } from "./run-activity";
+import { Reasoning } from "./reasoning.aui";
 
 type WorkOptions = {
   workMode?: boolean;
@@ -71,11 +71,6 @@ export const ChatGPT: FC<WorkOptions> = (options) => {
                 return <AssistantMessage />;
               }}
             </ThreadPrimitive.Messages>
-            <AuiIf condition={(s) => s.thread.isRunning}>
-              <div role="status" className="chat-thinking mx-auto flex w-full max-w-3xl items-center gap-2 text-sm text-neutral-500">
-                <span className="chat-thinking-dot" aria-hidden="true" /> Thinking…
-              </div>
-            </AuiIf>
 
             <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mx-auto mt-auto flex w-full max-w-3xl flex-col gap-2 overflow-visible rounded-t-3xl bg-white pb-2 dark:bg-black">
               <ThreadScrollToBottom />
@@ -398,32 +393,28 @@ const AssistantMessage: FC = () => {
   return (
     <MessagePrimitive.Root className="relative mx-auto flex w-full max-w-3xl flex-col">
       <div className="text-[#0d0d0d] dark:text-[#ececec]">
-        <MessagePrimitive.GroupedParts groupBy={groupPartByType({
-          reasoning: ["group-thought", "group-reasoning"],
-          "tool-call": ["group-thought", "group-tool"],
-          "standalone-tool-call": [],
-        })}>
+        <MessagePrimitive.GroupedParts indicator="empty" groupBy={(part) => {
+          const work = "providerMetadata" in part && part.providerMetadata?.canvasdoc?.work;
+          const groups: `group-${string}`[] = work ? ["group-work"] : [];
+          if (part.type === "reasoning" || part.type === "tool-call") groups.push("group-activity");
+          return groups;
+        }}>
           {({ part, children }) => {
             switch (part.type) {
-              case "group-thought": return <div className="chat-run-activity">{children}</div>;
-              case "group-tool": return <ToolGroupRoot variant="ghost">
-                <ToolGroupTrigger count={part.indices.length} active={part.status.type === "running"} />
-                <ToolGroupContent>{children}</ToolGroupContent>
-              </ToolGroupRoot>;
-              case "group-reasoning": {
-                const running = part.status.type === "running";
-                return <ReasoningRoot streaming={running}>
-                  <ReasoningTrigger active={running} />
-                  <ReasoningContent aria-busy={running}><ReasoningText>{children}</ReasoningText></ReasoningContent>
-                </ReasoningRoot>;
-              }
+              case "group-work": return <WorkHistory indices={part.indices}>{children}</WorkHistory>;
+              case "group-activity": return <ActivityGroup indices={part.indices} running={part.status.type === "running"}>{children}</ActivityGroup>;
               case "text": return <MarkdownText />;
-              case "reasoning": return <Reasoning {...part} />;
-              case "tool-call": return part.toolUI ?? <ToolFallback {...part} />;
+              case "reasoning": return part.text ? <div className="chat-reasoning-summary"><Reasoning {...part} /></div> : null;
+              case "tool-call": return part.toolUI ?? <ActivityTool {...part} />;
+              case "data": return <RunData part={part} />;
+              case "indicator": return <div role="status" className="chat-thinking flex items-center gap-2 text-sm text-neutral-500">
+                <span className="chat-thinking-dot" aria-hidden="true" /> Thinking…
+              </div>;
               default: return null;
             }
           }}
         </MessagePrimitive.GroupedParts>
+        <RunOutcome />
       </div>
 
       <div className="chat-message-actions -ml-2 flex items-center pt-1">

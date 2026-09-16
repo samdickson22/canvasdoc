@@ -46,6 +46,7 @@ Both scripts install dependencies from the lockfile when needed. `start.sh` rebu
 - Native Canvas assignment content with its conversation in the sidebar.
 - Workspace expands that same conversation, with a collapsed-by-default Outputs/Sources inspector.
 - Model and reasoning-effort selection, attachments, browser history, and asynchronous local backups.
+- Command/file approvals and agent questions in the requesting conversation.
 - Course-material collection into readable course and assignment source folders, with incremental updates and protection for edited files.
 - Local PDF and PowerPoint text sidecars with page/slide markers, speaker notes, and explicit OCR/error status. See [document extraction](docs/document-extraction.md).
 - Material sync reuses course/to-do responses and responds to page activity; there is no repeating background poll. Manual refresh remains available.
@@ -65,6 +66,10 @@ node scripts/package-webstore.mjs  # store upload ZIP, without development origi
 Routine testing belongs in a self-hosted Canvas instance with synthetic data. See [dev/README.md](dev/README.md). Real Canvas tests must remain read-only unless a specific write is authorized. Never put real course materials, credentials, browser profiles, or workspace exports into fixtures or commits.
 
 Release preparation: [checklist](docs/release-checklist.md) and [privacy policy](docs/privacy.md).
+
+The companion uses Harness SDK’s full `CodexTransport`, pinned with its matching core to the experimental integration branch. Harness owns execution, queueing, and native-history recovery; Canvasdoc owns conversation routing and browser delivery. See [integration details and source attribution](companion/vendor/harness-codex/README.md). Existing workspaces resume the same Codex session; no history migration is required.
+
+Runtime and T3 browser coverage: [Harness verification](docs/harness-verification.md).
 
 Architecture notes: [material sync](docs/material-sync.md), [filesystem/workspace](docs/filesystem-workspace.md), and [loading](docs/loading.md).
 

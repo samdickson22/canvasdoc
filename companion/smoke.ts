@@ -2,7 +2,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { CodexRuntime, type RpcEvent } from "./codex.ts";
-const root = path.resolve("dev/.state/runtime-smoke");
+const root = path.resolve(process.env.CANVASDOC_SMOKE_ROOT || "dev/.state/runtime-smoke");
 await mkdir(root, { recursive: true });
 async function turn(runtime: CodexRuntime, text: string) {
   let answer = "";

@@ -1,30 +1,24 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {
-  applyDisplayEvent,
-  finishDisplayParts,
-  type DisplayPart,
-} from "../companion/message-parts.ts";
-
-test("tool calls stream between text items, retain IDs and survive serialized replay", () => {
-  const run: { text: string; parts?: DisplayPart[] } = { text: "" };
-  applyDisplayEvent(run, "item/agentMessage/delta", {
-    itemId: "a",
-    delta: "Checking files.",
-  });
-  applyDisplayEvent(run, "item/started", {
-    item: {
-      id: "b",
-      type: "commandExecution",
-      command: "rg syllabus courses/",
-      cwd: "/workspace",
-      status: "inProgress",
-    },
-  });
-  assert.equal(run.parts?.[1].type, "tool-call");
-  assert.equal((run.parts?.[1] as any).result, undefined);
-  applyDisplayEvent(run, "item/completed", {
-    item: {
+import { projectThread } from "@harness-sdk/codex/projection";
+import { displayParts } from "../companion/harness-parts.ts";
+const convert = (items: any[], status = "completed") =>
+  displayParts(
+    Object.values(
+      projectThread(
+        {
+          id: "thread",
+          turns: [{ id: "turn", items, status, error: null }],
+        } as any,
+        [],
+        [],
+      ),
+    ),
+  );
+test("Harness messages retain text/tool ordering, IDs, and serialized output in the browser adapter", () => {
+  const parts = convert([
+    { id: "a", type: "agentMessage", text: "Checking files." },
+    {
       id: "b",
       type: "commandExecution",
       command: "rg syllabus courses/",
@@ -33,50 +27,68 @@ test("tool calls stream between text items, retain IDs and survive serialized re
       exitCode: 0,
       aggregatedOutput: "courses/TEST/syllabus.md",
     },
-  });
-  applyDisplayEvent(run, "item/agentMessage/delta", {
-    itemId: "c",
-    delta: "Found it.",
-  });
-  applyDisplayEvent(run, "item/completed", {
-    item: { id: "c", type: "agentMessage", text: "Found it." },
-  });
-  assert.equal(run.parts?.length, 3);
-  assert.equal(run.text, "Checking files.\n\nFound it.");
-  assert.equal((run.parts?.[1] as any).result, "courses/TEST/syllabus.md");
-  assert.deepEqual(JSON.parse(JSON.stringify(run)).parts, run.parts);
+    { id: "c", type: "agentMessage", text: "Found it." },
+  ]);
+  assert.deepEqual(
+    parts.map((p) => p.type),
+    ["text", "tool-call", "text"],
+  );
+  assert.equal((parts[1] as any).toolCallId, "b");
+  assert.equal((parts[1] as any).result, "courses/TEST/syllabus.md");
+  assert.deepEqual(JSON.parse(JSON.stringify(parts)), parts);
 });
-test("failed and interrupted tool calls are terminal, and output is bounded", () => {
-  const run = { text: "", parts: [] as DisplayPart[] };
-  applyDisplayEvent(run, "item/completed", {
-    item: {
+test("browser adapter preserves nonzero exits, interrupted tools, and output limits", () => {
+  const failed = convert([
+    {
       id: "x",
       type: "commandExecution",
       command: "test",
+      status: "completed",
       exitCode: 1,
       aggregatedOutput: "x".repeat(20000),
     },
-  });
-  assert.equal((run.parts[0] as any).isError, true);
-  assert.ok((run.parts[0] as any).result.length < 12100);
-  applyDisplayEvent(run, "item/started", {
-    item: {
-      id: "y",
-      type: "mcpToolCall",
-      tool: "search",
-      arguments: { query: "test" },
-    },
-  });
-  finishDisplayParts(run);
-  assert.equal((run.parts[1] as any).isError, true);
-  assert.match((run.parts[1] as any).result, /interrupted/);
+  ]);
+  assert.equal((failed[0] as any).isError, true);
+  assert.ok((failed[0] as any).result.length < 12100);
+  const interrupted = convert(
+    [
+      {
+        id: "y",
+        type: "mcpToolCall",
+        tool: "search",
+        arguments: { query: "test" },
+        status: "inProgress",
+      },
+    ],
+    "interrupted",
+  );
+  assert.equal((interrupted[0] as any).isError, true);
+  assert.match((interrupted[0] as any).result, /interrupted/);
 });
-
-test('only provider reasoning summaries become displayable reasoning parts', () => {
-  const run = {text:'',parts:[] as DisplayPart[]};
-  applyDisplayEvent(run,'item/reasoning/summaryTextDelta',{itemId:'r',summaryIndex:0,delta:'Checking '});
-  applyDisplayEvent(run,'item/reasoning/summaryTextDelta',{itemId:'r',summaryIndex:0,delta:'the files'});
-  assert.deepEqual(run.parts,[{type:'reasoning',itemId:'r:summary:0',text:'Checking the files'}]);
-  assert.equal(applyDisplayEvent(run,'item/reasoning/textDelta',{itemId:'r',delta:'raw'}),false);
-  assert.equal(run.text,'');
+test("only Harness reasoning summaries become displayed reasoning", () => {
+  const parts = convert([
+    {
+      id: "r",
+      type: "reasoning",
+      summary: ["Checking the files"],
+      content: ["private reasoning"],
+    },
+  ]);
+  assert.deepEqual(parts, [
+    { type: "reasoning", itemId: "r", text: "Checking the files" },
+  ]);
+});
+test("activity presentation retains answer phases and command classifications through Harness", () => {
+  const parts = convert([
+    { id: "intro", type: "agentMessage", text: "Checking.", phase: "commentary" },
+    { id: "cmd", type: "commandExecution", command: "cat README.md", cwd: "/workspace", status: "completed", exitCode: 0, aggregatedOutput: "Readme", commandActions: [{ type: "read", path: "README.md" }] },
+    { id: "answer", type: "agentMessage", text: "Done.", phase: "final_answer" },
+  ]);
+  assert.equal(parts[0].phase, "commentary");
+  assert.equal(parts[2].phase, "final_answer");
+  const tool = parts[1];
+  assert.equal(tool.type, "tool-call");
+  if (tool.type !== "tool-call") throw Error("Expected tool");
+  assert.equal(tool.providerMetadata?.canvasdoc?.lifecycle, "completed");
+  assert.deepEqual(tool.providerMetadata?.canvasdoc?.commandActions, [{ type: "read", path: "README.md" }]);
 });

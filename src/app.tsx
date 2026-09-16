@@ -39,6 +39,7 @@ import {
   connect,
   disconnect,
   useConnection,
+  reconnectAgent,
   connectNative,
   usesNativeConnection,
 } from "./runtime/client";
@@ -617,6 +618,8 @@ function ConnectionSettings() {
             Disconnect
           </button>
         </>
+      ) : state.canReconnectAgent ? (
+        <><p>Your computer is connected, but Codex needs to reconnect.</p><button className="primary-button" onClick={() => { try { reconnectAgent(); } catch (error) { setError((error as Error).message); } }}>Reconnect agent</button></>
       ) : usesNativeConnection ? (
         <>
           <p>

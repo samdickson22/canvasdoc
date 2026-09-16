@@ -11,6 +11,7 @@ export type Approval = {
 };
 type State = {
   materials?: boolean;
+  canReconnectAgent?: boolean;
   workspaceId?: string;
   models?: { id: string; name: string; description: string; efforts: string[]; defaultEffort: string }[];
   currentModel?: string;
@@ -100,7 +101,7 @@ async function applyRun(run: any) {
       text: c.text,
       createdAt: run.createdAt,
     });
-  if (run.text || run.parts?.length || run.files?.length) {
+  if (run.text || run.parts?.length || run.files?.length || run.error || ["interrupted", "cancelled"].includes(run.status)) {
     const id = `assistant:${c.requestId}`;
     const index = messages.findIndex((m) => m.id === id);
     const message = {
@@ -109,6 +110,7 @@ async function applyRun(run: any) {
       text: run.text,
       parts: run.parts,
       files: run.files,
+      run: { status: run.status, startedAt: run.startedAt, completedAt: run.completedAt, error: run.error },
       createdAt: run.createdAt,
     };
     if (index < 0) messages.push(message);
@@ -126,7 +128,7 @@ async function applyRun(run: any) {
     });
   const persisted = store.committed().threads[c.sourceThreadId];
   if (
-    !["working", "queued"].includes(run.status) &&
+    ["completed", "interrupted", "cancelled", "error"].includes(run.status) &&
     persisted?.messages.some((m) => m.id === c.requestId) &&
     (!(run.text || run.parts?.length || run.files?.length) ||
       persisted.messages.some(
@@ -238,7 +240,7 @@ function receive(event: { data: string }) {
   }
   if (m.type === "connected") {
     update({
-      status: "connected",
+      status: m.runtimeAvailable === false ? "disconnected" : "connected",
       materials: !!m.capabilities?.materials,
       workspaceId: m.workspace.workspaceId,
       models: m.models || [],
@@ -246,11 +248,13 @@ function receive(event: { data: string }) {
       currentEffort: m.currentEffort,
       root: m.workspace.root,
       runtimeThreadId: m.workspace.runtimeThreadId,
-      error: undefined,
+      canReconnectAgent: m.runtimeAvailable === false,
+      error: m.runtimeAvailable === false ? "Codex stopped. Restart the companion to reconnect." : undefined,
     });
     for (const run of m.runs) void applyRun(run);
-    for (const command of Object.values(store.committed().outbox ?? {}))
-      send({ type: "send", command });
+    if (m.runtimeAvailable !== false)
+      for (const command of Object.values(store.committed().outbox ?? {}))
+        send({ type: "send", command });
     scheduleBackup();
     return;
   }
@@ -268,6 +272,10 @@ function receive(event: { data: string }) {
     });
   if (m.type === "approval-resolved")
     update({ approvals: state.approvals.filter((a) => a.id !== m.id) });
+  if (m.type === "runtime-status")
+    update({ status: m.connected ? "connected" : "disconnected", canReconnectAgent: !m.connected,
+      runtimeThreadId: m.runtimeThreadId ?? state.runtimeThreadId,
+      ...(!m.connected ? { approvals: [] } : {}), error: m.message });
   if (m.type === "backup-saved") update({ backupRevision: m.revision });
   if (m.type === "backup-error") {
     clearTimeout(backupTimer);
@@ -381,4 +389,11 @@ export function useConnection() {
     },
     () => state,
   );
+}
+
+export function reconnectAgent() {
+  const command = { type: "reconcile" };
+  if (nativePort) nativePort.postMessage(command);
+  else if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(command));
+  else throw new Error("Reconnect your computer first.");
 }
