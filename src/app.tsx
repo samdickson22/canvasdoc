@@ -13,6 +13,8 @@ import {
   Link,
   MessageSquare,
   Plus,
+  PanelLeft,
+  PanelLeftClose,
   RefreshCw,
   Settings2,
   Sparkles,
@@ -105,6 +107,7 @@ export function App({
   const [revision, setRevision] = useState(0);
   const [open, setOpen] = useState(() => initialContext.kind !== "page" && window.innerWidth > 1100);
   const [workspace, setWorkspace] = useState(false);
+  const navigationCollapsed = data.workspaceNavigationCollapsed === true;
   const [requestedFile, setRequestedFile] = useState<{path:string}>();
   useEffect(() => {
     const openFile = (event: Event) => {
@@ -182,15 +185,19 @@ export function App({
     document.body.classList.toggle("canvasdoc-sidebar-open", open && !workspace);
     return () => document.body.classList.remove("canvasdoc-sidebar-open");
   }, [open, workspace]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.body.classList.toggle("canvasdoc-workspace-open", workspace);
+    document.body.classList.toggle("canvasdoc-navigation-collapsed", workspace && navigationCollapsed);
+    const navigationHost = (mounts.navigation.getRootNode() as ShadowRoot).host as HTMLElement;
+    navigationHost.hidden = workspace && navigationCollapsed;
     for (const element of mounts.original) element.hidden = workspace;
     if (mounts.workspace) mounts.workspace.hidden = !workspace;
     return () => {
-      document.body.classList.remove("canvasdoc-workspace-open");
+      document.body.classList.remove("canvasdoc-workspace-open", "canvasdoc-navigation-collapsed");
+      navigationHost.hidden = false;
       for (const element of mounts.original) element.hidden = false;
     };
-  }, [workspace, mounts]);
+  }, [workspace, navigationCollapsed, mounts]);
   const onConnect = () => setModal("connection");
   const course = courses.find((item) => item.id === context.courseId);
   return (
@@ -302,6 +309,18 @@ export function App({
         )}
       {mounts.tabs &&
         createPortal(
+          <div className={workspace ? "assignment-toolbar workspace-toolbar" : "assignment-toolbar"}>
+            {workspace && (
+              <button
+                className="navigation-toggle"
+                aria-label={navigationCollapsed ? "Show navigation sidebar" : "Hide navigation sidebar"}
+                title={navigationCollapsed ? "Show navigation sidebar" : "Hide navigation sidebar"}
+                aria-expanded={!navigationCollapsed}
+                onClick={() => void store.setWorkspaceNavigationCollapsed(!navigationCollapsed)}
+              >
+                {navigationCollapsed ? <PanelLeft size={18} /> : <PanelLeftClose size={18} />}
+              </button>
+            )}
           <div
             className="assignment-tabs"
             role="tablist"
@@ -340,6 +359,7 @@ export function App({
             >
               Workspace
             </button>
+          </div>
           </div>,
           mounts.tabs,
         )}

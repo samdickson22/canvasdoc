@@ -68,7 +68,31 @@ body.canvasdoc-workspace-open .ic-app-main-content { margin-left:0; }
 body.canvasdoc-workspace-open #main { margin-left:0; }
 body.canvasdoc-workspace-open #right-side-wrapper { display:none !important; }
 body.canvasdoc-workspace-open #content-wrapper { flex:1; width:100%; max-width:none; }
-body.canvasdoc-workspace-open #content { padding:16px 24px; }
+/* Workspace owns the viewport; Canvas chrome returns in Assignment view. */
+body.canvasdoc-workspace-open .ic-app-nav-toggle-and-crumbs,
+body.canvasdoc-workspace-open #mobile-header,
+body.canvasdoc-workspace-open #footer { display:none !important; }
+body.canvasdoc-workspace-open #wrapper {
+  position:fixed;
+  inset:0 0 0 220px;
+  margin:0;
+  width:auto;
+  max-width:none;
+  height:100dvh;
+  min-height:0;
+  overflow:hidden;
+}
+body.canvasdoc-workspace-open #main,
+body.canvasdoc-workspace-open #not_right_side,
+body.canvasdoc-workspace-open #content-wrapper { height:100%; min-height:0; padding:0; }
+body.canvasdoc-workspace-open #content { display:flex; flex-direction:column; height:100%; min-height:0; padding:0 !important; }
+body.canvasdoc-workspace-open #canvasdoc-tabs { flex-shrink:0; }
+body.canvasdoc-workspace-open #canvasdoc-workspace { flex:1; min-height:0; }
+@media(max-width:1000px) {
+  body.canvasdoc-workspace-open #wrapper { left:72px; width:auto; }
+}
+body.canvasdoc-workspace-open.canvasdoc-navigation-collapsed #wrapper { left:0; width:auto; }
+#canvasdoc-navigation[hidden] { display:none !important; }
 body.canvasdoc-workspace-open #content > :not(#canvasdoc-tabs):not(#canvasdoc-workspace) { display:none !important; }
 
 @media(max-width:1100px) {

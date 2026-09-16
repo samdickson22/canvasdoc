@@ -61,6 +61,7 @@ function update(op: Mutation): Promise<boolean> {
   return operation.then(() => ok);
 }
 export const store = {
+  setWorkspaceNavigationCollapsed(collapsed: boolean) { return update({type:"workspace-navigation",collapsed}); },
   saveMaterials(catalog: NonNullable<Data["materialCatalog"]>) { return update({type:"material-catalog",catalog}); },
   cacheCanvas(cache: NonNullable<Data['canvasCache']>) { return update({type:"canvas-cache",cache}); },
   setModel(id: string, effort?: string) { return update({type:"model",model:{id,effort}}); },

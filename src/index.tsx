@@ -109,7 +109,10 @@ async function mount() {
     context.kind === "assignment"
       ? region("canvasdoc-workspace", content)
       : null;
-  if (workspace) workspace.host.hidden = true;
+  if (workspace) {
+    workspace.host.hidden = true;
+    workspace.container.style.cssText = "height:100%;min-height:0";
+  }
   const mounts: Mounts = {
     sidebar: sidebar.container,
     conversation: conversation?.container ?? null,

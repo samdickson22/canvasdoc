@@ -1,6 +1,7 @@
 import type { PersonalTask, ThreadRecord } from "../types.ts";
 import type { UserCommand } from "../runtime/protocol.ts";
 export type Data = {
+  workspaceNavigationCollapsed?: boolean;
   materialCatalog?: import("../material-types.ts").MaterialCatalog;
   canvasCache?: { courses: import('../types.ts').Course[]; todos: import('../types.ts').Todo[]; fetchedAt: string };
   model?: { id: string; effort?: string };
@@ -23,6 +24,7 @@ export function parseSavedData(value: string | null): Data {
     Array.isArray(parsed.threads)
   )
     throw new Error("Unsupported saved data.");
+  if (typeof parsed.workspaceNavigationCollapsed !== "boolean") delete parsed.workspaceNavigationCollapsed;
   const validDate = (value: unknown) =>
     typeof value === "string" && Number.isFinite(new Date(value).getTime());
   if (parsed.canvasCache && (!Array.isArray(parsed.canvasCache.courses) || !Array.isArray(parsed.canvasCache.todos) || !validDate(parsed.canvasCache.fetchedAt))) delete parsed.canvasCache;
@@ -68,6 +70,7 @@ export function parseSavedData(value: string | null): Data {
 }
 
 export type Mutation =
+  | { type: "workspace-navigation"; collapsed: boolean }
   | { type: "material-catalog"; catalog: NonNullable<Data["materialCatalog"]> }
   | { type: "canvas-cache"; cache: NonNullable<Data['canvasCache']> }
   | { type: "model"; model: { id: string; effort?: string } }
@@ -78,7 +81,10 @@ export type Mutation =
   | { type: "ack"; requestId: string };
 export function mutate(current: Data, op: Mutation): Data {
   const next = { ...current, revision: (current.revision ?? 0) + 1 };
-  if (op.type === "material-catalog") next.materialCatalog = op.catalog;
+  if (op.type === "workspace-navigation") {
+    if (typeof op.collapsed !== "boolean") throw new Error("Invalid navigation preference.");
+    next.workspaceNavigationCollapsed = op.collapsed;
+  } else if (op.type === "material-catalog") next.materialCatalog = op.catalog;
   else if (op.type === "canvas-cache") {
     if (!Array.isArray(op.cache?.courses) || !Array.isArray(op.cache?.todos)) throw new Error("Invalid Canvas cache.");
     next.canvasCache = op.cache;
