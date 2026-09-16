@@ -10,7 +10,7 @@ import path from 'node:path';
 import { canvasOrigin, readSettings, selectRoot, saveSettings } from './setup.mjs';
 
 const args = process.argv.slice(2);
-const help = `Canvasdoc\n\nUsage: npx canvasdoc-cli [--folder PATH] [--origin URL] [--no-open] [--relocate]\n\nFirst run chooses a folder and Canvas URL. Later runs resume the same agent.\nKeep this terminal open while using Canvasdoc. Chat attachments support files up to 5 MB. Node.js 22 or later is required.\nThe Canvasdoc browser extension or development UI must already be installed.
+const help = `Canvasdoc\n\nUsage: npx canvasdoc-cli [--folder PATH] [--origin URL] [--no-open] [--relocate]\n\nFirst run chooses a folder and Canvas URL. Later runs resume the same agent.\nKeep this terminal open while using Canvasdoc. Chat attachments support files up to 5 MB. Node.js 22.13 or later is required.\nThe Canvasdoc browser extension or development UI must already be installed.
 Update this connector to use the chat model and reasoning-effort selector.\n\n--folder PATH  Select or create a Canvasdoc folder\n--extension-id ID  Register the Chrome extension on this Mac\n--origin URL   Canvas site allowed to connect\n--relocate     Resume an existing agent from its moved folder (requires --folder)
 --no-open      Start without opening a browser\n--help         Show this help\n--version      Show version`;
 

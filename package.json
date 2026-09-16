@@ -1,6 +1,6 @@
 {
   "name": "canvasdoc",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "private": true,
   "type": "module",
   "scripts": {
@@ -23,7 +23,10 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "fast-xml-parser": "5.11.1",
+    "fflate": "0.8.3",
     "lucide-react": "^0.468.0",
+    "pdfjs-dist": "6.3.289",
     "proper-lockfile": "^4.1.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -48,5 +51,8 @@
     "prettier": "^3.9.6",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=22.13"
   }
 }

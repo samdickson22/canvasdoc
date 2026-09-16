@@ -102,7 +102,7 @@ export function Workspace({
     [conversationHost, active],
   );
   const refs = threadFileReferences(data.threads[context.threadId]?.messages ?? [], connection.root);
-  const scoped = files.filter(f => refs.has(f.path) || belongsToAssignment(f.path, context));
+  const scoped = files.filter(f => refs.has(f.path) || (f.path.endsWith(".txt") && refs.has(f.path.slice(0,-4))) || belongsToAssignment(f.path, context));
   const isSource = (file: {path:string}) => isSyncedSource(file.path);
   const shown = scoped.filter(f => (tab === "sources" ? isSource(f) : !isSource(f)) && f.path.toLowerCase().includes(query.toLowerCase()));
   useEffect(() => {

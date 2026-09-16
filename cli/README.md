@@ -2,7 +2,7 @@
 
 Run `npx canvasdoc-cli` to choose a Canvasdoc folder and Canvas URL, reuse your Codex sign-in, and start the local connector. Keep the terminal open while working. Later runs remember the folder and resume the same main agent.
 
-Requires Node.js 22 or later. Uses an existing Codex CLI when available and includes Codex as a fallback. Sign-in runs only when Codex reports no active login. Existing `CODEX_HOME` settings are inherited.
+Requires Node.js 22.13 or later. Uses an existing Codex CLI when available and includes Codex as a fallback. Sign-in runs only when Codex reports no active login. Existing `CODEX_HOME` settings are inherited.
 
 Canvasdoc is in early development. The Canvasdoc browser UI must already be installed on your Canvas site. This package does not install a browser extension or modify your school's Canvas deployment. Automatic browser pairing currently supports the development UI on macOS and Linux; extension native-host installation remains separate.
 

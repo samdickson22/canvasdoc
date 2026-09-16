@@ -6,7 +6,7 @@ Canvasdoc uses assistant-ui for chat and the signed-in Canvas browser session fo
 
 ## Run from this repo
 
-Requires **macOS, Google Chrome, and Node.js 22 or later**. Native bridge installation is currently macOS-only. Codex is included as a fallback; an existing Codex installation and sign-in are reused.
+Requires **macOS, Google Chrome, and Node.js 22.13 or later**. Native bridge installation is currently macOS-only. Codex is included as a fallback; an existing Codex installation and sign-in are reused.
 
 ```bash
 git clone https://github.com/samdickson22/canvasdoc.git

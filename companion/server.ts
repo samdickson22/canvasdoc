@@ -24,6 +24,7 @@ if (!origin)
 const config = await runtime.start();
 const stateDir = path.join(config.root, ".canvasdoc");
 const materials = new MaterialMirror(config.root);
+void materials.extractor.restore();
 const exporter = new HistoryExporter(path.join(stateDir, "history"));
 const tokenFile = path.join(stateDir, "dev-connection-token");
 let token: string;
@@ -257,6 +258,7 @@ wss.on("connection", (socket, request) => {
         if (message.type === "upload") {
           try {
             const filePath = await saveUpload(config.root, message.name, message.base64);
+            materials.extractor.enqueue(filePath,"User attachment");
             socket.send(JSON.stringify({ type: "upload-result", id: message.id, path: filePath }));
           } catch (error) {
             socket.send(JSON.stringify({ type: "upload-result", id: message.id, error: (error as Error).message }));

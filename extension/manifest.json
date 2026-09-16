@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Canvasdoc",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "description": "Your local coursework agent, with Canvas assignments, course materials, and a persistent workspace.",
   "content_scripts": [
     {

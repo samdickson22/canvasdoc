@@ -1,3 +1,4 @@
+import { DocumentExtractor } from "./extraction.ts";
 import { validMaterialPath } from "../src/material-layout.ts";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile, rename, lstat, realpath, unlink } from "node:fs/promises";
@@ -10,7 +11,8 @@ export class MaterialMirror {
   private queue = Promise.resolve();
   private transfers = new Map<string, { account: string; material: Material; chunks: Buffer[]; size: number; touched: number }>();
   private root: string;
-  constructor(root: string) { this.root = root; }
+  readonly extractor: DocumentExtractor;
+  constructor(root: string) { this.root = root; this.extractor = new DocumentExtractor(root); }
   private scope(account: string) {
     if (typeof account !== "string" || !account || account.length > 1000) throw new Error("Invalid Canvas account.");
     return digest(account).slice(0, 16);
@@ -57,6 +59,7 @@ export class MaterialMirror {
         try { if (digest(await readFile(await this.target(receipt.path))) !== receipt.hash) delete receipts[id]; }
         catch { delete receipts[id]; }
       }
+      for (const receipt of Object.values(receipts)) this.extractor.enqueue(receipt.path,receipt.sourceUrl);
       return { receipts, directory: `courses/${scope}` };
     }
     if (op === "begin") {
@@ -104,6 +107,7 @@ export class MaterialMirror {
     const tempManifest = `${manifestPath}.${randomUUID()}.tmp`;
     await writeFile(tempManifest, JSON.stringify(receipts, null, 2), {flag:"wx",mode:0o600});
     await rename(tempManifest, manifestPath);
+    this.extractor.enqueue(relative, material.sourceUrl);
     return receipts[material.id];
   }
 }
