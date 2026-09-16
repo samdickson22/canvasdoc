@@ -1,3 +1,4 @@
+import { transitionView } from "./transitions";
 import { localFilePath } from "./workspace-files";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -111,7 +112,7 @@ export function App({
       const path = localFilePath(detail.path);
       if(!path) return;
       setRequestedFile({path});
-      setWorkspace(true);
+      void transitionView(() => setWorkspace(true));
     };
     window.addEventListener("canvasdoc:open-file",openFile);
     return () => window.removeEventListener("canvasdoc:open-file",openFile);
@@ -198,7 +199,7 @@ export function App({
       {createPortal(
         workspace ? null : open ? (
           <>
-          <button className="sidebar-backdrop" aria-label="Close Canvasdoc sidebar" onClick={() => setOpen(false)} />
+          <button className="sidebar-backdrop" aria-label="Close Canvasdoc sidebar" onClick={() => void transitionView(() => setOpen(false))} />
           <aside
             className="sidebar"
             aria-label={
@@ -230,7 +231,7 @@ export function App({
                 <button
                   className="icon-button"
                   aria-label="Collapse Canvasdoc sidebar"
-                  onClick={() => setOpen(false)}
+                  onClick={() => void transitionView(() => setOpen(false))}
                 >
                   <X size={18} />
                 </button>
@@ -267,7 +268,7 @@ export function App({
           </aside>
           </>
         ) : (
-          <button className="launcher" aria-label={context.kind === "home" ? "Open to-do list" : "Open Canvasdoc conversation"} onClick={() => setOpen(true)}>
+          <button className="launcher" aria-label={context.kind === "home" ? "Open to-do list" : "Open Canvasdoc conversation"} onClick={() => void transitionView(() => setOpen(true))}>
             <MessageSquare size={18} /> Canvasdoc
           </button>
         ),
@@ -310,10 +311,10 @@ export function App({
               aria-selected={!workspace}
               id="canvasdoc-assignment-tab"
               tabIndex={!workspace ? 0 : -1}
-              onClick={() => setWorkspace(false)}
+              onClick={() => void transitionView(() => setWorkspace(false))}
               onKeyDown={(e) => {
                 if (e.key === "ArrowRight") {
-                  setWorkspace(true);
+                  void transitionView(() => setWorkspace(true));
                   e.currentTarget.nextElementSibling instanceof HTMLElement &&
                     e.currentTarget.nextElementSibling.focus();
                 }
@@ -326,10 +327,10 @@ export function App({
               aria-selected={workspace}
               id="canvasdoc-workspace-tab"
               tabIndex={workspace ? 0 : -1}
-              onClick={() => setWorkspace(true)}
+              onClick={() => void transitionView(() => setWorkspace(true))}
               onKeyDown={(e) => {
                 if (e.key === "ArrowLeft") {
-                  setWorkspace(false);
+                  void transitionView(() => setWorkspace(false));
                   e.currentTarget.previousElementSibling instanceof
                     HTMLElement &&
                     e.currentTarget.previousElementSibling.focus();
@@ -341,9 +342,9 @@ export function App({
           </div>,
           mounts.tabs,
         )}
-      {mounts.workspace && workspace &&
+      {mounts.workspace &&
         createPortal(
-          <Workspace requestedFile={requestedFile} context={context} conversationHost={mounts.conversationHost!} onAssignment={() => setWorkspace(false)} onConnect={onConnect} />,
+          <Workspace active={workspace} requestedFile={requestedFile} context={context} conversationHost={mounts.conversationHost!} onAssignment={() => void transitionView(() => setWorkspace(false))} onConnect={onConnect} />,
           mounts.workspace,
         )}
       {modal &&

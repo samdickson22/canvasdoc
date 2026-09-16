@@ -80,3 +80,17 @@ body.canvasdoc-workspace-open #content > :not(#canvasdoc-tabs):not(#canvasdoc-wo
 @media(prefers-reduced-motion:reduce) {
   body.canvasdoc-mounted .ic-Layout-wrapper { transition:none; }
 }
+
+/* Native snapshots animate layout handoffs without remounting the live agent. */
+::view-transition-old(root), ::view-transition-new(root) {
+  animation-duration:180ms;
+  animation-timing-function:cubic-bezier(.2,.8,.2,1);
+}
+::view-transition-group(canvasdoc-conversation) {
+  animation-duration:200ms;
+  animation-timing-function:cubic-bezier(.2,.8,.2,1);
+}
+#canvasdoc-conversation { view-transition-name:canvasdoc-conversation; }
+@media(prefers-reduced-motion:reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation:none !important; }
+}

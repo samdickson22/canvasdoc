@@ -1,3 +1,4 @@
+import { transitionView } from "./transitions";
 import { FileLinkThread } from "./workspace-link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -82,11 +83,12 @@ export function Conversation({
       preparation.current = controller;
       setPreparing(true);
       const previous = store.get().threads[context.threadId];
-      const savedImmediately = store.saveThread({
+      const saveMessage = () => store.saveThread({
         id: context.threadId, title: context.title, href: context.href, draft: "",
         updatedAt: new Date().toISOString(),
         messages: [...(previous?.messages ?? []), { id: requestId, role: "user", text: displayText, attachments, createdAt: new Date().toISOString() }],
       });
+      const savedImmediately = home && messages.length === 0 ? transitionView(saveMessage) : saveMessage();
       try {
         if (!(await savedImmediately)) throw new Error(store.error());
         const source = pageReference(location.origin,context);

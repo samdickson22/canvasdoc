@@ -1,3 +1,4 @@
+import { transitionView } from "./transitions";
 import { useData } from "./store";
 import { belongsToAssignment, isSyncedSource, threadFileReferences } from "./workspace-files";
 import { MaterialStatus } from "./material-status";
@@ -32,8 +33,10 @@ export function Workspace({
   onAssignment,
   onConnect,
   requestedFile,
+  active,
 }: {
   context: PageContext;
+  active: boolean;
   requestedFile?: {path:string};
   conversationHost: HTMLElement;
   onAssignment: () => void;
@@ -50,7 +53,7 @@ export function Workspace({
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<"outputs" | "sources">("outputs");
   const refresh = useCallback(async () => {
-    if (connection.status !== "connected" || !inspectorOpen) return;
+    if (connection.status !== "connected" || !inspectorOpen || !active) return;
     try {
       const next = await workspaceRequest<Entry[]>("files-list");
       setFiles((prev) =>
@@ -60,7 +63,7 @@ export function Workspace({
     } catch (e) {
       setError((e as Error).message);
     }
-  }, [connection.status, inspectorOpen]);
+  }, [connection.status, inspectorOpen, active]);
   useEffect(() => {
     void refresh();
     const timer = setInterval(() => void refresh(), 5000);
@@ -92,10 +95,10 @@ export function Workspace({
   }, [selected, modified, connection.status]);
   const attach = useCallback(
     (node: HTMLDivElement | null) => {
-      if (node && conversationHost.parentNode !== node)
+      if (active && node && conversationHost.parentNode !== node)
         node.append(conversationHost);
     },
-    [conversationHost],
+    [conversationHost, active],
   );
   const refs = threadFileReferences(data.threads[context.threadId]?.messages ?? [], connection.root);
   const scoped = files.filter(f => refs.has(f.path) || belongsToAssignment(f.path, context));
@@ -128,7 +131,7 @@ export function Workspace({
                 : "Show workspace sidebar"
             }
             aria-expanded={inspectorOpen}
-            onClick={() => setInspectorOpen((v) => !v)}
+            onClick={() => void transitionView(() => setInspectorOpen((v) => !v))}
           >
             <PanelRight size={18} />
           </button>
@@ -153,7 +156,7 @@ export function Workspace({
               <div className="workspace-file-tabs">
                 <button
                   aria-pressed={tab === "outputs"}
-                  onClick={() => setTab("outputs")}
+                  onClick={() => void transitionView(() => setTab("outputs"))}
                 >
                   Outputs{" "}
                   <small>
@@ -162,7 +165,7 @@ export function Workspace({
                 </button>
                 <button
                   aria-pressed={tab === "sources"}
-                  onClick={() => setTab("sources")}
+                  onClick={() => void transitionView(() => setTab("sources"))}
                 >
                   Sources{" "}
                   <small>
@@ -173,7 +176,7 @@ export function Workspace({
               </div>
               <button
                 aria-label="Close workspace sidebar"
-                onClick={() => setInspectorOpen(false)}
+                onClick={() => void transitionView(() => setInspectorOpen(false))}
               >
                 <X size={16} />
               </button>
@@ -221,7 +224,7 @@ export function Workspace({
                       key={f.path}
                       className="workspace-file-row"
                       aria-pressed={selected === f.path}
-                      onClick={() => setSelected(f.path)}
+                      onClick={() => void transitionView(() => setSelected(f.path))}
                     >
                       <File size={16} />
                       <span>
@@ -256,7 +259,7 @@ export function Workspace({
                       <span>{fileName(selected)}</span>
                       <button
                         aria-label="Close file preview"
-                        onClick={() => setSelected(null)}
+                        onClick={() => void transitionView(() => setSelected(null))}
                       >
                         <X size={16} />
                       </button>
