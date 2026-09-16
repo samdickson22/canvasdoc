@@ -5,7 +5,7 @@ test('connector reconnect, duplicate sends, delivery receipts and restart preser
  const reservation=net.createServer();reservation.listen(0,'127.0.0.1');await once(reservation,'listening');const port=(reservation.address() as net.AddressInfo).port;await new Promise<void>(r=>reservation.close(()=>r()));
  let child:ReturnType<typeof spawn>|undefined;const sockets:WebSocket[]=[];
  async function start(){
-  child=spawn(process.execPath,['companion/server.ts',root],{cwd:process.cwd(),env:{...process.env,CANVASDOC_CODEX_BIN:process.execPath,CANVASDOC_CODEX_PREFIX:JSON.stringify([path.resolve('tests/fixtures/codex-recovery.mjs')]),CANVASDOC_DEV_ORIGIN:'http://localhost:3210',CANVASDOC_CONNECTOR_PORT:String(port)},stdio:['ignore','pipe','pipe']});
+  child=spawn(process.execPath,[process.env.CANVASDOC_TEST_CONNECTOR || 'companion/server.ts',root],{cwd:process.cwd(),env:{...process.env,CANVASDOC_CODEX_BIN:process.execPath,CANVASDOC_CODEX_PREFIX:JSON.stringify([path.resolve('tests/fixtures/codex-recovery.mjs')]),CANVASDOC_DEV_ORIGIN:'http://localhost:3210',CANVASDOC_CONNECTOR_PORT:String(port)},stdio:['ignore','pipe','pipe']});
   let stderr='';child.stderr!.on('data',b=>stderr+=b);
   await new Promise<void>((resolve,reject)=>{child!.once('exit',()=>reject(Error(stderr)));const lines=createInterface({input:child!.stdout!});lines.on('line',l=>{if(JSON.parse(l).ready){lines.close();resolve()}})});
  }

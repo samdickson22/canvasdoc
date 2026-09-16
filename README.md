@@ -47,6 +47,7 @@ Both scripts install dependencies from the lockfile when needed. `start.sh` rebu
 - Workspace expands that same conversation, with a collapsed-by-default Outputs/Sources inspector.
 - Model and reasoning-effort selection, attachments, browser history, and asynchronous local backups.
 - Course-material collection into readable course and assignment source folders, with incremental updates and protection for edited files.
+- Local PDF and PowerPoint text sidecars with page/slide markers, speaker notes, and explicit OCR/error status. See [document extraction](docs/document-extraction.md).
 - Material sync reuses course/to-do responses and responds to page activity; there is no repeating background poll. Manual refresh remains available.
 
 This is an early test build. Some Canvas endpoints are restricted for student accounts, and material coverage varies by course. Comprehensive approval/tool interaction UI and agent-initiated Canvas tools remain unfinished. No automatic Canvas submissions or other production writes are performed by the sync code.
