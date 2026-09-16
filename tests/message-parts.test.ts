@@ -71,3 +71,12 @@ test("failed and interrupted tool calls are terminal, and output is bounded", ()
   assert.equal((run.parts[1] as any).isError, true);
   assert.match((run.parts[1] as any).result, /interrupted/);
 });
+
+test('only provider reasoning summaries become displayable reasoning parts', () => {
+  const run = {text:'',parts:[] as DisplayPart[]};
+  applyDisplayEvent(run,'item/reasoning/summaryTextDelta',{itemId:'r',summaryIndex:0,delta:'Checking '});
+  applyDisplayEvent(run,'item/reasoning/summaryTextDelta',{itemId:'r',summaryIndex:0,delta:'the files'});
+  assert.deepEqual(run.parts,[{type:'reasoning',itemId:'r:summary:0',text:'Checking the files'}]);
+  assert.equal(applyDisplayEvent(run,'item/reasoning/textDelta',{itemId:'r',delta:'raw'}),false);
+  assert.equal(run.text,'');
+});

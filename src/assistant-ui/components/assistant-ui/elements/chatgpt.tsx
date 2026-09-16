@@ -11,6 +11,7 @@ import {
   MessagePrimitive,
   ThreadPrimitive,
   useAui,
+  groupPartByType,
 } from "@assistant-ui/react";
 import { type FC, type PropsWithChildren, useContext, createContext, useEffect, useRef, useState } from "react";
 import { PortalContainerContext } from "../../../lib/portal-container";
@@ -40,6 +41,9 @@ import { MarkdownText } from "./markdown-text";
 import { hasFileDrop, readDroppedFiles } from "../../../../runtime/dropped-files";
 import { CodexModelSelector } from "../../../../model-selector";
 import { ToolFallback } from "./tool-fallback.aui";
+
+import { ToolGroupRoot, ToolGroupTrigger, ToolGroupContent } from "./tool-group.aui";
+import { Reasoning, ReasoningRoot, ReasoningTrigger, ReasoningContent, ReasoningText } from "./reasoning.aui";
 
 type WorkOptions = {
   workMode?: boolean;
@@ -394,14 +398,32 @@ const AssistantMessage: FC = () => {
   return (
     <MessagePrimitive.Root className="relative mx-auto flex w-full max-w-3xl flex-col">
       <div className="text-[#0d0d0d] dark:text-[#ececec]">
-        <MessagePrimitive.Parts>
-          {({ part }) => {
-            if (part.type === "text") return <MarkdownText />;
-            if (part.type === "tool-call")
-              return part.toolUI ?? <ToolFallback {...part} />;
-            return null;
+        <MessagePrimitive.GroupedParts groupBy={groupPartByType({
+          reasoning: ["group-thought", "group-reasoning"],
+          "tool-call": ["group-thought", "group-tool"],
+          "standalone-tool-call": [],
+        })}>
+          {({ part, children }) => {
+            switch (part.type) {
+              case "group-thought": return <div className="chat-run-activity">{children}</div>;
+              case "group-tool": return <ToolGroupRoot variant="ghost">
+                <ToolGroupTrigger count={part.indices.length} active={part.status.type === "running"} />
+                <ToolGroupContent>{children}</ToolGroupContent>
+              </ToolGroupRoot>;
+              case "group-reasoning": {
+                const running = part.status.type === "running";
+                return <ReasoningRoot streaming={running}>
+                  <ReasoningTrigger active={running} />
+                  <ReasoningContent aria-busy={running}><ReasoningText>{children}</ReasoningText></ReasoningContent>
+                </ReasoningRoot>;
+              }
+              case "text": return <MarkdownText />;
+              case "reasoning": return <Reasoning {...part} />;
+              case "tool-call": return part.toolUI ?? <ToolFallback {...part} />;
+              default: return null;
+            }
           }}
-        </MessagePrimitive.Parts>
+        </MessagePrimitive.GroupedParts>
       </div>
 
       <div className="chat-message-actions -ml-2 flex items-center pt-1">

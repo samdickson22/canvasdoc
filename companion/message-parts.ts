@@ -1,6 +1,7 @@
 import type { ToolCallMessagePart } from "@assistant-ui/react";
 export type DisplayPart =
   | { type: "text"; text: string; itemId?: string }
+  | { type: "reasoning"; text: string; itemId?: string }
   | (ToolCallMessagePart & { itemId?: string });
 type RunParts = { text: string; parts?: DisplayPart[] };
 const tools = new Set([
@@ -28,6 +29,13 @@ export function applyDisplayEvent(
   const id = item?.id ?? params.itemId;
   if (typeof id !== "string") return false;
   const parts = (run.parts ??= []);
+  if (method === "item/reasoning/summaryTextDelta") {
+    const key = `${id}:summary:${params.summaryIndex ?? 0}`;
+    const previous = parts.find(p => p.itemId === key);
+    if (previous && previous.type === "reasoning") previous.text += params.delta || "";
+    else parts.push({type:"reasoning", itemId:key, text:params.delta || ""});
+    return true;
+  }
   const index = parts.findIndex((p) => p.itemId === id);
   if (
     method === "item/agentMessage/delta" ||
