@@ -58,9 +58,12 @@ npm run check           # typecheck, build, tests
 npm run dev             # watch extension sources
 node scripts/package-cli.mjs   # optional npm tarball in release/artifacts
 node scripts/package-extension.mjs # optional distributable extension bundle
+node scripts/package-webstore.mjs  # store upload ZIP, without development origins
 ```
 
 Routine testing belongs in a self-hosted Canvas instance with synthetic data. See [dev/README.md](dev/README.md). Real Canvas tests must remain read-only unless a specific write is authorized. Never put real course materials, credentials, browser profiles, or workspace exports into fixtures or commits.
+
+Release preparation: [checklist](docs/release-checklist.md) and [privacy policy](docs/privacy.md).
 
 Architecture notes: [material sync](docs/material-sync.md), [filesystem/workspace](docs/filesystem-workspace.md), and [loading](docs/loading.md).
 

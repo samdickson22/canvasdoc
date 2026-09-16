@@ -50,7 +50,7 @@ const fileChunks = new Map<string, string[]>();
 export function workspaceRequest<T>(type: "files-list" | "files-read", path?: string): Promise<T> {
   const id = crypto.randomUUID();
   return new Promise((resolve,reject) => {
-    const timer = setTimeout(() => {fileRequests.delete(id);reject(new Error("Reconnect your computer to load files."));},15000);
+    const timer = setTimeout(() => {fileRequests.delete(id);fileChunks.delete(id);reject(new Error("Reconnect your computer to load files."));},15000);
     fileRequests.set(id,{resolve:r=>{clearTimeout(timer);resolve(r)},reject:e=>{clearTimeout(timer);reject(e)}});
     try {send({type,id,path})} catch(error) {fileRequests.delete(id);clearTimeout(timer);reject(error)}
   });
@@ -217,7 +217,7 @@ function receive(event: { data: string }) {
     return;
   }
   if (m.type === "files-result-chunk") {
-    if (!fileRequests.has(m.id) || !Number.isInteger(m.count) || m.count < 1 || m.count > 16 || !Number.isInteger(m.index) || m.index < 0 || m.index >= m.count || typeof m.data !== "string" || m.data.length > 600000) return;
+    if (!fileRequests.has(m.id) || !Number.isInteger(m.count) || m.count < 1 || m.count > 64 || !Number.isInteger(m.index) || m.index < 0 || m.index >= m.count || typeof m.data !== "string" || m.data.length > 600000) return;
     const chunks=fileChunks.get(m.id) || Array(m.count).fill(null);
     chunks[m.index]=m.data;fileChunks.set(m.id,chunks);
     if(chunks.some(c=>c===null))return;
@@ -225,7 +225,7 @@ function receive(event: { data: string }) {
     m={type:"files-result",id:m.id,result:{...m.metadata,base64:chunks.join("")}};
   }
   if (m.type === "files-result") {
-    const request = fileRequests.get(m.id); fileRequests.delete(m.id);
+    const request = fileRequests.get(m.id); fileRequests.delete(m.id); fileChunks.delete(m.id);
     if (m.error) request?.reject(new Error(m.error)); else request?.resolve(m.result);
     return;
   }

@@ -28,3 +28,30 @@ test('Chrome bridge connects without access to the workspace directory',async()=
   assert.equal(packet.type,'connected');
  }finally{child?.kill();for(const socket of server.clients)socket.terminate();server.close();await rm(temp,{recursive:true,force:true})}
 });
+
+test('native host splits a 25 MB file into bounded Chrome frames without losing bytes',{timeout:15000},async()=>{
+ const temp=await mkdtemp(path.join(os.tmpdir(),'canvasdoc-native-file-'));
+ const server=new WebSocketServer({host:'127.0.0.1',port:0});await new Promise<void>(r=>server.on('listening',r));
+ const port=(server.address() as {port:number}).port;
+ const original=Buffer.alloc(25*1024*1024,65).toString('base64');
+ server.on('connection',socket=>socket.once('message',()=>socket.send(JSON.stringify({type:'files-result',id:'large',result:{path:'large.txt',mime:'text/plain',base64:original}}))));
+ let child:ReturnType<typeof spawn>|undefined;
+ try{
+  await build({entryPoints:['companion/native-host.ts'],outfile:path.join(temp,'host.mjs'),bundle:true,platform:'node',format:'esm',banner:{js:'import {createRequire} from "node:module";const require=createRequire(import.meta.url);'}});
+  await writeFile(path.join(temp,'connection.json'),JSON.stringify({origin:'http://localhost:3210',port,token:'synthetic'}));
+  child=spawn(process.execPath,[path.join(temp,'host.mjs'),'--connection-config',path.join(temp,'connection.json')],{stdio:['pipe','pipe','pipe']});
+  const chunks=await new Promise<string[]>((resolve,reject)=>{
+   let buffer=Buffer.alloc(0);const chunks:string[]=[];
+   child!.on('error',reject);
+   child!.stdout!.on('data',data=>{
+    buffer=Buffer.concat([buffer,data]);
+    while(buffer.length>=4&&buffer.length>=4+buffer.readUInt32LE(0)){
+     const n=buffer.readUInt32LE(0);assert.ok(n<900000);const m=JSON.parse(buffer.subarray(4,4+n).toString());buffer=buffer.subarray(n+4);
+     assert.equal(m.type,'files-result-chunk');assert.ok(m.count<=64);chunks[m.index]=m.data;
+     if(chunks.filter(Boolean).length===m.count)resolve(chunks);
+    }
+   });
+  });
+  assert.equal(chunks.join(''),original);
+ }finally{child?.kill();for(const socket of server.clients)socket.terminate();server.close();await rm(temp,{recursive:true,force:true});}
+});

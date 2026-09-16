@@ -30,11 +30,12 @@ export async function readWorkspaceFile(root: string, relative: string) {
   const target = await within(root, relative);
   const info = await stat(target);
   if (!info.isFile()) throw new Error("Choose a file to preview.");
-  if (info.size > 5 * 1024 * 1024) throw new Error("Preview is limited to files up to 5 MB.");
   const ext = path.extname(relative).toLowerCase();
-  const mime: Record<string,string> = {'.pdf':'application/pdf','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.gif':'image/gif'};
+  const mime: Record<string,string> = {'.pdf':'application/pdf','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.gif':'image/gif','.html':'text/html','.htm':'text/html'};
+  const metadata = {path:relative,size:info.size,modified:info.mtimeMs,mime:mime[ext] || 'text/plain'};
+  if (info.size > 25 * 1024 * 1024) return {...metadata,base64:'',previewKind:'unavailable',notice:'This file exceeds the 25 MB preview and download limit. Open it from your Canvasdoc folder.'};
   const bytes = await readFile(target);
-  const type = mime[ext] || 'text/plain';
-  if (!mime[ext] && bytes.includes(0)) throw new Error("This file type cannot be previewed yet.");
-  return { path: relative, mime: type, base64: bytes.toString('base64'), size: bytes.length, modified: info.mtimeMs };
+  const binary = !mime[ext] && (bytes.includes(0) || ['.docx','.xlsx','.pptx','.zip','.gz','.exe'].includes(ext));
+  const previewKind = binary ? 'download' : metadata.mime.startsWith('image/') ? 'image' : ext === '.pdf' ? 'pdf' : ['.html','.htm'].includes(ext) ? 'html' : /\.(md|markdown)$/i.test(relative) ? 'markdown' : 'text';
+  return {...metadata,mime:binary?'application/octet-stream':metadata.mime,base64:bytes.toString('base64'),previewKind};
 }

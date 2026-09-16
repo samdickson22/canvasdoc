@@ -1,3 +1,4 @@
+import { sandboxedHtml } from "./html-preview";
 import { transitionView } from "./transitions";
 import { useData } from "./store";
 import { belongsToAssignment, isSyncedSource, threadFileReferences } from "./workspace-files";
@@ -26,7 +27,7 @@ const fileName = (file: string) =>
         .replace(/^[a-f0-9]{64}-/, "")
     : file.split("/").pop()!;
 type Entry = { path: string; size: number; modified: number };
-type Preview = Entry & { mime: string; base64: string };
+type Preview = Entry & { mime: string; base64: string; previewKind?: string; notice?: string };
 export function Workspace({
   context,
   conversationHost,
@@ -284,9 +285,14 @@ export function Workspace({
   );
 }
 function FilePreview({ file }: { file: Preview }) {
+  const [htmlSource, setHtmlSource] = useState(false);
   const [url, setUrl] = useState("");
   const bytes = Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0));
+  const text = new TextDecoder().decode(bytes.subarray(0,256*1024));
+  const truncated = bytes.length > 256*1024;
   useEffect(() => {
+    setHtmlSource(false);
+    if(file.previewKind === "unavailable") {setUrl("");return;}
     const next = URL.createObjectURL(
       new Blob([Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0))], {
         type: file.mime,
@@ -297,14 +303,18 @@ function FilePreview({ file }: { file: Preview }) {
   }, [file]);
   return (
     <>
-      <a
+      {file.previewKind !== "unavailable" && <a
         className="workspace-download"
         href={url || undefined}
         download={fileName(file.path)}
       >
         <Download size={14} /> Download
-      </a>
-      {file.mime.startsWith("image/") ? (
+      </a>}
+      {file.previewKind === "html" && <button className="workspace-download" aria-pressed={htmlSource} onClick={() => setHtmlSource(v=>!v)}>{htmlSource ? "Preview" : "View source"}</button>}
+      {file.previewKind === "unavailable" ? <p className="workspace-file-hint">{file.notice}</p>
+      : file.previewKind === "download" ? <p className="workspace-file-hint">Preview is not available for this file type. Download it to open in its application.</p>
+      : file.previewKind === "html" && !htmlSource ? <iframe className="workspace-pdf" title={file.path} sandbox="allow-scripts" referrerPolicy="no-referrer" srcDoc={sandboxedHtml(new TextDecoder().decode(bytes))} />
+      : file.mime.startsWith("image/") ? (
         <img
           className="workspace-image"
           src={url || undefined}
@@ -319,14 +329,15 @@ function FilePreview({ file }: { file: Preview }) {
       ) : /\.(md|markdown)$/i.test(file.path) ? (
         <div className="workspace-markdown">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {new TextDecoder().decode(bytes)}
+            {text}
           </ReactMarkdown>
         </div>
       ) : (
         <pre className="workspace-text">
-          <code>{new TextDecoder().decode(bytes)}</code>
+          <code>{text}</code>
         </pre>
       )}
+      {truncated && ["text","markdown"].includes(file.previewKind || "text") && <p className="workspace-file-hint">Showing the first 256 KB. Download for the complete file.</p>}
     </>
   );
 }
