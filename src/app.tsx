@@ -101,7 +101,7 @@ export function App({
   const [loading, setLoading] = useState(!data.canvasCache);
   const [refreshing, setRefreshing] = useState(false);
   const [revision, setRevision] = useState(0);
-  const [open, setOpen] = useState(() => initialContext.kind !== "page" && window.innerWidth > 760);
+  const [open, setOpen] = useState(() => initialContext.kind !== "page" && window.innerWidth > 1100);
   const [workspace, setWorkspace] = useState(false);
   const [requestedFile, setRequestedFile] = useState<{path:string}>();
   useEffect(() => {
@@ -117,6 +117,21 @@ export function App({
     return () => window.removeEventListener("canvasdoc:open-file",openFile);
   }, [initialContext.threadId, mounts.workspace]);
   const [modal, setModal] = useState<"task" | "connection" | null>(null);
+  useEffect(() => {
+    const narrow = window.matchMedia("(max-width: 1100px)");
+    const closeOnNarrow = () => { if(narrow.matches) setOpen(false); };
+    narrow.addEventListener("change", closeOnNarrow);
+    return () => narrow.removeEventListener("change",closeOnNarrow);
+  }, []);
+  useEffect(() => {
+    const escape = (event: KeyboardEvent) => {
+      if(event.key === "Escape" && !event.defaultPrevented && !modal && open && !workspace) {
+        setOpen(false);
+      }
+    };
+    window.addEventListener("keydown",escape);
+    return () => window.removeEventListener("keydown",escape);
+  }, [modal,open,workspace]);
   const personal = data.tasks.find((task) => task.id === initialContext.taskId);
   const context = {
     ...initialContext,
@@ -182,6 +197,8 @@ export function App({
       {createPortal(<Navigation courses={courses} />, mounts.navigation)}
       {createPortal(
         workspace ? null : open ? (
+          <>
+          <button className="sidebar-backdrop" aria-label="Close Canvasdoc sidebar" onClick={() => setOpen(false)} />
           <aside
             className="sidebar"
             aria-label={
@@ -248,8 +265,9 @@ export function App({
               </p>
             )}
           </aside>
+          </>
         ) : (
-          <button className="launcher" onClick={() => setOpen(true)}>
+          <button className="launcher" aria-label={context.kind === "home" ? "Open to-do list" : "Open Canvasdoc conversation"} onClick={() => setOpen(true)}>
             <MessageSquare size={18} /> Canvasdoc
           </button>
         ),

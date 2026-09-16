@@ -20,7 +20,7 @@ export function Navigation({ courses }: { courses: Course[] }) {
   ];
   return (
     <nav className="bc-nav" aria-label="Canvas navigation">
-      <a className="bc-brand" href="/">
+      <a className="bc-brand" href="/" aria-label="Canvasdoc home" title="Canvasdoc home">
         <PanelsTopLeft size={22} />
         <strong>Canvasdoc</strong>
       </a>
@@ -30,7 +30,9 @@ export function Navigation({ courses }: { courses: Course[] }) {
           <a
             href={href}
             key={href}
-            aria-current={location.pathname === href ? "page" : undefined}
+            title={label}
+            aria-label={label}
+            aria-current={(location.pathname === href || (href !== "/" && location.pathname.startsWith(href + "/"))) ? "page" : undefined}
           >
             <Icon size={19} />
             <span>{label}</span>
@@ -40,7 +42,7 @@ export function Navigation({ courses }: { courses: Course[] }) {
       <span className="bc-nav-label">Courses</span>
       <div className="bc-nav-courses">
         {courses.map((c) => (
-          <a href={`/courses/${c.id}`} key={c.id} title={c.name}>
+          <a href={`/courses/${c.id}`} key={c.id} title={c.name} aria-label={c.name} aria-current={location.pathname.startsWith(`/courses/${c.id}/`) || location.pathname === `/courses/${c.id}` ? "page" : undefined}>
             <i
               style={{ background: courseColors[c.id % courseColors.length] }}
             />
@@ -49,7 +51,7 @@ export function Navigation({ courses }: { courses: Course[] }) {
           </a>
         ))}
       </div>
-      <a className="bc-nav-help" href="/profile/settings">
+      <a className="bc-nav-help" href="/profile/settings" title="Settings & help" aria-label="Settings & help">
         <CircleHelp size={18} />
         <span>Settings & help</span>
       </a>

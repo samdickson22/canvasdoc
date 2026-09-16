@@ -423,13 +423,12 @@ export function TodoList({
           {completionError}
         </p>
       )}
-      {loading ? (
+      {error && <div className="error" role="alert">
+        {todos.length ? "Could not refresh. Showing saved coursework." : error}
+        <button onClick={retry}>Retry</button>
+      </div>}
+      {loading && !todos.length ? (
         <p className="loading">Loading coursework…</p>
-      ) : error ? (
-        <div className="error">
-          {error}
-          <button onClick={retry}>Retry</button>
-        </div>
       ) : groups.length ? (
         groups.map((g) => (
           <section className="bc-group" key={g.label}>

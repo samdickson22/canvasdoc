@@ -969,3 +969,16 @@ select {
 .material-status ul { max-height:140px; overflow:auto; padding-left:18px; color:#a34937; }
 .dashboard-footer { flex-wrap:wrap; }
 .dashboard-footer .material-status { justify-content:center; width:100%; }
+
+/* Narrow desktop windows use an overlay instead of squeezing Canvas content. */
+.sidebar-backdrop { display:none; }
+.bc-nav a[aria-current="page"] { background:#e7eddf; color:#35552b; }
+@media (max-width:1100px) {
+  .sidebar-backdrop { display:block; position:fixed; inset:0; z-index:19; background:#17291d26; }
+  .sidebar { width:min(390px, calc(100vw - 72px)); box-shadow:-8px 0 32px #17291d18; }
+  .sidebar-header { padding-inline:18px; }
+}
+@media (max-height:700px) {
+  .bc-nav { gap:8px; padding-top:12px; padding-bottom:12px; }
+  .bc-brand { margin-bottom:12px; }
+}

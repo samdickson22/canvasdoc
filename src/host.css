@@ -70,3 +70,13 @@ body.canvasdoc-workspace-open #right-side-wrapper { display:none !important; }
 body.canvasdoc-workspace-open #content-wrapper { flex:1; width:100%; max-width:none; }
 body.canvasdoc-workspace-open #content { padding:16px 24px; }
 body.canvasdoc-workspace-open #content > :not(#canvasdoc-tabs):not(#canvasdoc-workspace) { display:none !important; }
+
+@media(max-width:1100px) {
+  body.canvasdoc-mounted.canvasdoc-sidebar-open #wrapper { margin-right:0; width:calc(100% - 220px); }
+}
+@media(max-width:1000px) {
+  body.canvasdoc-mounted.canvasdoc-sidebar-open #wrapper { margin-right:0; width:calc(100% - 72px); }
+}
+@media(prefers-reduced-motion:reduce) {
+  body.canvasdoc-mounted .ic-Layout-wrapper { transition:none; }
+}
