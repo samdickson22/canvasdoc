@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { sandboxedHtml } from "./html-preview";
 import { useData } from "./store";
 import {
@@ -40,6 +41,7 @@ type Preview = Entry & {
   notice?: string;
 };
 export function Workspace({
+  toolbar,
   context,
   conversationHost,
   onAssignment,
@@ -47,6 +49,7 @@ export function Workspace({
   requestedFile,
   active,
 }: {
+  toolbar: HTMLElement | null;
   context: PageContext;
   active: boolean;
   requestedFile?: { path: string };
@@ -57,6 +60,7 @@ export function Workspace({
   const connection = useConnection();
   const data = useData();
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [fileActions, setFileActions] = useState<HTMLDivElement | null>(null);
   const [maximized, setMaximized] = useState(false);
   const [explorerOpen, setExplorerOpen] = useState(true);
   const [tabs, dispatchTab] = useReducer(fileTabs, {
@@ -163,12 +167,8 @@ export function Workspace({
       aria-label={`${context.title} workspace`}
       data-viewer-maximized={viewerOnly || undefined}
     >
-      <header className="workbench-header">
-        <div>
-          <FolderOpen size={18} />
-          <strong>{context.title}</strong>
-          <span>Workspace</span>
-        </div>
+      {toolbar && createPortal(<>
+        <strong className="workspace-title" title={context.title}>{context.title}</strong>
         <div className="workbench-actions">
           <button
             className="connection-status"
@@ -190,7 +190,7 @@ export function Workspace({
             <PanelRight size={18} />
           </button>
         </div>
-      </header>
+      </>, toolbar)}
       <div
         className="workbench-split workspace-pane-grid"
         style={{
@@ -318,9 +318,9 @@ export function Workspace({
               </div>
             </header>
             <div className="workspace-file-toolbar">
-              <nav className="workspace-breadcrumbs" aria-label="File path">
+              <nav className="workspace-breadcrumbs" aria-label="File path" title={selected ?? undefined}>
                 {selected ? (
-                  selected.split("/").map((part, index, array) => (
+                  selected.split("/").slice(-2).map((part, index, array) => (
                     <span key={index}>
                       {index > 0 && <ChevronRight size={12} />}
                       <span
@@ -338,6 +338,7 @@ export function Workspace({
                   <span>Select a file</span>
                 )}
               </nav>
+              <div className="workspace-inline-actions" ref={setFileActions} />
               <button
                 className="workspace-explorer-toggle"
                 aria-label={
@@ -382,7 +383,7 @@ export function Workspace({
                       hidden={path !== selected}
                     >
                       {previews[path] ? (
-                        <FilePreview file={previews[path]} />
+                        <FilePreview file={previews[path]} actions={path === selected ? fileActions : null} />
                       ) : loading && path === selected ? (
                         <p className="workspace-file-hint">Loading preview…</p>
                       ) : (
@@ -641,7 +642,7 @@ function FileTreeItem({
     </li>
   );
 }
-function FilePreview({ file }: { file: Preview }) {
+function FilePreview({ file, actions }: { file: Preview; actions: HTMLElement | null }) {
   const [htmlSource, setHtmlSource] = useState(false);
   const [url, setUrl] = useState("");
   const bytes = Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0));
@@ -662,14 +663,16 @@ function FilePreview({ file }: { file: Preview }) {
   }, [file]);
   return (
     <>
-      <div className="workspace-file-actions">
+      {actions && createPortal(<div className="workspace-file-actions">
         {file.previewKind !== "unavailable" && (
           <a
             className="workspace-download"
+            aria-label="Download file"
+            title="Download file"
             href={url || undefined}
             download={fileName(file.path)}
           >
-            <Download size={14} /> Download
+            <Download size={14} />
           </a>
         )}
         {file.previewKind === "html" && (
@@ -688,7 +691,7 @@ function FilePreview({ file }: { file: Preview }) {
             </button>
           </div>
         )}
-      </div>
+      </div>, actions)}
       {file.previewKind === "unavailable" ? (
         <p className="workspace-file-hint">{file.notice}</p>
       ) : file.previewKind === "download" ? (

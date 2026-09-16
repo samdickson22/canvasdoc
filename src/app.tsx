@@ -107,6 +107,7 @@ export function App({
   const [revision, setRevision] = useState(0);
   const [open, setOpen] = useState(() => initialContext.kind !== "page" && window.innerWidth > 1100);
   const [workspace, setWorkspace] = useState(false);
+  const [workspaceToolbar, setWorkspaceToolbar] = useState<HTMLDivElement | null>(null);
   const navigationCollapsed = data.workspaceNavigationCollapsed === true;
   const [requestedFile, setRequestedFile] = useState<{path:string}>();
   useEffect(() => {
@@ -360,12 +361,13 @@ export function App({
               Workspace
             </button>
           </div>
+            {workspace && <div className="workspace-toolbar-content" ref={setWorkspaceToolbar} />}
           </div>,
           mounts.tabs,
         )}
       {mounts.workspace &&
         createPortal(
-          <Workspace active={workspace} requestedFile={requestedFile} context={context} conversationHost={mounts.conversationHost!} onAssignment={() => void transitionView(() => setWorkspace(false))} onConnect={onConnect} />,
+          <Workspace toolbar={workspaceToolbar} active={workspace} requestedFile={requestedFile} context={context} conversationHost={mounts.conversationHost!} onAssignment={() => void transitionView(() => setWorkspace(false))} onConnect={onConnect} />,
           mounts.workspace,
         )}
       {modal &&

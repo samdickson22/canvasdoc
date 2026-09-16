@@ -1058,3 +1058,28 @@ select {
 .navigation-toggle:hover { background:#e9eee2; color:#354b2c; }
 .navigation-toggle:focus-visible { outline:2px solid #819775; outline-offset:2px; }
 .workbench-header { min-height:46px; padding:7px 18px; }
+
+/* Workspace and file controls share rows instead of stacking headers. */
+.workspace-toolbar { height:40px; gap:12px; padding-inline:12px; }
+.workspace-toolbar-content { display:flex; align-items:center; gap:12px; flex:1; min-width:0; }
+.workspace-title { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; font-weight:600; color:#45513e; }
+.workspace-toolbar-content .workbench-actions { flex-shrink:0; gap:10px; }
+.workspace-toolbar-content .connection-status { font-size:11px; }
+.workspace-file-dock > .workspace-tab-bar { height:36px; min-height:36px; padding:0 8px; }
+.workspace-open-tab > button[role=tab] { padding-block:5px; }
+.workspace-file-toolbar { height:34px; min-height:34px; padding:0 8px; flex-shrink:0; }
+.workspace-breadcrumbs { overflow:hidden; }
+.workspace-breadcrumbs > span { min-width:0; }
+.workspace-breadcrumbs > span > span { overflow:hidden; text-overflow:ellipsis; }
+.workspace-breadcrumbs svg { flex-shrink:0; }
+.workspace-inline-actions { flex-shrink:0; }
+.workspace-inline-actions .workspace-file-actions { border:0; min-height:0; padding:0; gap:8px; }
+.workspace-inline-actions .workspace-download { padding:6px; border-radius:4px; }
+.workspace-inline-actions .workspace-download:hover { background:#edf1e7; }
+.workspace-inline-actions .workspace-artifact-views { margin:0; }
+@media(max-width:600px) {
+  .workspace-toolbar { gap:8px; }
+  .workspace-toolbar .assignment-tabs { gap:12px; }
+  .workspace-toolbar-content .connection-status { font-size:0; gap:0; }
+  .workspace-toolbar-content .connection-status i { width:7px; height:7px; }
+}
