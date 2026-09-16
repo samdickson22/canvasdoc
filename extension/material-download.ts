@@ -5,10 +5,10 @@ export async function materialDownload(message:any, senderUrl:string) {
   for(const [id, download] of downloads) if(Date.now()-download.touched>60000){void download.reader.cancel();downloads.delete(id)}
   if(message.op==="begin") {
     const source=new URL(message.sourceUrl);
-    const ids=source.pathname.match(/^\/courses\/(\d+)\/files\/(\d+)$/);
-    if(source.origin!==owner || !ids) throw new Error("Only Canvas course files can be downloaded.");
+    const ids=source.pathname.match(/^\/(?:courses\/\d+\/)?files\/(\d+)(?:\/(?:download|preview))?\/?$/);
+    if(source.origin!==owner || !ids) throw new Error("Only Canvas files can be downloaded.");
     if(downloads.size>=4)throw new Error("Downloads are busy. Retry shortly.");
-    const metadata=await fetch(`${owner}/api/v1/courses/${ids[1]}/files/${ids[2]}`,{credentials:"include",signal:AbortSignal.timeout(30000)});
+    const metadata=await fetch(`${owner}/api/v1/files/${ids[1]}`,{credentials:"include",signal:AbortSignal.timeout(30000)});
     if(!metadata.ok)throw new Error(`Canvas file access failed (${metadata.status}).`);
     const file=await metadata.json();
     if(file.locked_for_user || file.hidden_for_user)throw new Error("Canvas has not made this file available.");

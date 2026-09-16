@@ -1,3 +1,4 @@
+import { canvasResponseError } from "./canvas-error.ts";
 import type { Assignment, Course, Todo, PlannerOverride } from "./types";
 
 export async function canvasRead<T>(
@@ -12,12 +13,7 @@ export async function canvasRead<T>(
     signal,
     headers: { Accept: "application/json" },
   });
-  if (!response.ok)
-    throw new Error(
-      response.status === 401
-        ? "Sign in to Canvas to load your work."
-        : `Canvas could not load this data (${response.status}).`,
-    );
+  if (!response.ok) throw await canvasResponseError(response);
   return response.json();
 }
 
@@ -43,7 +39,7 @@ export async function canvasPages<T>(
       headers: { Accept: "application/json" },
     });
     if (!response.ok)
-      throw new Error(`Canvas could not load your work (${response.status}).`);
+      throw await canvasResponseError(response);
     result.push(...(await response.json()));
     next =
       response.headers.get("Link")?.match(/<([^>]+)>;\s*rel="next"/)?.[1] ??

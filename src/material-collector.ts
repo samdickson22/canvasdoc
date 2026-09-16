@@ -1,3 +1,4 @@
+import { CanvasAccessError } from "./canvas-error";
 import { courseFolder, resourceName } from "./material-layout";
 import TurndownService from "turndown";
 import { canvasRead, canvasPages, readCourses } from "./canvas";
@@ -12,6 +13,7 @@ export async function collectMaterials(signal: AbortSignal, previous?: MaterialC
   const responses = {...previous?.responses};
   const resources = new Map<string, Material>();
   const errors: string[] = [];
+  const notices: string[] = onlyCourse ? [...(previous?.notices ?? [])] : [];
   const prior = new Map(previous?.resources.map(r=>[r.id,r]));
   if (onlyCourse) for (const resource of previous?.resources ?? []) if(resource.courseId !== onlyCourse) resources.set(resource.id, resource);
   async function single(endpoint:string,ttl:number):Promise<any> {
@@ -29,23 +31,28 @@ export async function collectMaterials(signal: AbortSignal, previous?: MaterialC
   const courses=onlyCourse ? [knownCourses.find(course=>course.id===onlyCourse) || await single(`/api/v1/courses/${onlyCourse}`,60*60*1000)] : knownCourses;
   for (const course of courses) {
     signal.throwIfAborted();
+    if (onlyCourse) for(let i=notices.length-1;i>=0;i--) if(notices[i].startsWith(`${course.name}:`)) notices.splice(i,1);
     const base = `/api/v1/courses/${course.id}`;
     const folder = courseFolder(course.id, course.course_code || course.name);
     const fileIds = new Set<number>();
+    const fileLinks = new Map<number,string>();
     const documents: {id:string; path:string; title:string; url:string; html:string; extra?:string}[] = [];
     const failed = new Set<string>();
     async function list(endpoint: string, category: string): Promise<any[]> {
       const cached=responses[endpoint];
       const ttl=cached?.error ? 6*60*60*1000 : category === "assignment" ? 5*60*1000 : 15*60*1000;
       if(!force && cached && Date.now()-cached.at < ttl) {
-        if(cached.error){failed.add(category);errors.push(`${course.name}: ${category}: ${cached.error}`);}
+        if(cached.error){failed.add(category);(cached.notice ? notices : errors).push(`${course.name}: ${category}: ${cached.error}`);}
         return cached.value;
       }
       try { const value=await canvasPages<any>(endpoint,signal);responses[endpoint]={at:Date.now(),value};return value; }
       catch(error) {
         signal.throwIfAborted();const message=(error as Error).message;
-        if(/\((403|404)\)/.test(message))responses[endpoint]={at:Date.now(),value:cached?.value || [],error:message};
-        failed.add(category);errors.push(`${course.name}: ${category}: ${message}`);return cached?.value || [];
+        const notice = error instanceof CanvasAccessError && (error.unavailable || (category === "file" && error.status === 403));
+        if(/\((403|404)\)/.test(message))responses[endpoint]={at:Date.now(),value:cached?.value || [],error:message,notice};
+        failed.add(category);
+        (notice ? notices : errors).push(`${course.name}: ${category}: ${category === "file" && notice ? "Canvas does not allow listing this folder. Linked files are checked separately." : message}`);
+        return cached?.value || [];
       }
     }
     const addDocument = (id:string, relative:string, title:string, url:string, html:string, extra="") => {
@@ -53,7 +60,7 @@ export async function collectMaterials(signal: AbortSignal, previous?: MaterialC
       const doc = new DOMParser().parseFromString(html || "", "text/html");
       for(const node of doc.querySelectorAll("[href],[src]")) {
         const raw = node.getAttribute("href") || node.getAttribute("src") || "";
-        try { const link=new URL(raw,location.origin); const match=link.pathname.match(/\/files\/(\d+)/); if(link.origin===location.origin && match) fileIds.add(Number(match[1])); } catch {}
+        try { const link=new URL(raw,url); const match=link.pathname.match(/\/files\/(\d+)/); if(link.origin===location.origin && match) { fileIds.add(Number(match[1])); fileLinks.set(Number(match[1]),link.href); } } catch {}
       }
     };
     try {
@@ -105,13 +112,13 @@ export async function collectMaterials(signal: AbortSignal, previous?: MaterialC
     const files = await list(`${base}/files?per_page=100`,"file");
     const knownFiles = new Map(files.map(file=>[file.id,file]));
     for(const id of fileIds) if(!knownFiles.has(id)) {
-      try { knownFiles.set(id,await single(`${base}/files/${id}`,15*60*1000)); }
+      try { knownFiles.set(id,await single(`/api/v1/files/${id}`,15*60*1000)); }
       catch(error) { signal.throwIfAborted(); errors.push(`${course.name}: file ${id}: ${(error as Error).message}`); }
     }
     for(const file of knownFiles.values()) {
       if(file.locked_for_user || file.hidden_for_user) continue;
       const id=`${course.id}:file:${file.id}`;
-      resources.set(id,{id,courseId:course.id,path:`${folder}/materials/files/${safeFilename(file.display_name || file.filename).replace(/(\.[^.]+)?$/, (_match,extension="")=>`--${file.id}${extension}`)}`,title:file.display_name || file.filename,sourceUrl:`${location.origin}/courses/${course.id}/files/${file.id}`,downloadUrl:file.url,size:file.size,revision:await sha256(JSON.stringify([file.updated_at,file.modified_at,file.size,file.filename]))});
+      resources.set(id,{id,courseId:course.id,path:`${folder}/materials/files/${safeFilename(file.display_name || file.filename).replace(/(\.[^.]+)?$/, (_match,extension="")=>`--${file.id}${extension}`)}`,title:file.display_name || file.filename,sourceUrl:fileLinks.get(file.id) || `${location.origin}/files/${file.id}`,downloadUrl:file.url,size:file.size,revision:await sha256(JSON.stringify([file.updated_at,file.modified_at,file.size,file.filename]))});
     }
     const renamedFiles=[...resources.values()].filter(resource=>resource.courseId===course.id && resource.id.includes(":file:") && prior.get(resource.id)?.path !== resource.path);
     for(const [id,resource] of resources) {
@@ -141,5 +148,5 @@ export async function collectMaterials(signal: AbortSignal, previous?: MaterialC
     const indexText=`# ${course.name} — material index\n\nCanvas source: ${location.origin}/courses/${course.id}\n\nOnly materials currently visible to this Canvas account are listed. Files retained on disk but absent here may be removed or no longer accessible. Recheck Canvas before relying on them.\n\n${entries}\n`;
     resources.set(`${course.id}:index`,{id:`${course.id}:index`,courseId:course.id,path:`${folder}/materials/index.md`,title:`${course.name} material index`,sourceUrl:`${location.origin}/courses/${course.id}`,text:indexText,revision:await sha256(indexText)});
   }
-  return {checkedAt:new Date().toISOString(),resources:[...resources.values()],errors,responses};
+  return {checkedAt:new Date().toISOString(),resources:[...resources.values()],errors,notices:[...new Set(notices)],responses};
 }

@@ -10,7 +10,8 @@ export type Material = {
   size?: number;
 };
 export type MaterialCatalog = {
-  responses?: Record<string,{at:number;value:any[];error?:string}>;
+  notices?: string[];
+  responses?: Record<string,{at:number;value:any[];error?:string;notice?:boolean}>;
   checkedAt: string;
   resources: Material[];
   errors: string[];

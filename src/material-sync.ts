@@ -4,7 +4,7 @@ import type { Material, MaterialReceipt } from "./material-types";
 import { store } from "./store";
 import { connectionState, materialRequest, subscribeConnection } from "./runtime/client";
 
-type SyncState = { phase:"idle"|"checking"|"syncing"|"waiting"|"error"; detail:string; completed:number; total:number; errors:string[]; checkedAt?:string; directory?:string; changes:string[] };
+type SyncState = { phase:"idle"|"checking"|"syncing"|"waiting"|"error"; detail:string; completed:number; total:number; errors:string[]; notices?:string[]; checkedAt?:string; directory?:string; changes:string[] };
 let state: SyncState = {phase:"idle",detail:"Materials not checked yet",completed:0,total:0,errors:[],changes:[]};
 const listeners=new Set<()=>void>();
 const update=(patch:Partial<SyncState>)=>{state={...state,...patch};listeners.forEach(listener=>listener());};
@@ -66,7 +66,7 @@ async function perform(courseId?:number,force=false,downloadsOnly=false) {
       if(!catalog.responses?.[key] || value.at > catalog.responses[key].at) (catalog.responses ??= {})[key]=value;
     }
     if(!await store.saveMaterials(catalog)) throw new Error(store.error());
-    update({checkedAt:catalog.checkedAt,errors:catalog.errors,total:catalog.resources.length});
+    update({checkedAt:catalog.checkedAt,errors:catalog.errors,notices:catalog.notices || [],total:catalog.resources.length});
     const connection=connectionState();
     if(connection.status!=="connected" || !connection.materials) {
       update({phase:"waiting",detail:connection.status!=="connected" ? "Materials indexed · connect your computer to download" : "Update canvasdoc-cli to sync materials"}); return;
@@ -128,7 +128,7 @@ export function observeCanvasWork(courses: import("./types").Course[], todos?: i
       } else changed.add(course.id);
     }
   }
-  void store.saveMaterials({checkedAt:prior?.checkedAt || new Date(0).toISOString(),resources:prior?.resources || [],errors:prior?.errors || [],responses}).then(()=>{
+  void store.saveMaterials({checkedAt:prior?.checkedAt || new Date(0).toISOString(),resources:prior?.resources || [],errors:prior?.errors || [],notices:prior?.notices || [],responses}).then(()=>{
     const isStale=Date.now()-new Date(prior?.checkedAt || 0).getTime()>30*60*1000;
     if(stopped || (!changed.size && prior?.resources.length && !isStale))return;
     clearTimeout(observedTimer);
