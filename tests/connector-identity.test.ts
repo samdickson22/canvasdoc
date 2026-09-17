@@ -126,7 +126,6 @@ test(
       title: "Synthetic",
       href: "/courses/1/assignments/1",
       text: "hello",
-      instructions: { personal: "Synthetic preference", course: { id: 1, text: "Course preference" } },
     };
     try {
       await start();
@@ -166,7 +165,6 @@ test(
         type: "send",
         command: {
           ...Object.fromEntries(Object.entries(command).reverse()),
-          instructions: { course: { text: "Course preference", id: 1 }, personal: "Synthetic preference" },
         },
       });
       const delivered = await c.wait(
@@ -198,7 +196,7 @@ test(
         type: "send",
         command: {
           ...command,
-          instructions: { personal: "Changed preference", course: { id: 1, text: "Course preference" } },
+          text: "Changed message",
         },
       });
       assert.equal(

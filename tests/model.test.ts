@@ -31,6 +31,14 @@ test("personal tasks have their own route without hijacking assignment URLs", ()
   );
 });
 
+test("personal task routes retain the saved title and course for material context", () => {
+  const task = newTask({ title: "Study", description: "", link: "", courseId: 1, dueAt: null });
+  const context = pageContext("/", `?canvasdoc-task=${task.id}`, "Dashboard", [task]);
+  assert.equal(context.title, task.title);
+  assert.equal(context.courseId, task.courseId);
+  assert.equal(context.threadId, `personal:${task.id}`);
+});
+
 test("due grouping follows the Canvas time zone near midnight and across DST", () => {
   const now = new Date("2026-09-15T06:30:00Z");
   assert.equal(
