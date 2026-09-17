@@ -138,9 +138,11 @@ export async function collectMaterials(signal: AbortSignal, previous?: MaterialC
         const match=raw.match(/\/files\/(\d+)/);const linked=match && resources.get(`${course.id}:file:${match[1]}`);
         return linked ? [`- ${linked.title}: ${linked.path}`] : [];
       });
-      const text=`# ${document.title}\n\nSource: ${document.url}\n\n${document.extra || ""}\n\n${markdown.turndown(dom.body.innerHTML)}\n\n${links.length ? `## Linked local files\n\n${[...new Set(links)].join("\n")}` : ""}\n`;
+      const body = markdown.turndown(dom.body.innerHTML);
+      const contentRevision = await sha256(JSON.stringify([document.title, document.extra, body]));
+      const text=`# ${document.title}\n\nSource: ${document.url}\n\n${document.extra || ""}\n\n${body}\n\n${links.length ? `## Linked local files\n\n${[...new Set(links)].join("\n")}` : ""}\n`;
       const page=pages.find(p=>document.id===`${course.id}:page:${p.page_id}`);
-      resources.set(document.id,{id:document.id,courseId:course.id,path:document.path,title:document.title,sourceUrl:document.url,revision:`${page?.updated_at || ""}:${await sha256(text)}`,text});
+      resources.set(document.id,{id:document.id,courseId:course.id,path:document.path,title:document.title,sourceUrl:document.url,contentRevision,revision:`${page?.updated_at || ""}:${await sha256(text)}`,text});
     }
     // A failed endpoint must not make previously collected sources disappear.
     for(const old of prior.values()) if(old.courseId===course.id && failed.has(old.id.split(":")[1]) && !resources.has(old.id)) resources.set(old.id,old);
