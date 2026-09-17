@@ -22,11 +22,12 @@ export function HomeSuggestions({ items }: { items: ReturnType<typeof homeSugges
   return <div className="home-suggestions" aria-label="Suggested next steps">
     <ThreadPrimitive.Suggestions>{({ suggestion }) => {
       const href = items.find(item => item.prompt === suggestion.prompt)?.href;
-      const content = <><SuggestionPrimitive.Title /><SuggestionPrimitive.Description /></>;
+      const content = <SuggestionPrimitive.Title />;
+      const title = `${suggestion.title ?? suggestion.prompt} — ${suggestion.label ?? ""}`;
       // Recent work opens the existing assignment/task conversation.
       return href
-        ? <a className="home-suggestion" href={href}>{content}</a>
-        : <SuggestionPrimitive.Trigger className="home-suggestion">{content}</SuggestionPrimitive.Trigger>;
+        ? <a className="home-suggestion" href={href} title={title}>{content}</a>
+        : <SuggestionPrimitive.Trigger className="home-suggestion" title={title}>{content}</SuggestionPrimitive.Trigger>;
     }}</ThreadPrimitive.Suggestions>
   </div>;
 }

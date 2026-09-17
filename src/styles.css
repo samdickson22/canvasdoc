@@ -415,13 +415,12 @@ select {
   padding: 20px;
 }
 .conversation { display: flex; flex-direction: column; min-height: 0; flex: 1; }
-.home-suggestions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.home-suggestion { display: flex; flex-direction: column; gap: 5px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; text-align: left; background: var(--paper); color: var(--ink); min-width: 0; font-size: 13px; line-height: 1.5; }
-.home-suggestion > span:first-child { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.home-suggestion > span:last-child { color: var(--muted-foreground); font-size: 12px; }
+/* assistant-ui paper-pill layout, using Canvasdoc's existing theme. */
+.home-suggestions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.home-suggestion { display: inline-flex; max-width: 100%; min-width: 0; padding: 8px 16px; border: 1px solid var(--line); border-radius: 9999px; background: var(--paper); color: var(--ink); font-size: 13px; line-height: 1.5; }
+.home-suggestion > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-suggestion:hover { background: var(--tint); border-color: #b8c5b8; }
 .home-suggestion:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
-@media (max-width: 600px) { .home-suggestions { grid-template-columns: 1fr; } }
 .assignment-tabs {
   display: flex;
   gap: 24px;
