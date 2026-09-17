@@ -1,5 +1,4 @@
 import {
-  empty,
   mutate,
   parseSavedData,
   type Data,

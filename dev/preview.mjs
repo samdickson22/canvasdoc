@@ -20,7 +20,8 @@ const assets = new Map([
   ["version.json", "application/json"],
 ]);
 createServer(async (req, res) => {
-  const pathname = new URL(req.url, "http://localhost").pathname;
+  const incoming = new URL(req.url, "http://localhost");
+  const { pathname } = incoming;
   const name = pathname.startsWith("/canvasdoc/")
     ? pathname.slice("/canvasdoc/".length)
     : "";
@@ -39,7 +40,6 @@ createServer(async (req, res) => {
     }
     return;
   }
-  const incoming = new URL(req.url, "http://localhost");
   const target = new URL(upstream);
   target.pathname = incoming.pathname;
   target.search = incoming.search;

@@ -20,7 +20,6 @@ import { TooltipIconButton } from "./tooltip-icon-button";
 import { useAttachmentSrc } from "../../../hooks/use-attachment-src";
 import {
   ArrowUpIcon,
-  AudioLines,
   CheckIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -32,7 +31,6 @@ import {
   PencilIcon,
   PlusIcon,
   RefreshCwIcon,
-  Share,
   ThumbsDown,
   ThumbsUp,
   Volume2,
@@ -41,7 +39,6 @@ import {
 import { MarkdownText } from "./markdown-text";
 import { hasFileDrop, readDroppedFiles } from "../../../../runtime/dropped-files";
 import { CodexModelSelector } from "../../../../model-selector";
-import { ToolFallback } from "./tool-fallback.aui";
 
 import { WorkHistory, ActivityGroup, ActivityTool, RunData, RunOutcome } from "./run-activity";
 import { Reasoning } from "./reasoning.aui";

@@ -15,7 +15,6 @@ export class HistoryExporter {
       return Promise.reject(new Error("Invalid backup identity or revision."));
     const snapshot = structuredClone(data);
     const operation = this.tail
-      .catch(() => {})
       .then(async () => {
         await mkdir(this.directory, { recursive: true });
         const file = path.join(

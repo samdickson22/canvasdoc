@@ -26,9 +26,7 @@
 }
 @layer components {
   .aui-root { min-height: 0; font-size: 14px; }
-  .aui-root [data-slot="aui_thread-viewport"] { min-height: 0; overscroll-behavior: contain; }
   .aui-root textarea { border: 0; box-shadow: none; font-family: inherit; }
-  .conversation-home .aui-thread-root { height: 100%; }
 }
 /* The dashboard positions the welcome group; avoid the demo's extra bottom offset. */
 .conversation-home .aui-chatgpt-empty { padding-bottom: 0; }

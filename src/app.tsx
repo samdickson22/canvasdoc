@@ -6,8 +6,6 @@ import {
   ArrowLeft,
   BookOpen,
   Check,
-  ChevronDown,
-  Circle,
   ExternalLink,
   Link,
   MessageSquare,
@@ -16,7 +14,6 @@ import {
   PanelLeftClose,
   RefreshCw,
   Settings2,
-  Sparkles,
   X,
 } from "lucide-react";
 import { observeCanvasWork } from "./material-sync";
@@ -27,7 +24,7 @@ import { TodoList } from "./todo-panel";
 import { Conversation } from "./conversation";
 import { visibleHomeMessages } from "./runtime/home-view";
 import { readAssignment, readCourses, readDashboardWork } from "./canvas";
-import { dueGroup, newTask, safeLink } from "./model";
+import { newTask, safeLink } from "./model";
 import { store, useData, useStorageError } from "./store";
 import type {
   Assignment,
@@ -56,7 +53,6 @@ export type Mounts = {
   workspace: HTMLElement | null;
   original: HTMLElement[];
 };
-const colors = ["#496b54", "#687ab2", "#a378a1", "#b78c56"];
 const shortName = (name: string) => name.replace(/^\[DEV\]\s*/, "");
 const dateLabel = (value: string | null) =>
   value
@@ -204,7 +200,6 @@ export function App({
     };
   }, [workspace, navigationCollapsed, mounts]);
   const onConnect = () => setModal("connection");
-  const course = courses.find((item) => item.id === context.courseId);
   return (
     <>
       {mounts.conversation && createPortal(<Conversation key={context.threadId} context={context} workMode={workspace} onConnect={onConnect} />, mounts.conversation)}

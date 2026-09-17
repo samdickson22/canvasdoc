@@ -53,11 +53,10 @@ export function materialRequest<T>(operation: Record<string, unknown>): Promise<
 }
 export const connectionState = () => state;
 export const subscribeConnection = (listener: () => void) => { listeners.add(listener); return () => {listeners.delete(listener)}; };
-const fileChunks = new Map<string, string[]>();
 export function workspaceRequest<T>(type: "files-list" | "files-read", path?: string): Promise<T> {
   const id = crypto.randomUUID();
   return new Promise((resolve,reject) => {
-    const timer = setTimeout(() => {fileRequests.delete(id);fileChunks.delete(id);reject(new Error("Reconnect your computer to load files."));},15000);
+    const timer = setTimeout(() => {fileRequests.delete(id);reject(new Error("Reconnect your computer to load files."));},15000);
     fileRequests.set(id,{resolve:r=>{clearTimeout(timer);resolve(r)},reject:e=>{clearTimeout(timer);reject(e)}});
     try {send({type,id,path})} catch(error) {fileRequests.delete(id);clearTimeout(timer);reject(error)}
   });
@@ -238,16 +237,8 @@ function receive(event: { data: string }) {
     }
     return;
   }
-  if (m.type === "files-result-chunk") {
-    if (!fileRequests.has(m.id) || !Number.isInteger(m.count) || m.count < 1 || m.count > 64 || !Number.isInteger(m.index) || m.index < 0 || m.index >= m.count || typeof m.data !== "string" || m.data.length > 600000) return;
-    const chunks=fileChunks.get(m.id) || Array(m.count).fill(null);
-    chunks[m.index]=m.data;fileChunks.set(m.id,chunks);
-    if(chunks.some(c=>c===null))return;
-    fileChunks.delete(m.id);
-    m={type:"files-result",id:m.id,result:{...m.metadata,base64:chunks.join("")}};
-  }
   if (m.type === "files-result") {
-    const request = fileRequests.get(m.id); fileRequests.delete(m.id); fileChunks.delete(m.id);
+    const request = fileRequests.get(m.id); fileRequests.delete(m.id);
     if (m.error) request?.reject(new Error(m.error)); else request?.resolve(m.result);
     return;
   }
@@ -441,15 +432,7 @@ export function answerApproval(id: string, decision: "accept" | "decline") {
   return replyToApproval(id, { decision });
 }
 export function useConnection() {
-  return useSyncExternalStore(
-    (fn) => {
-      listeners.add(fn);
-      return () => {
-        listeners.delete(fn);
-      };
-    },
-    () => state,
-  );
+  return useSyncExternalStore(subscribeConnection, connectionState);
 }
 
 export function reconnectAgent() {

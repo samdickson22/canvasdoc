@@ -53,8 +53,6 @@ export const readCourses = (signal?: AbortSignal) =>
     "/api/v1/courses?enrollment_state=active&per_page=100",
     signal,
   );
-export const readTodos = (signal?: AbortSignal) =>
-  canvasPages<Todo>("/api/v1/users/self/todo?per_page=100", signal);
 export async function readDashboardWork(
   signal?: AbortSignal,
   knownCourses?: Course[],

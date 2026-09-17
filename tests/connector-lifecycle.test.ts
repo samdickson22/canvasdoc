@@ -1,54 +1,18 @@
+import { connector } from "./fixtures/connector.ts";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { createInterface } from "node:readline";
-import { once } from "node:events";
-import net from "node:net";
 import path from "node:path";
 import os from "node:os";
-import WebSocket from "ws";
-
 test(
   "connector exposes approvals, clears expired requests, stops before receipt, and reports provider death",
   { timeout: 30000 },
   async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "canvasdoc-lifecycle-"));
-    const reservation = net.createServer();
-    reservation.listen(0, "127.0.0.1");
-    await once(reservation, "listening");
-    const port = (reservation.address() as net.AddressInfo).port;
-    await new Promise<void>((r) => reservation.close(() => r()));
-    const child = spawn(
-      process.execPath,
-      [process.env.CANVASDOC_TEST_CONNECTOR || "companion/server.ts", root],
-      {
-        env: {
-          ...process.env,
-          CANVASDOC_CODEX_BIN: process.execPath,
-          CANVASDOC_CODEX_PREFIX: JSON.stringify([
-            path.resolve("tests/fixtures/codex-lifecycle.mjs"),
-          ]),
-          CANVASDOC_DEV_ORIGIN: "http://localhost:3210",
-          CANVASDOC_CONNECTOR_PORT: String(port),
-        },
-        stdio: ["ignore", "pipe", "pipe"],
-      },
-    );
-    const sockets: WebSocket[] = [];
+    const fixture = await connector(root, "lifecycle");
+    const { connect } = fixture;
     try {
-      await new Promise<void>((resolve, reject) => {
-        let stderr = "";
-        child.stderr!.on("data", (b) => (stderr += b));
-        child.once("exit", () => reject(Error(stderr)));
-        const lines = createInterface({ input: child.stdout! });
-        lines.on("line", (l) => {
-          if (JSON.parse(l).ready) {
-            lines.close();
-            resolve();
-          }
-        });
-      });
+      await fixture.start();
       for (const name of [
         "canvasdoc-assignment-review",
         "canvasdoc-study-preparation",
@@ -61,76 +25,6 @@ test(
           ),
           new RegExp(`name: ${name}`),
         );
-      }
-      async function connect() {
-        const ws = new WebSocket(`ws://127.0.0.1:${port}`, {
-          origin: "http://localhost:3210",
-        });
-        sockets.push(ws);
-        const inbox: any[] = [];
-        const waiters: {
-          pred: (m: any) => boolean;
-          resolve: (m: any) => void;
-        }[] = [];
-        ws.on("message", (b) => {
-          const m = JSON.parse(String(b));
-          const i = waiters.findIndex((w) => w.pred(m));
-          if (i >= 0) waiters.splice(i, 1)[0].resolve(m);
-          else inbox.push(m);
-        });
-        const wait = (pred: (m: any) => boolean) => {
-          const i = inbox.findIndex(pred);
-          if (i >= 0) return Promise.resolve(inbox.splice(i, 1)[0]);
-          return new Promise<any>((resolve, reject) => {
-            const waiter = {
-              pred,
-              resolve: (m: any) => {
-                clearTimeout(timer);
-                resolve(m);
-              },
-            };
-            const timer = setTimeout(() => {
-              const index = waiters.indexOf(waiter);
-              if (index >= 0) waiters.splice(index, 1);
-              reject(
-                Error(
-                  "Timed out waiting for connector event: " +
-                    String(pred) +
-                    " received " +
-                    JSON.stringify(
-                      inbox.map((m) => ({
-                        type: m.type,
-                        status: m.run?.status,
-                        id: m.run?.command.requestId,
-                        message: m.message,
-                      })),
-                    ),
-                ),
-              );
-            }, 5000);
-            waiters.push(waiter);
-          });
-        };
-        await once(ws, "open");
-        ws.send(
-          JSON.stringify({
-            type: "connect",
-            account: "canvasdoc:v1:http://localhost:3210:101",
-            token: (
-              await readFile(
-                path.join(root, ".canvasdoc/dev-connection-token"),
-                "utf8",
-              )
-            ).trim(),
-          }),
-        );
-        const hello = await wait((m) => m.type === "connected");
-        return {
-          ws,
-          wait,
-          hello,
-          send: (m: any) => ws.send(JSON.stringify({account:"canvasdoc:v1:http://localhost:3210:101",...m})),
-        };
       }
       let c = await connect();
       let count = 0;
@@ -268,12 +162,7 @@ test(
         7,
       );
     } finally {
-      for (const socket of sockets) socket.terminate();
-      if (child.exitCode === null) {
-        const stopped = once(child, "exit");
-        child.kill("SIGTERM");
-        await stopped;
-      }
+      await fixture.close();
       await rm(root, { recursive: true, force: true });
     }
   },

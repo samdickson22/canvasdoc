@@ -5,7 +5,7 @@ import type { DisplayPart } from "./message-parts.ts";
 import { displayParts } from "./harness-parts.ts";
 import { createServer } from "node:http";
 import { WebSocketServer, WebSocket } from "ws";
-import { mkdir, readFile, writeFile, rename, unlink } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 import { randomBytes, createHash } from "node:crypto";
 import path from "node:path";
 import { CodexRuntime, atomicJson } from "./codex.ts";
@@ -13,6 +13,7 @@ import { HistoryExporter } from "./history-export.ts";
 import { MaterialMirror } from "./materials.ts";
 import { saveUpload } from "./uploads.ts";
 import { listWorkspaceFiles, readWorkspaceFile } from "./files.ts";
+import type { UserCommand } from "../src/runtime/protocol.ts";
 
 const rootArg = process.argv[2];
 if (!rootArg)
@@ -39,19 +40,9 @@ try {
   await writeFile(tokenFile, token, { mode: 0o600 });
 }
 
-type Command = {
-  model?: string;
-  effort?: string;
-  requestId: string;
-  sourceThreadId: string;
-  title: string;
-  href: string;
-  text: string;
-  context?: string;
-};
 type Run = {
   revision?: number;
-  command: Command;
+  command: UserCommand;
   hash: string;
   status: string;
   turnId?: string;
@@ -265,7 +256,7 @@ wss.on("connection", (socket, request) => {
           return;
         }
         if (message.type === "send") {
-          const c = message.command as Command;
+          const c = message.command as UserCommand;
           if (
             !c ||
             typeof c.requestId !== "string" ||
@@ -372,22 +363,20 @@ wss.on("connection", (socket, request) => {
               answers[question.id] = { answers: [text] };
             }
             await runtime.answer(a.id, { answers });
-            approvals = approvals.filter(a => a.id !== String(message.id));
-            broadcast({ type: "approval-resolved", id: String(message.id) });
-            return;
+          } else {
+            if (
+              ![
+                "item/commandExecution/requestApproval",
+                "item/fileChange/requestApproval",
+              ].includes(a.method)
+            )
+              throw new Error(
+                "This input request needs a supported answer form.",
+              );
+            if (!["accept", "decline"].includes(message.decision))
+              throw new Error("Invalid approval decision");
+            await runtime.answer(a.id, { decision: message.decision });
           }
-          if (
-            ![
-              "item/commandExecution/requestApproval",
-              "item/fileChange/requestApproval",
-            ].includes(a.method)
-          )
-            throw new Error(
-              "This input request needs a supported answer form.",
-            );
-          if (!["accept", "decline"].includes(message.decision))
-            throw new Error("Invalid approval decision");
-          await runtime.answer(a.id, { decision: message.decision });
           approvals = approvals.filter(a => a.id !== String(message.id));
           broadcast({ type: "approval-resolved", id: String(message.id) });
           return;

@@ -1,4 +1,3 @@
-import { catchUpPrompt } from "./home-suggestions";
 import { catchUp } from "./catch-up";
 import { transitionView } from "./transitions";
 import { FileLinkThread } from "./workspace-link";
@@ -18,6 +17,8 @@ import { presentMessage } from "./runtime/message-presentation";
 import { materialContext } from "./material-sync";
 import { store, useData } from "./store";
 import type { PageContext } from "./types";
+
+const catchUpPrompt = "Catch me up on what's changed in Canvas and what needs my attention.";
 
 export function Conversation({
   context,
@@ -120,8 +121,7 @@ export function Conversation({
         controller.signal.throwIfAborted();
         await sendMessage(
           context,
-          text ||
-            (attachments?.length ? "Please review the attached files." : ""),
+          displayText,
           [source, personal, materials, catchUpContext, attachmentContext].filter(Boolean).join("\n"),
           attachments,
           requestId,

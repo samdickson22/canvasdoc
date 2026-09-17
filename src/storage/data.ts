@@ -174,13 +174,11 @@ export function mutate(current: Data, op: Mutation): Data {
       },
     };
     next.outbox = { ...current.outbox, [c.requestId]: c };
-  } else if (op.type === "ack") {
+  } else if (op.type === "ack" || op.type === "cancel") {
     next.outbox = { ...current.outbox };
     delete next.outbox[op.requestId];
-  } else if (op.type === "cancel") {
-    next.outbox = { ...current.outbox };
-    delete next.outbox[op.requestId];
-    next.cancelledRequests = { ...current.cancelledRequests, [op.requestId]: true };
+    if (op.type === "cancel")
+      next.cancelledRequests = { ...current.cancelledRequests, [op.requestId]: true };
   } else if (op.type === "ack-cancellation") {
     next.cancelledRequests = { ...current.cancelledRequests };
     delete next.cancelledRequests[op.requestId];

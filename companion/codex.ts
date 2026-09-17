@@ -420,16 +420,14 @@ export class CodexRuntime {
   }
   async answer(id: string | number, result: unknown) {
     const prefix = `${this.client.id}:`;
-    if (!String(id).startsWith(prefix))
+    const requestId = String(id);
+    if (!requestId.startsWith(prefix))
       throw new Error("This runtime request is no longer pending.");
-    if (
-      !this.client.requests.some(
-        (request) => request.key === String(id).slice(prefix.length),
-      )
-    )
+    const key = requestId.slice(prefix.length);
+    if (!this.client.requests.some((request) => request.key === key))
       throw new Error("This runtime request is no longer live.");
     return this.transport.commands["run/input"]({
-      requestId: String(id).slice(prefix.length),
+      requestId: key,
       response: result,
     });
   }

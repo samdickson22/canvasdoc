@@ -95,7 +95,7 @@ export async function collectMaterials(signal: AbortSignal, previous?: MaterialC
       const id = `${course.id}:page:${page.page_id}`;
       const old = prior.get(id);
       if(old && old.path===`${folder}/materials/pages/${resourceName(page.page_id,page.title)}.md` && old.revision.startsWith(`${page.updated_at}:`)) {
-        resources.set(id,{...old,path:`${folder}/materials/pages/${resourceName(page.page_id,page.title)}.md`});
+        resources.set(id,old);
         for(const match of (old.text || "").matchAll(/\/files\/(\d+)/g)) fileIds.add(Number(match[1]));
         continue;
       }

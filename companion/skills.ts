@@ -73,10 +73,8 @@ export async function installBundledSkills(root: string) {
     try {
       await directory(dir);
     } catch (error) {
-      if (
-        (await lstat(dir)).isSymbolicLink() ||
-        !(await lstat(dir)).isDirectory()
-      ) {
+      const stat = await lstat(dir);
+      if (stat.isSymbolicLink() || !stat.isDirectory()) {
         result[name] = "preserved";
         continue;
       }

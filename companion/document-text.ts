@@ -65,17 +65,15 @@ export async function extractDocument(
       return true;
     },
   });
-  const parser = new XMLParser({
+  const parserOptions = {
     ignoreAttributes: false,
     transformTagName: (tag: string) => tag.split(":").at(-1)!,
     parseTagValue: false,
     trimValues: false,
-  });
+  };
+  const parser = new XMLParser(parserOptions);
   const ordered = new XMLParser({
-    ignoreAttributes: false,
-    transformTagName: (tag: string) => tag.split(":").at(-1)!,
-    parseTagValue: false,
-    trimValues: false,
+    ...parserOptions,
     preserveOrder: true,
   });
   const xml = (name: string) => {

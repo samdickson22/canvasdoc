@@ -92,7 +92,8 @@ export class MaterialMirror {
     const receipts = await this.manifest(account);
     let existing: Buffer | undefined;
     try { existing = await readFile(target); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error; }
-    if (existing && digest(existing) !== message.hash && digest(existing) !== receipts[material.id]?.hash) throw new Error(`Local edits preserved: ${relative}. Move your edited copy into work/ before syncing this source.`);
+    const existingHash = existing && digest(existing);
+    if (existing && existingHash !== message.hash && existingHash !== receipts[material.id]?.hash) throw new Error(`Local edits preserved: ${relative}. Move your edited copy into work/ before syncing this source.`);
     const temporary = `${target}.${randomUUID()}.tmp`;
     try { await writeFile(temporary, bytes, {flag:"wx", mode:0o600}); await rename(temporary, target); }
     finally { await unlink(temporary).catch(() => {}); }

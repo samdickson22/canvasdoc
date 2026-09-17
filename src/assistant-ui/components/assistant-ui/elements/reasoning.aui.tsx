@@ -100,10 +100,8 @@ Reasoning.Fade = ReasoningFade;
 
 /**
  * @deprecated This wrapper targets the legacy `components.ReasoningGroup`
- * prop on `<MessagePrimitive.Parts>`. Use `<MessagePrimitive.GroupedParts>`
- * with a `groupBy` returning `"group-reasoning"` and compose `ReasoningRoot`
- * / `ReasoningTrigger` / `ReasoningContent` / `ReasoningText` directly.
- * See `thread.aui.tsx` for an example.
+ * prop on `<MessagePrimitive.Parts>`. Use `<MessagePrimitive.GroupedParts>`;
+ * see `chatgpt.tsx` for mixed reasoning and tool grouping.
  */
 const ReasoningGroup = memo(ReasoningGroupImpl);
 ReasoningGroup.displayName = "ReasoningGroup";

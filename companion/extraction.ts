@@ -129,10 +129,11 @@ export class DocumentExtractor {
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
+    const currentHash = current && hash(current);
     if (
       current &&
-      (!previous?.outputHash || hash(current) !== previous.outputHash) &&
-      hash(current) !== previous?.pendingOutputHash
+      (!previous?.outputHash || currentHash !== previous.outputHash) &&
+      currentHash !== previous?.pendingOutputHash
     ) {
       await this.atomic(
         stateFile,
@@ -202,14 +203,15 @@ export class DocumentExtractor {
     // Do not replace edits made while extraction was running.
     try {
       const now = await readFile(output);
-      if (!current || hash(now) !== hash(current)) return;
+      if (!current || hash(now) !== currentHash) return;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     }
     const text = `# Extracted document text\n\nOriginal: ${relative}\nSource: ${sourceUrl}\nSHA-256: ${sourceHash}\nExtractor: ${EXTRACTOR_VERSION}\nStatus: ${result.status}\n\nDerived search aid. The original document is authoritative for layout, tables, equations, and diagrams.\n${result.error ? `\nExtraction failed: ${result.error}\n` : ""}${result.status === "needs-ocr" ? "\nNo extractable text was found. OCR is required; it has not been performed.\n" : ""}\n${result.text}`;
+    const outputHash = hash(text);
     await this.atomic(
       stateFile,
-      JSON.stringify({ ...job, pendingOutputHash: hash(text) }),
+      JSON.stringify({ ...job, pendingOutputHash: outputHash }),
     );
     await this.atomic(output, text);
     await this.atomic(
@@ -218,7 +220,7 @@ export class DocumentExtractor {
         ...job,
         status: result.status,
         error: result.error,
-        outputHash: hash(text),
+        outputHash,
       }),
     );
   }

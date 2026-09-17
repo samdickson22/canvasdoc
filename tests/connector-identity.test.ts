@@ -1,13 +1,9 @@
+import { connector } from "./fixtures/connector.ts";
 import test from "node:test";
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
-import { createInterface } from "node:readline";
-import { once } from "node:events";
-import net from "node:net";
 import path from "node:path";
 import os from "node:os";
-import WebSocket from "ws";
 const account = "canvasdoc:v1:http://localhost:3210:101";
 const other = "canvasdoc:v1:http://localhost:3210:202";
 test(
@@ -15,111 +11,8 @@ test(
   { timeout: 30000 },
   async () => {
     const root = await mkdtemp(path.join(os.tmpdir(), "canvasdoc-identity-"));
-    const reservation = net.createServer();
-    reservation.listen(0, "127.0.0.1");
-    await once(reservation, "listening");
-    const port = (reservation.address() as net.AddressInfo).port;
-    await new Promise<void>((r) => reservation.close(() => r()));
-    let child: ReturnType<typeof spawn> | undefined;
-    const sockets: WebSocket[] = [];
-    async function start() {
-      child = spawn(
-        process.execPath,
-        [process.env.CANVASDOC_TEST_CONNECTOR || "companion/server.ts", root],
-        {
-          env: {
-            ...process.env,
-            CANVASDOC_CODEX_BIN: process.execPath,
-            CANVASDOC_CODEX_PREFIX: JSON.stringify([
-              path.resolve("tests/fixtures/codex-recovery.mjs"),
-            ]),
-            CANVASDOC_DEV_ORIGIN: "http://localhost:3210",
-            CANVASDOC_CONNECTOR_PORT: String(port),
-          },
-          stdio: ["ignore", "pipe", "pipe"],
-        },
-      );
-      let stderr = "";
-      child.stderr!.on("data", (b) => (stderr += b));
-      await new Promise<void>((resolve, reject) => {
-        child!.once("exit", () => reject(Error(stderr)));
-        const lines = createInterface({ input: child!.stdout! });
-        lines.on("line", (l) => {
-          if (JSON.parse(l).ready) {
-            lines.close();
-            resolve();
-          }
-        });
-      });
-    }
-    async function stop() {
-      const done = once(child!, "exit");
-      child!.kill("SIGTERM");
-      await done;
-      child = undefined;
-    }
-    async function connect(
-      identity: string | undefined = account,
-      workspaceId?: string,
-    ) {
-      const ws = new WebSocket(`ws://127.0.0.1:${port}`, {
-        origin: "http://localhost:3210",
-      });
-      sockets.push(ws);
-      const inbox: any[] = [];
-      const waiters: {
-        pred: (m: any) => boolean;
-        resolve: (m: any) => void;
-      }[] = [];
-      ws.on("message", (b) => {
-        const m = JSON.parse(String(b));
-        const i = waiters.findIndex((w) => w.pred(m));
-        if (i >= 0) waiters.splice(i, 1)[0].resolve(m);
-        else inbox.push(m);
-      });
-      const wait = (pred: (m: any) => boolean) => {
-        const i = inbox.findIndex(pred);
-        return i >= 0
-          ? Promise.resolve(inbox.splice(i, 1)[0])
-          : new Promise<any>((resolve, reject) => {
-              const timer = setTimeout(
-                () => reject(Error("Missing event " + String(pred))),
-                5000,
-              );
-              waiters.push({
-                pred,
-                resolve: (m) => {
-                  clearTimeout(timer);
-                  resolve(m);
-                },
-              });
-            });
-      };
-      await once(ws, "open");
-      ws.send(
-        JSON.stringify({
-          type: "connect",
-          account: identity,
-          workspaceId,
-          token: (
-            await readFile(
-              path.join(root, ".canvasdoc/dev-connection-token"),
-              "utf8",
-            )
-          ).trim(),
-        }),
-      );
-      const hello = await wait(
-        (m) => m.type === "connected" || m.type === "error",
-      );
-      return {
-        ws,
-        wait,
-        hello,
-        inbox,
-        send: (m: any) => ws.send(JSON.stringify({ account: identity, ...m })),
-      };
-    }
+    const fixture = await connector(root, "recovery");
+    const { start, stop, connect } = fixture;
     const command = {
       requestId: "identity-request-001",
       sourceThreadId: "assignment:1:1",
@@ -222,8 +115,7 @@ test(
         workspaceId,
       );
     } finally {
-      for (const socket of sockets) socket.terminate();
-      if (child) await stop();
+      await fixture.close();
       await rm(root, { recursive: true, force: true });
     }
   },

@@ -49,9 +49,9 @@ const build = await context({
             target: "chrome120",
             minify: true,
           });
-          await copyFile("extension/manifest.json", `${output}/manifest.json`);
-          await copyFile("extension/bootstrap.js", `${output}/bootstrap.js`);
-          await copyFile("extension/bootstrap.css", `${output}/bootstrap.css`);
+          for (const file of ["manifest.json", "bootstrap.js", "bootstrap.css"]) {
+            await copyFile(`extension/${file}`, `${output}/${file}`);
+          }
           const version = String(Date.now());
           await writeFile(
             `${output}/version.json`,
@@ -59,16 +59,9 @@ const build = await context({
           );
           if (existsSync(resolve("dev/canvas-lms/public"))) {
             await mkdir(devOutput, { recursive: true });
-            await copyFile(`${output}/bootstrap.js`, `${devOutput}/bootstrap.js`);
-            await copyFile(`${output}/bootstrap.css`, `${devOutput}/bootstrap.css`);
-            await copyFile(
-              `${output}/canvasdoc.js`,
-              `${devOutput}/canvasdoc.js`,
-            );
-            await copyFile(
-              `${output}/version.json`,
-              `${devOutput}/version.json`,
-            );
+            for (const file of ["bootstrap.js", "bootstrap.css", "canvasdoc.js", "version.json"]) {
+              await copyFile(`${output}/${file}`, `${devOutput}/${file}`);
+            }
           }
           console.log(`Canvasdoc built ${new Date().toLocaleTimeString()}`);
         });

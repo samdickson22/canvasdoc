@@ -4,7 +4,7 @@ Run `npx canvasdoc-cli` to choose a Canvasdoc folder and Canvas URL, reuse your 
 
 Requires Node.js 22.13 or later. Uses an existing Codex CLI when available and includes Codex as a fallback. Sign-in runs only when Codex reports no active login. Existing `CODEX_HOME` settings are inherited.
 
-Canvasdoc is in early development. The Canvasdoc browser UI must already be installed on your Canvas site. This package does not install a browser extension or modify your school's Canvas deployment. Automatic browser pairing currently supports the development UI on macOS and Linux; extension native-host installation remains separate.
+Canvasdoc is in early development. The Canvasdoc browser UI must already be installed on your Canvas site. This package does not install a browser extension or modify your school's Canvas deployment. Automatic browser pairing supports the development UI on macOS and Linux. On macOS, pass `--extension-id <id>` to register the installed extension with the native host.
 
 ```sh
 npx canvasdoc-cli
@@ -18,15 +18,15 @@ A missing remembered folder causes an error rather than creating a replacement. 
 
 The connector listens on loopback port 3218. `CANVASDOC_CONNECTOR_PORT`, `CANVASDOC_CODEX_BIN`, and `CANVASDOC_CONFIG_DIR` can override defaults. `--no-open` suppresses opening your browser.
 
-Chat attachments support files up to 5 MB each. The connector saves attached files in `uploads/` inside the selected Canvasdoc folder so the main agent can read them. Update the connector to 0.1.1 or later to use file uploads.
+Chat attachments support files up to 5 MB each. The connector saves attached files in `uploads/` inside the selected Canvasdoc folder so the main agent can read them.
 
-The Workspace tab can list files from your Canvasdoc folder and preview text, PDFs, and supported images. Previews are limited to 5 MB per file. Hidden directories, dependency folders, and symlinks are excluded from the listing; files outside the chosen folder are not exposed. Update the connector to 0.1.2 or later for workspace browsing.
+Workspace lists files from your Canvasdoc folder and previews text, PDFs, images, and sandboxed HTML. Preview and download are limited to 25 MiB per file; text rendering is capped at 256 KiB. Hidden directories, dependency folders, and symlinks are excluded from the listing; files outside the chosen folder are not exposed.
 
-The chat model and reasoning-effort selector requires connector 0.1.3 or later. Choices come from the connected Codex runtime. Selecting a different model applies to the next turn while retaining the same main-agent thread and Canvasdoc folder. Stop an older connector and run `npx canvasdoc-cli@latest` after updating.
+The chat model and reasoning-effort choices come from the connected Codex runtime. Selecting a different model applies to the next turn while retaining the same main-agent thread and Canvasdoc folder.
 
 ## Course materials
 
-Canvasdoc's browser extension reads course materials using your existing Canvas login. The companion receives source files through authenticated, verified transfers and writes them under `courses/<account>/course-<id>/`. It never needs a Canvas API token or browser cookies.
+Canvasdoc's browser extension reads course materials using your existing Canvas login. The companion receives source files through authenticated, verified transfers and writes them under `courses/<account>/<course-name>--<id>/`. It never needs a Canvas API token or browser cookies.
 
 The extension owns the material index and checks for updates while Canvas is open. Connect this companion to download new or changed materials. Course pages, syllabus content, assignment instructions, module indexes, announcements, and accessible files appear in the workspace Sources panel. Synced source files are separate from `work/` folders; locally edited sources are preserved and reported as conflicts. Files are limited to 100 MB each; preview limits are separate. External publisher content remains linked rather than automatically downloaded.
 
