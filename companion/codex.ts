@@ -18,6 +18,8 @@ import type { CodexProtocol } from "@harness-sdk/codex/protocol";
 import type { Harness } from "harness-sdk";
 import { decodeMessage, encodeMessage } from "./vendor/harness-codex/json.ts";
 
+import { installBundledSkills } from "./skills.ts";
+
 export type RpcEvent = {
   method: string;
   params: Record<string, any>;
@@ -139,6 +141,7 @@ export class CodexRuntime {
         };
         await atomicJson(configPath, this.config);
       }
+      await installBundledSkills(root);
       const prefix: unknown = JSON.parse(
         process.env.CANVASDOC_CODEX_PREFIX || "[]",
       );
