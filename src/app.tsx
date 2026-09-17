@@ -114,7 +114,7 @@ export function App({
     const openFile = (event: Event) => {
       const detail = (event as CustomEvent).detail;
       if(detail?.threadId !== initialContext.threadId || typeof detail.path !== "string" || !mounts.workspace) return;
-      const path = localFilePath(detail.path);
+      const path = localFilePath(detail.path, undefined, true);
       if(!path) return;
       setRequestedFile({path});
       void transitionView(() => setWorkspace(true));

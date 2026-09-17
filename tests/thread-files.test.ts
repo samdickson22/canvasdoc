@@ -5,6 +5,7 @@ import {
   localFilePath,
   threadFileReferences,
   isSyncedSource,
+  isLocalFileLink,
 } from "../src/workspace-files.ts";
 import type { SavedMessage, PageContext } from "../src/types.ts";
 const context: PageContext = {
@@ -90,4 +91,13 @@ test("file links cannot escape the root or access private files", () => {
     localFilePath("/root/work/report.md#L1", "/root"),
     "work/report.md",
   );
+});
+
+test("file-link clicks distinguish inaccessible artifacts from Canvas navigation", () => {
+  for (const href of ["../outside.md", "/root/work/report.pdf", "file:///tmp/report.pdf", "missing.md"])
+    assert.equal(isLocalFileLink(href), true);
+  for (const href of ["https://example.com/report.pdf", "/courses/1/assignments/1", "#requirements", "/calendar", "/", "/files/123/download", "//example.com/report.pdf"])
+    assert.equal(isLocalFileLink(href), false);
+  assert.equal(localFilePath("chapter%231.md", "/root"), "chapter#1.md");
+  assert.equal(localFilePath("growth%2026.csv", "/root", true), "growth%2026.csv");
 });

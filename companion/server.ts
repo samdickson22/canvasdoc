@@ -1,4 +1,5 @@
-import { isSyncedSource } from "../src/workspace-files.ts";
+import type { ArtifactEvidence } from "../src/workspace-files.ts";
+import { verifyArtifacts } from "./artifact-evidence.ts";
 import type { DisplayPart } from "./message-parts.ts";
 import { displayParts } from "./harness-parts.ts";
 import { createServer } from "node:http";
@@ -55,6 +56,7 @@ type Run = {
   text: string;
   parts?: DisplayPart[];
   files?: string[];
+  artifacts?: ArtifactEvidence[];
   error?: string;
   createdAt: string;
   startedAt?: string;
@@ -135,13 +137,17 @@ function scheduleView() {
         run.status = projected.status;
         run.turnId = projected.turnId;
         run.error = projected.error;
+        const previousParts = JSON.stringify(run.parts);
         run.parts = displayParts(projected.messages);
         run.text = run.parts.filter(p => p.type === "text").map(p => p.text).join("\n\n");
         const files = projected.messages.flatMap(m => m.parts.flatMap(p => {
           const item = p.metadata?.provider?.codex as {type?:string; changes?:{path:string}[]} | undefined;
-          return item?.type === "fileChange" ? (item.changes ?? []).map(c => path.relative(config.root, path.resolve(config.root, c.path))) : [];
-        })).filter(file => file && !file.startsWith("..") && !path.isAbsolute(file) && !isSyncedSource(file));
-        if (files.length) run.files = [...new Set(files)];
+          return item?.type === "fileChange" ? (item.changes ?? []).map(c => c.path) : [];
+        }));
+        if (terminal(run.status) && (!run.artifacts || previousStatus !== run.status || previousParts !== JSON.stringify(run.parts))) {
+          run.artifacts = await verifyArtifacts(config.root, run.text, files);
+          run.files = run.artifacts.filter(file => file.status === "available").map(file => file.path);
+        }
       } else if (!admitting.has(run.command.requestId) && !terminal(run.status)) {
         run.status = "cancelled";
         run.error = "This request was not dispatched or was removed from the agent queue.";

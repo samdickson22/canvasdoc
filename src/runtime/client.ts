@@ -110,6 +110,7 @@ async function applyRun(run: any) {
       text: run.text,
       parts: run.parts,
       files: run.files,
+      artifacts: run.artifacts,
       run: { status: run.status, startedAt: run.startedAt, completedAt: run.completedAt, error: run.error },
       createdAt: run.createdAt,
     };
@@ -132,7 +133,7 @@ async function applyRun(run: any) {
     persisted?.messages.some((m) => m.id === c.requestId) &&
     (!(run.text || run.parts?.length || run.files?.length) ||
       persisted.messages.some(
-        (m) => m.id === `assistant:${c.requestId}` && m.text === run.text && JSON.stringify(m.parts) === JSON.stringify(run.parts) && JSON.stringify(m.files) === JSON.stringify(run.files),
+        (m) => m.id === `assistant:${c.requestId}` && m.text === run.text && JSON.stringify(m.parts) === JSON.stringify(run.parts) && JSON.stringify(m.files) === JSON.stringify(run.files) && JSON.stringify(m.artifacts) === JSON.stringify(run.artifacts),
       ))
   ) {
     try {
