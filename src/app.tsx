@@ -4,7 +4,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
-  BookOpen,
   Check,
   ExternalLink,
   Link,
@@ -22,7 +21,6 @@ import { Workspace } from "./workspace";
 import { Navigation } from "./navigation";
 import { TodoList } from "./todo-panel";
 import { Conversation } from "./conversation";
-import { visibleHomeMessages } from "./runtime/home-view";
 import { readAssignment, readCourses, readDashboardWork } from "./canvas";
 import { newTask, safeLink } from "./model";
 import { store, useData, useStorageError } from "./store";
@@ -80,11 +78,16 @@ export function App({
     window.dispatchEvent(new Event("canvasdoc:ready"));
     return () => document.documentElement.classList.remove("canvasdoc-dashboard");
   }, [initialContext.kind]);
-  const activeDashboard = initialContext.kind === "home" && visibleHomeMessages(data.threads[initialContext.threadId]?.messages).length > 0;
+  const [homeChatOpen, setHomeChatOpen] = useState(false);
+  const homeChatPanel = useRef<HTMLDivElement>(null);
+  const homeChatButton = useRef<HTMLButtonElement>(null);
+  const closeHomeChat = () => {
+    setHomeChatOpen(false);
+    homeChatButton.current?.focus();
+  };
   useEffect(() => {
-    document.documentElement.classList.toggle("canvasdoc-chat-active", activeDashboard);
-    return () => document.documentElement.classList.remove("canvasdoc-chat-active");
-  }, [activeDashboard]);
+    if (homeChatOpen) homeChatPanel.current?.querySelector<HTMLTextAreaElement>("textarea")?.focus();
+  }, [homeChatOpen]);
   const connection = useConnection();
   const connectionLabel =
     connection.status === "connected"
@@ -285,21 +288,19 @@ export function App({
       {mounts.main &&
         createPortal(
           context.kind === "home" ? (
-            <main className="dashboard">
-              <header className="dashboard-header">
-                <span>Home</span>
-                <button className="connection-status" data-status={connection.status} onClick={onConnect}>
-                  <i /> {connectionLabel}
-                </button>
-              </header>
-              <div className="dashboard-center">
+            <section className="home-agent" aria-label="Canvasdoc assistant">
+              <div ref={homeChatPanel} id="home-agent-panel" className="home-agent-panel" hidden={!homeChatOpen} onKeyDown={event => { if (event.key === "Escape") closeHomeChat(); }}>
+                <header className="home-agent-header">
+                  <strong>Canvasdoc</strong>
+                  <button className="connection-status" data-status={connection.status} onClick={onConnect}><i /> {connectionLabel}</button>
+                  <button aria-label="Close chat" onClick={closeHomeChat}><X size={18} /></button>
+                </header>
                 <Conversation context={context} home onConnect={onConnect} />
               </div>
-              <footer className="dashboard-footer">
-                <BookOpen size={14} /> Canvas is the source for your courses and
-                assignments.
-              </footer>
-            </main>
+              <button ref={homeChatButton} className="home-agent-bar" aria-expanded={homeChatOpen} aria-controls="home-agent-panel" onClick={() => setHomeChatOpen(value => !value)}>
+                <MessageSquare size={18} /><span>Ask Canvasdoc</span><span className="home-agent-hint">Help with your courses</span>
+              </button>
+            </section>
           ) : (
             <PersonalPage task={personal} />
           ),

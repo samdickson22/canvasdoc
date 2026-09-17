@@ -237,7 +237,7 @@ export function Conversation({
             queuedMessages={queuedMessages}
             onCancelQueued={stopRun}
             composerFooter={home && !!saved?.messages.length && <button type="button" className="home-history-toggle" aria-pressed={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? "Hide previous conversation" : "Show previous conversation"}</button>}
-            composerPlaceholder={home ? "Catch me up" : undefined}
+            composerPlaceholder={home ? "Ask about your courses…" : undefined}
             workMode={home || workMode}
             uploadStates={uploadStates}
             connected={connection.status === "connected"}

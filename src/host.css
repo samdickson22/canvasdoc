@@ -5,14 +5,6 @@ body.canvasdoc-mounted {
   --ic-brand-global-nav-menu-item__text-color: #f1f5f0;
   --ic-brand-global-nav-menu-item__text-color--active: #194d3b;
 }
-html.canvasdoc-dashboard,
-html.canvasdoc-dashboard body,
-html.canvasdoc-chat-active,
-html.canvasdoc-chat-active body {
-  height: 100%;
-  overflow: hidden;
-  overscroll-behavior: none;
-}
 body.canvasdoc-sidebar-open #wrapper {
   margin-right: var(--canvasdoc-sidebar-width);
   width: calc(100% - 84px - var(--canvasdoc-sidebar-width));
@@ -22,11 +14,11 @@ body.canvasdoc-sidebar-open #right-side-wrapper,
 body.canvasdoc-home #right-side-wrapper {
   display: none !important;
 }
-body.canvasdoc-home #content > :not(#canvasdoc-main) {
+body.canvasdoc-personal #content > :not(#canvasdoc-main) {
   display: none !important;
 }
 body.canvasdoc-home #content {
-  padding: 0 !important;
+  padding-bottom: 100px !important;
 }
 body.canvasdoc-home #content-wrapper {
   max-width: none !important;
@@ -118,3 +110,28 @@ body.canvasdoc-workspace-open #content > :not(#canvasdoc-tabs):not(#canvasdoc-wo
 @media(prefers-reduced-motion:reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation:none !important; }
 }
+
+/* Keep Canvas's dashboard intact; the assistant floats within the center pane. */
+html.canvasdoc-dashboard #canvasdoc-main {
+  position: fixed;
+  bottom: 20px;
+  left: 244px;
+  right: 24px;
+  z-index: 90;
+}
+html.canvasdoc-dashboard body.canvasdoc-sidebar-open #canvasdoc-main { right: calc(var(--canvasdoc-sidebar-width) + 24px); }
+@media(max-width:1100px) {
+  html.canvasdoc-dashboard body.canvasdoc-sidebar-open #canvasdoc-main { right: 24px; }
+}
+@media(max-width:1000px) {
+  html.canvasdoc-dashboard #canvasdoc-main { left: 88px; }
+}
+@media(max-width:600px) {
+  html.canvasdoc-dashboard #canvasdoc-main { left: 80px; right: 8px; bottom: 8px; }
+}
+
+html.canvasdoc-dashboard #dashboard_header_container { border-bottom:1px solid #e4e8e2; }
+html.canvasdoc-dashboard .ic-DashboardCard { border-radius:12px; box-shadow:0 2px 8px #163d2410; border:1px solid #e4e8e2; transition:box-shadow .16s ease; }
+html.canvasdoc-dashboard .ic-DashboardCard:hover { box-shadow:0 5px 18px #163d2420; }
+html.canvasdoc-dashboard .ic-DashboardCard__header_content { padding:16px; }
+html.canvasdoc-dashboard .ic-DashboardCard__header-title { line-height:1.4; }

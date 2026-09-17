@@ -138,6 +138,7 @@ async function mount() {
     });
   document.body.classList.add("canvasdoc-mounted");
   if (isHome) document.body.classList.add("canvasdoc-home");
+  if (context.kind === "personal") document.body.classList.add("canvasdoc-personal");
   const control = document.createElement("div");
   document.body.append(control);
   const root = createRoot(control);
@@ -153,6 +154,7 @@ async function mount() {
       document.body.classList.remove(
         "canvasdoc-mounted",
         "canvasdoc-home",
+        "canvasdoc-personal",
         "canvasdoc-sidebar-open",
       );
       delete window.__canvasdoc;
