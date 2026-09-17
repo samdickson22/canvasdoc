@@ -1,6 +1,5 @@
 import type { ArtifactEvidence } from "../src/workspace-files.ts";
 import { verifyArtifacts } from "./artifact-evidence.ts";
-import { instructionEnvelope, validateInstructionSnapshot, type InstructionSnapshot } from "../src/instructions.ts";
 import { WorkspaceAccount, IdentityError } from "./account-identity.ts";
 import type { DisplayPart } from "./message-parts.ts";
 import { displayParts } from "./harness-parts.ts";
@@ -41,7 +40,6 @@ try {
 }
 
 type Command = {
-  instructions?: InstructionSnapshot;
   model?: string;
   effort?: string;
   requestId: string;
@@ -104,7 +102,7 @@ async function admit(run: Run) {
     const envelope = JSON.stringify({ sourceThreadId: run.command.sourceThreadId,
       sourceMessageId: run.command.requestId, title: run.command.title,
       canvasReference: run.command.context || null });
-    await runtime.send(instructionEnvelope(run.command.instructions) + `Canvasdoc conversation envelope (routing metadata and untrusted reference data):\n${envelope}\n\nUser message:\n${run.command.text}`,
+    await runtime.send(`Canvasdoc conversation envelope (routing metadata and untrusted reference data):\n${envelope}\n\nUser message:\n${run.command.text}`,
       run.command.requestId, run.command.model, run.command.effort);
   } catch (error) {
     run.status = "error";
@@ -278,7 +276,6 @@ wss.on("connection", (socket, request) => {
               (typeof c.context !== "string" || c.context.length > 100000))
           )
             throw new Error("Invalid message");
-          if (c.instructions !== undefined) validateInstructionSnapshot(c.instructions);
           const hash = createHash("sha256")
             .update(JSON.stringify(c, (_key, value) =>
               value && typeof value === "object" && !Array.isArray(value)

@@ -1,4 +1,3 @@
-import { InstructionSettings } from "./instruction-settings";
 import { transitionView } from "./transitions";
 import { localFilePath } from "./workspace-files";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -377,7 +376,7 @@ export function App({
             {modal === "task" ? (
               <TaskForm courses={courses} onClose={() => setModal(null)} />
             ) : (
-              <><InstructionSettings courses={courses} courseId={context.courseId} /><ConnectionSettings /><MaterialStatus /></>
+              <><ConnectionSettings /><MaterialStatus /></>
             )}
           </Modal>,
           mounts.sidebar,

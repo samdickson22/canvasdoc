@@ -1,4 +1,3 @@
-import { validateInstruction, validateCourseId } from "./instructions.ts";
 import { useSyncExternalStore } from "react";
 import type { PersonalTask, ThreadRecord } from "./types";
 import { browserStorage } from "./storage/browser.ts";
@@ -63,11 +62,6 @@ function update(op: Mutation): Promise<boolean> {
 }
 export const store = {
   saveCatchUp(state: NonNullable<Data["catchUp"]>) { return update({type:"catch-up",state}); },
-  saveInstructions(text: string, courseId?: number) {
-    validateInstruction(text);
-    if (courseId !== undefined) validateCourseId(courseId);
-    return update({type:"instructions",text,courseId});
-  },
   setWorkspaceNavigationCollapsed(collapsed: boolean) { return update({type:"workspace-navigation",collapsed}); },
   saveMaterials(catalog: NonNullable<Data["materialCatalog"]>) { return update({type:"material-catalog",catalog}); },
   cacheCanvas(cache: NonNullable<Data['canvasCache']>) { return update({type:"canvas-cache",cache}); },
