@@ -1083,3 +1083,9 @@ select {
   .workspace-toolbar-content .connection-status { font-size:0; gap:0; }
   .workspace-toolbar-content .connection-status i { width:7px; height:7px; }
 }
+
+.instruction-settings { margin-bottom: 24px; }
+.instruction-scope { display: flex; flex-direction: column; gap: 6px; margin: 16px 0; font-size: 12px; }
+.instruction-settings select, .instruction-settings textarea { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 10px; background: var(--paper); color: inherit; font: inherit; }
+.instruction-settings textarea { resize: vertical; }
+.instruction-actions { display: flex; flex-wrap: wrap; gap: 8px; }

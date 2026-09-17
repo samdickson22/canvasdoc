@@ -1,3 +1,4 @@
+import { InstructionSettings } from "./instruction-settings";
 import { transitionView } from "./transitions";
 import { localFilePath } from "./workspace-files";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -232,7 +233,7 @@ export function App({
                 )}
                 <button
                   className="icon-button"
-                  aria-label="Connection settings"
+                  aria-label="Settings"
                   onClick={onConnect}
                 >
                   <Settings2 size={17} />
@@ -373,13 +374,13 @@ export function App({
       {modal &&
         createPortal(
           <Modal
-            title={modal === "task" ? "New task" : "Connect your computer"}
+            title={modal === "task" ? "New task" : "Settings"}
             onClose={() => setModal(null)}
           >
             {modal === "task" ? (
               <TaskForm courses={courses} onClose={() => setModal(null)} />
             ) : (
-              <><ConnectionSettings /><MaterialStatus /></>
+              <><InstructionSettings courses={courses} courseId={context.courseId} /><ConnectionSettings /><MaterialStatus /></>
             )}
           </Modal>,
           mounts.sidebar,
