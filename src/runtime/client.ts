@@ -40,6 +40,7 @@ const listeners = new Set<() => void>();
 const uploads = new Map<string, { resolve: (path: string) => void; reject: (error: Error) => void }>();
 const fileRequests = new Map<string, { resolve: (result: any) => void; reject: (error: Error) => void }>();
 const materialRequests = new Map<string, { resolve: (result: any) => void; reject: (error: Error) => void }>();
+const approvalReplies = new Map<string, { resolve: () => void; reject: (error: Error) => void }>();
 export function materialRequest<T>(operation: Record<string, unknown>): Promise<T> {
   if (!state.materials) return Promise.reject(new Error("Update canvasdoc-cli to enable course material syncing."));
   const id = crypto.randomUUID();
@@ -100,8 +101,10 @@ async function applyRun(run: any) {
   )
     return;
   void store.acknowledge(c.requestId);
-  update({ runs: { ...state.runs, [c.requestId]: run } });
   const previous = store.get().threads[c.sourceThreadId];
+  const priorReply = previous?.messages.find(m => m.id === `assistant:${c.requestId}`);
+  if ((priorReply?.revision ?? -1) > (run.revision ?? -1)) return;
+  update({ runs: { ...state.runs, [c.requestId]: run } });
   const messages = [...(previous?.messages ?? [])];
   if (!messages.some((m) => m.id === c.requestId))
     messages.push({
@@ -109,6 +112,7 @@ async function applyRun(run: any) {
       role: "user",
       text: c.text,
       createdAt: run.createdAt,
+      revision: run.revision,
     });
   if (run.text || run.parts?.length || run.files?.length || run.error || ["interrupted", "cancelled"].includes(run.status)) {
     const id = `assistant:${c.requestId}`;
@@ -121,6 +125,7 @@ async function applyRun(run: any) {
       files: run.files,
       artifacts: run.artifacts,
       run: { status: run.status, startedAt: run.startedAt, completedAt: run.completedAt, error: run.error },
+      revision: run.revision,
       createdAt: run.createdAt,
     };
     if (index < 0) messages.push(message);
@@ -128,14 +133,12 @@ async function applyRun(run: any) {
   }
   // Each event is a complete response snapshot, so replay does not duplicate deltas.
   if (JSON.stringify(previous?.messages) !== JSON.stringify(messages))
-    await store.saveThread({
+    for (const message of messages.filter(m => m.id === c.requestId || m.id === `assistant:${c.requestId}`)) await store.saveMessage({
       id: c.sourceThreadId,
       title: c.title,
       href: c.href,
-      messages,
-      draft: previous?.draft ?? "",
       updatedAt: new Date().toISOString(),
-    });
+    }, message);
   if (account !== connectionAccount || account !== store.account()) return;
   const persisted = store.committed().threads[c.sourceThreadId];
   if (
@@ -277,8 +280,11 @@ function receive(event: { data: string }) {
     });
     for (const run of m.runs) void applyRun(run);
     if (m.runtimeAvailable !== false)
-      for (const command of Object.values(store.committed().outbox ?? {}))
-        send({ type: "send", command });
+      {
+        for (const requestId of Object.keys(store.get().cancelledRequests ?? {})) send({ type: "stop", requestId });
+        for (const command of Object.values(store.committed().outbox ?? {}))
+          if (!store.get().cancelledRequests?.[command.requestId]) send({ type: "send", command });
+      }
     scheduleBackup();
     return;
   }
@@ -294,8 +300,16 @@ function receive(event: { data: string }) {
     update({
       approvals: [...state.approvals.filter((a) => a.id !== m.id), m],
     });
-  if (m.type === "approval-resolved")
+  if (m.type === "stop-ack") void store.acknowledgeCancellation(m.requestId);
+  if (m.type === "approval-resolved") {
+    approvalReplies.get(m.id)?.resolve();
+    approvalReplies.delete(m.id);
     update({ approvals: state.approvals.filter((a) => a.id !== m.id) });
+  }
+  if (m.type === "approval-error") {
+    approvalReplies.get(m.id)?.reject(new Error(m.message));
+    approvalReplies.delete(m.id);
+  }
   if (m.type === "runtime-status")
     update({ status: m.connected ? "connected" : "disconnected", canReconnectAgent: !m.connected,
       runtimeThreadId: m.runtimeThreadId ?? state.runtimeThreadId,
@@ -396,17 +410,35 @@ export async function sendMessage(
   };
   if (!(await store.enqueue(command))) throw new Error(store.error());
   if (account !== store.account()) throw new Error("Canvas account changed. Reconnect your computer.");
-  if (state.status === "connected") send({ type: "send", command });
+  if (state.status === "connected" && !store.get().cancelledRequests?.[requestId]) send({ type: "send", command });
   return requestId;
 }
-export function stopRun(requestId: string) {
-  send({ type: "stop", requestId });
+export async function stopRun(requestId: string) {
+  if (!(await store.cancel(requestId))) throw new Error(store.error());
+  if (state.status === "connected") send({ type: "stop", requestId });
+}
+function replyToApproval(id: string, reply: object): Promise<void> {
+  // Validate the connection synchronously before installing the pending reply.
+  if (!connectionAccount || connectionAccount !== store.account()) throw new Error("Canvas account changed. Reconnect your computer.");
+  if (approvalReplies.has(id)) return Promise.reject(new Error("This answer is already being sent."));
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      approvalReplies.delete(id);
+      reject(new Error("The answer was not acknowledged. Reconnect and check the pending request before retrying."));
+    }, 15000);
+    approvalReplies.set(id, {
+      resolve: () => { clearTimeout(timer); resolve(); },
+      reject: error => { clearTimeout(timer); reject(error); },
+    });
+    try { send({ type: "approval", id, ...reply }); }
+    catch (error) { approvalReplies.get(id)?.reject(error as Error); approvalReplies.delete(id); }
+  });
 }
 export function answerQuestions(id: string, answers: Record<string, string>) {
-  send({ type: "approval", id, answers });
+  return replyToApproval(id, { answers });
 }
 export function answerApproval(id: string, decision: "accept" | "decline") {
-  send({ type: "approval", id, decision });
+  return replyToApproval(id, { decision });
 }
 export function useConnection() {
   return useSyncExternalStore(

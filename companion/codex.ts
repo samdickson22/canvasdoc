@@ -416,15 +416,7 @@ export class CodexRuntime {
     });
   }
   async interrupt(requestId: string) {
-    const snapshot = this.snapshot();
-    const queued = snapshot.queue.find((q) => q.message.id === requestId);
-    if (queued)
-      return this.transport.commands["run/dequeue"]({
-        runId: queued.runId,
-        messageId: requestId,
-      });
-    if (snapshot.runId)
-      return this.transport.commands["run/stop"]({ runId: snapshot.runId });
+    return this.transport.interruptMessage(requestId);
   }
   async answer(id: string | number, result: unknown) {
     const prefix = `${this.client.id}:`;

@@ -168,7 +168,7 @@ test(
       assert.match(run.run.text, /DECISION: decline/);
       c.send({ type: "approval", id: a.id, decision: "accept" });
       await c.wait(
-        (m) => m.type === "error" && /no longer pending/i.test(m.message),
+        (m) => m.type === "approval-error" && /no longer pending/i.test(m.message),
       );
       id = send("question");
       a = await c.wait((m) => m.type === "approval");

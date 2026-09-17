@@ -415,6 +415,8 @@ select {
   padding: 20px;
 }
 .conversation { display: flex; flex-direction: column; min-height: 0; flex: 1; }
+.home-history-toggle { align-self: flex-end; margin: 8px 20px; padding: 4px 8px; color: var(--muted); font-size: 12px; border-radius: 6px; }
+.home-history-toggle:hover { background: #f3f5f0; color: var(--green); }
 /* assistant-ui paper-pill layout, using Canvasdoc's existing theme. */
 .home-suggestions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .home-suggestion { display: inline-flex; max-width: 100%; min-width: 0; padding: 8px 16px; border: 1px solid var(--line); border-radius: 9999px; background: var(--paper); color: var(--ink); font-size: 13px; line-height: 1.5; }

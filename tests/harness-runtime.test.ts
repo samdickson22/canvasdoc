@@ -20,6 +20,53 @@ function nextEvent(runtime: CodexRuntime, method: string) {
   });
 }
 
+test("targeted interruption preserves queued work and stale stops cannot stop its successor", { timeout: 15000 }, async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), "canvasdoc-scoped-stop-"));
+  const prefix = process.env.CANVASDOC_CODEX_PREFIX;
+  process.env.CANVASDOC_CODEX_PREFIX = JSON.stringify([path.resolve("tests/fixtures/codex-harness.mjs")]);
+  const runtime = new CodexRuntime(root, process.execPath);
+  const waitFor = async (predicate: () => boolean) => {
+    const deadline = Date.now() + 5000;
+    while (!predicate()) {
+      if (Date.now() > deadline) throw new Error("Timed out waiting for scoped stop state");
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
+  };
+  try {
+    await runtime.start();
+    await runtime.send("first", "request-A");
+    await runtime.send("second", "request-B");
+    await runtime.send("third", "request-C");
+    assert.equal(runtime.snapshot().queue.length, 2);
+    await runtime.interrupt("request-A");
+    await waitFor(() => runtime.snapshot().submissions["request-B"]?.status === "accepted");
+    assert.equal(runtime.view().runs["request-A"].status, "interrupted");
+    assert.ok(runtime.snapshot().queue.some(q => q.message.id === "request-C"));
+    await runtime.interrupt("request-A");
+    await runtime.interrupt("unknown-request");
+    await runtime.rpc("account/read");
+    assert.equal(runtime.view().runs["request-B"].status, "working");
+    await runtime.interrupt("request-C");
+    assert.equal(runtime.snapshot().queue.length, 0);
+    assert.equal(runtime.view().runs["request-B"].status, "working");
+    const messages = (await readFile(path.join(root, "rpc.jsonl"), "utf8")).trim().split("\n").map(line => JSON.parse(line));
+    assert.deepEqual(messages.filter(m => m.method === "turn/interrupt").map(m => m.params.turnId), ["request-A"]);
+    await runtime.interrupt("request-B");
+    await waitFor(() => runtime.view().runs["request-B"].status === "interrupted");
+    const sending = runtime.send("SCENARIO:slow-start", "request-slow");
+    await waitFor(() => runtime.snapshot().submissions["request-slow"]?.status === "sending");
+    const stopping = runtime.interrupt("request-slow");
+    await sending;
+    await stopping;
+    await waitFor(() => runtime.view().runs["request-slow"].status === "interrupted");
+  } finally {
+    await runtime.close();
+    if (prefix === undefined) delete process.env.CANVASDOC_CODEX_PREFIX;
+    else process.env.CANVASDOC_CODEX_PREFIX = prefix;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test(
   "Harness client preserves native requests and rejects stale approvals across restarts",
   { timeout: 15000 },

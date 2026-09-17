@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
-import type { PersonalTask, ThreadRecord } from "./types";
+import type { PersonalTask, SavedMessage, ThreadRecord } from "./types";
 import { browserStorage } from "./storage/browser.ts";
-import { empty, mutate, type Data, type Mutation } from "./storage/data.ts";
+import { empty, mutate, type Data, type DraftUpdate, type Mutation, type ThreadMetadata } from "./storage/data.ts";
 export { parseSavedData } from "./storage/data.ts";
 let key = "";
 let data = empty();
@@ -82,6 +82,13 @@ export const store = {
     if (!data.outbox?.[requestId]) return Promise.resolve(true);
     return update({ type: "ack", requestId });
   },
+  cancel(requestId: string) {
+    return update({ type: "cancel", requestId });
+  },
+  acknowledgeCancellation(requestId: string) {
+    if (!data.cancelledRequests?.[requestId]) return Promise.resolve(true);
+    return update({ type: "ack-cancellation", requestId });
+  },
   committed: () => committed,
   account: () => key,
   subscribe(fn: () => void) {
@@ -93,6 +100,12 @@ export const store = {
   error: () => storageError,
   saveThread(thread: ThreadRecord) {
     return update({ type: "thread", thread });
+  },
+  saveDraft(draft: DraftUpdate) {
+    return update({ type: "draft", draft });
+  },
+  saveMessage(thread: ThreadMetadata, message: SavedMessage) {
+    return update({ type: "message", thread, message });
   },
   addTask(task: PersonalTask) {
     return update({ type: "task", task });

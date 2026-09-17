@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { WebSocket } from "ws";
+import { nativeFrames } from "./native-framing.ts";
 
 // Chrome starts this small framing adapter; the independent connector owns Codex.
 const configuration = process.argv[2] === "--connection-config"
@@ -10,19 +11,12 @@ const { origin, port, token } = configuration;
 if (typeof origin !== "string" || !Number.isInteger(port) || port < 1 || port > 65535 || typeof token !== "string" || !token)
   throw new Error("Native host configuration is missing.");
 function send(value: unknown) {
-  const response = value as any;
-  if (response.type === "files-result" && response.result?.base64?.length > 600000) {
-    const {base64,...metadata}=response.result;
-    const count=Math.ceil(base64.length/600000);
-    for(let index=0;index<count;index++) send({type:"files-result-chunk",id:response.id,index,count,metadata,data:base64.slice(index*600000,(index+1)*600000)});
-    return;
+  for (const frame of nativeFrames(value)) {
+    const body = Buffer.from(frame);
+    const header = Buffer.alloc(4);
+    header.writeUInt32LE(body.length);
+    process.stdout.write(Buffer.concat([header, body]));
   }
-  const body = Buffer.from(JSON.stringify(value));
-  if (body.length > 900000)
-    throw new Error("Native message exceeds the supported frame size.");
-  const header = Buffer.alloc(4);
-  header.writeUInt32LE(body.length);
-  process.stdout.write(Buffer.concat([header, body]));
 }
 const socket = new WebSocket(`ws://127.0.0.1:${port}`, { origin });
 let connected = false;

@@ -1,4 +1,4 @@
-import type { PersonalTask, ThreadRecord } from "../types.ts";
+import type { PersonalTask, SavedMessage, ThreadRecord } from "../types.ts";
 import type { UserCommand } from "../runtime/protocol.ts";
 export type Data = {
   catchUp?: import("../catch-up.ts").CatchUpState;
@@ -9,6 +9,7 @@ export type Data = {
   version: 1;
   revision?: number;
   outbox?: Record<string, UserCommand>;
+  cancelledRequests?: Record<string, true>;
   tasks: PersonalTask[];
   threads: Record<string, ThreadRecord>;
 };
@@ -26,6 +27,11 @@ export function parseSavedData(value: string | null): Data {
   )
     throw new Error("Unsupported saved data.");
   if (typeof parsed.workspaceNavigationCollapsed !== "boolean") delete parsed.workspaceNavigationCollapsed;
+  if (parsed.cancelledRequests !== undefined && (
+    !parsed.cancelledRequests || typeof parsed.cancelledRequests !== "object" ||
+    Array.isArray(parsed.cancelledRequests) ||
+    Object.values(parsed.cancelledRequests).some(value => value !== true)
+  )) throw new Error("Invalid saved cancellations.");
   const validDate = (value: unknown) =>
     typeof value === "string" && Number.isFinite(new Date(value).getTime());
   if (parsed.canvasCache && (!Array.isArray(parsed.canvasCache.courses) || !Array.isArray(parsed.canvasCache.todos) || !validDate(parsed.canvasCache.fetchedAt))) delete parsed.canvasCache;
@@ -61,6 +67,7 @@ export function parseSavedData(value: string | null): Data {
           message &&
           typeof message.id === "string" &&
           typeof message.text === "string" &&
+          (message.revision === undefined || (Number.isSafeInteger(message.revision) && message.revision >= 0)) &&
           ["user", "assistant"].includes(message.role) &&
           validDate(message.createdAt),
       )
@@ -70,6 +77,17 @@ export function parseSavedData(value: string | null): Data {
   return parsed;
 }
 
+export type ThreadMetadata = Pick<ThreadRecord, "id" | "title" | "href" | "updatedAt">;
+export type DraftUpdate = ThreadMetadata & Pick<ThreadRecord, "draft">;
+
+function mergeMessage(messages: Map<string, SavedMessage>, message: SavedMessage) {
+  const prior = messages.get(message.id);
+  // Only the companion's increasing snapshot revision can supersede a
+  // versioned message. Older tabs and legacy whole-thread saves cannot rewind it.
+  if (prior?.revision !== undefined && (message.revision === undefined || message.revision <= prior.revision)) return;
+  messages.set(message.id, message);
+}
+
 export type Mutation =
   | { type: "catch-up"; state: NonNullable<Data["catchUp"]> }
   | { type: "workspace-navigation"; collapsed: boolean }
@@ -77,10 +95,14 @@ export type Mutation =
   | { type: "canvas-cache"; cache: NonNullable<Data['canvasCache']> }
   | { type: "model"; model: { id: string; effort?: string } }
   | { type: "thread"; thread: ThreadRecord }
+  | { type: "draft"; draft: DraftUpdate }
+  | { type: "message"; thread: ThreadMetadata; message: SavedMessage }
   | { type: "task"; task: PersonalTask }
   | { type: "toggle-task"; id: string }
   | { type: "enqueue"; command: UserCommand; createdAt: string }
-  | { type: "ack"; requestId: string };
+  | { type: "ack"; requestId: string }
+  | { type: "cancel"; requestId: string }
+  | { type: "ack-cancellation"; requestId: string };
 export function mutate(current: Data, op: Mutation): Data {
   const next = { ...current, revision: (current.revision ?? 0) + 1 };
   if (op.type === "catch-up") next.catchUp = op.state;
@@ -94,10 +116,24 @@ export function mutate(current: Data, op: Mutation): Data {
   } else if (op.type === "model") {
     if (!op.model || typeof op.model.id !== "string" || (op.model.effort !== undefined && typeof op.model.effort !== "string")) throw new Error("Invalid model preference.");
     next.model = op.model;
+  } else if (op.type === "draft") {
+    const prior = current.threads[op.draft.id];
+    next.threads = {
+      ...current.threads,
+      [op.draft.id]: { ...prior, ...op.draft, messages: prior?.messages ?? [] },
+    };
+  } else if (op.type === "message") {
+    const prior = current.threads[op.thread.id];
+    const messages = new Map((prior?.messages ?? []).map(message => [message.id, message]));
+    mergeMessage(messages, op.message);
+    next.threads = {
+      ...current.threads,
+      [op.thread.id]: { ...prior, ...op.thread, draft: prior?.draft ?? "", messages: [...messages.values()] },
+    };
   } else if (op.type === "thread") {
     const prior = current.threads[op.thread.id];
     const messages = new Map((prior?.messages ?? []).map((m) => [m.id, m]));
-    for (const message of op.thread.messages) messages.set(message.id, message);
+    for (const message of op.thread.messages) mergeMessage(messages, message);
     next.threads = {
       ...current.threads,
       [op.thread.id]: { ...op.thread, messages: [...messages.values()] },
@@ -112,6 +148,7 @@ export function mutate(current: Data, op: Mutation): Data {
     );
   else if (op.type === "enqueue") {
     const c = op.command;
+    if (current.cancelledRequests?.[c.requestId]) return next;
     const prior = current.threads[c.sourceThreadId];
     const messages = prior?.messages ?? [];
     next.threads = {
@@ -120,7 +157,7 @@ export function mutate(current: Data, op: Mutation): Data {
         id: c.sourceThreadId,
         title: c.title,
         href: c.href,
-        draft: "",
+        draft: prior?.draft ?? "",
         messages: messages.some((m) => m.id === c.requestId)
           ? messages
           : [
@@ -140,6 +177,13 @@ export function mutate(current: Data, op: Mutation): Data {
   } else if (op.type === "ack") {
     next.outbox = { ...current.outbox };
     delete next.outbox[op.requestId];
+  } else if (op.type === "cancel") {
+    next.outbox = { ...current.outbox };
+    delete next.outbox[op.requestId];
+    next.cancelledRequests = { ...current.cancelledRequests, [op.requestId]: true };
+  } else if (op.type === "ack-cancellation") {
+    next.cancelledRequests = { ...current.cancelledRequests };
+    delete next.cancelledRequests[op.requestId];
   } else throw new Error("Invalid browser mutation");
   return next;
 }

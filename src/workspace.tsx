@@ -8,7 +8,7 @@ import {
 } from "./workspace-files";
 import { MaterialStatus } from "./material-status";
 import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { MarkdownDocument, MarkdownImage, MarkdownLink, MarkdownStyles, markdownPlugins, markdownRehypePlugins, preprocessMarkdown } from "./markdown-rendering";
 import { useCallback, useEffect, useReducer, useState } from "react";
 import {
   Download,
@@ -391,7 +391,7 @@ export function Workspace({
                       hidden={path !== selected}
                     >
                       {previews[path] ? (
-                        <FilePreview file={previews[path]} actions={path === selected ? fileActions : null} />
+                        <FilePreview file={previews[path]} openFile={openFile} actions={path === selected ? fileActions : null} />
                       ) : loading && path === selected ? (
                         <p className="workspace-file-hint">Loading preview…</p>
                       ) : (
@@ -650,7 +650,7 @@ function FileTreeItem({
     </li>
   );
 }
-function FilePreview({ file, actions }: { file: Preview; actions: HTMLElement | null }) {
+function FilePreview({ file, actions, openFile }: { file: Preview; actions: HTMLElement | null; openFile: (path: string) => void }) {
   const [htmlSource, setHtmlSource] = useState(false);
   const [url, setUrl] = useState("");
   const bytes = Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0));
@@ -729,7 +729,10 @@ function FilePreview({ file, actions }: { file: Preview; actions: HTMLElement | 
         />
       ) : /\.(md|markdown)$/i.test(file.path) ? (
         <div className="workspace-markdown">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+          <MarkdownDocument.Provider value={{path: file.path, open: openFile}}>
+            <MarkdownStyles />
+            <ReactMarkdown remarkPlugins={markdownPlugins} rehypePlugins={markdownRehypePlugins} components={{a: MarkdownLink, img: MarkdownImage}}>{preprocessMarkdown(text)}</ReactMarkdown>
+          </MarkdownDocument.Provider>
         </div>
       ) : (
         <pre className="workspace-text">
