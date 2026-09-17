@@ -13,6 +13,8 @@ export const useMaterialSync=()=>useSyncExternalStore(listener=>{listeners.add(l
 let running: Promise<void> | undefined;
 let controller: AbortController | undefined;
 let stopped = false;
+// Match the extension and companion limits; bound in-memory file buffers too.
+const TRANSFER_CONCURRENCY = 4;
 const encoded = (bytes:Uint8Array) => {let value="";for(let i=0;i<bytes.length;i+=32768)value+=String.fromCharCode(...bytes.subarray(i,i+32768));return btoa(value)};
 
 async function download(material:Material, signal:AbortSignal):Promise<Uint8Array> {
@@ -27,7 +29,7 @@ async function download(material:Material, signal:AbortSignal):Promise<Uint8Arra
     const chunks:Uint8Array[]=[];let size=0;
     try {
       while(true){signal.throwIfAborted();const part=await request({op:"next",id});if(part.done)break;const bytes=Uint8Array.from(atob(part.base64),c=>c.charCodeAt(0));size+=bytes.length;if(size>100*1024*1024)throw new Error("File exceeds 100 MB.");chunks.push(bytes);}
-    } catch(error){void request({op:"cancel",id}).catch(()=>{});throw error;}
+    } catch(error){await request({op:"cancel",id}).catch(()=>{});throw error;}
     const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length}return bytes;
   }
   let response:Response;
@@ -43,18 +45,20 @@ async function download(material:Material, signal:AbortSignal):Promise<Uint8Arra
   } catch(error) {await reader.cancel();throw error;}
   const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length}return bytes;
 }
-async function transfer(material:Material,signal:AbortSignal) {
+async function transfer(material:Material,signal:AbortSignal,checkActive:()=>void) {
   const bytes=await download(material,signal);
-  signal.throwIfAborted();
+  checkActive();
   const {text,downloadUrl,...metadata}=material;
   const {transferId}=await materialRequest<{transferId:string}>({op:"begin",material:metadata});
   try {
     for(let offset=0;offset<bytes.length;offset+=384*1024) {
-      signal.throwIfAborted();
+      checkActive();
       await materialRequest({op:"chunk",transferId,offset,base64:encoded(bytes.subarray(offset,offset+384*1024))});
     }
-    await materialRequest({op:"commit",transferId,size:bytes.length,hash:await sha256(bytes)});
-  } catch(error) {void materialRequest({op:"cancel",transferId}).catch(()=>{});throw error;}
+    const hash=await sha256(bytes);
+    checkActive();
+    await materialRequest({op:"commit",transferId,size:bytes.length,hash});
+  } catch(error) {await materialRequest({op:"cancel",transferId}).catch(()=>{});throw error;}
 }
 async function perform(courseId?:number,force=false,downloadsOnly=false) {
   controller=new AbortController();
@@ -76,16 +80,33 @@ async function perform(courseId?:number,force=false,downloadsOnly=false) {
     const {receipts,directory}=await materialRequest<{receipts:Record<string,MaterialReceipt>;directory:string}>({op:"manifest"});
     update({directory,phase:"syncing",detail:"Syncing course materials…"});
     const errors=[...catalog.errors],changes:string[]=[];
-    let completed=0;
-    for(const resource of catalog.resources) {
+    let completed=0, next=0;
+    const active=new Set<Material>();
+    const progress=()=>update({completed,detail:active.size>1 ? `Downloading ${active.size} materials in parallel` : active.size===1 ? `Downloading ${[...active][0].title}` : "Syncing course materials…"});
+    const checkActive=()=>{
+      signal.throwIfAborted();
       if(stopped || connectionState().status!=="connected" || connectionState().workspaceId!==workspace) throw new Error("Material sync paused. It will retry when your computer reconnects.");
-      if(receipts[resource.id]?.revision!==resource.revision || receipts[resource.id]?.path!==`${directory}/${resource.path}`) {
-        update({detail:`Downloading ${resource.title}`});
-        try {await transfer(resource,signal);changes.push(resource.title);}
-        catch(error){signal.throwIfAborted();errors.push(`${resource.title}: ${(error as Error).message}`);}
-      }
-      completed++;update({completed});
-    }
+    };
+    let failed=false;
+    const worker=async()=>{
+      try {
+        while(next<catalog.resources.length && !failed) {
+          checkActive();
+          const resource=catalog.resources[next++];
+          if(receipts[resource.id]?.revision!==resource.revision || receipts[resource.id]?.path!==`${directory}/${resource.path}`) {
+            active.add(resource);progress();
+            try {await transfer(resource,signal,checkActive);changes.push(resource.title);}
+            catch(error){checkActive();errors.push(`${resource.title}: ${(error as Error).message}`);}
+            finally {active.delete(resource);}
+          }
+          completed++;progress();
+        }
+      } catch(error) {failed=true;throw error;}
+    };
+    // Drain every worker before releasing the cross-tab lock or starting a retry.
+    const workers=await Promise.allSettled(Array.from({length:Math.min(TRANSFER_CONCURRENCY,catalog.resources.length)},worker));
+    const failure=workers.find(result=>result.status==="rejected");
+    if(failure?.status==="rejected")throw failure.reason;
     update({phase:errors.length?"error":"idle",errors,changes,detail:errors.length?`${errors.length} material sync issue${errors.length===1?"":"s"}`:`${completed} materials up to date`});
   } catch(error) { if(!signal.aborted)update({phase:"error",detail:"Material sync needs attention",errors:[...state.errors,(error as Error).message]}); }
 }

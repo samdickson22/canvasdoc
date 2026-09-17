@@ -61,3 +61,15 @@ test("renaming a synced source removes only its unchanged old copy",async()=>{
   assert.equal(await readFile(path.join(root,renamed.path),"utf8"),"Fresh source");
  }finally{await rm(root,{recursive:true,force:true})}
 });
+
+test("four concurrent material transfers retain every file and receipt",async()=>{
+ const {root,mirror}=await fixture();try{
+  const receipts=await Promise.all(Array.from({length:4},(_,id)=>put(mirror,`Content ${id}`,{...material,id:`1:file:${id}`,path:`course-1/materials/files/file-${id}.txt`})));
+  const manifest=(await mirror.handle({account,op:"manifest"}) as any).receipts;
+  assert.equal(Object.keys(manifest).length,4);
+  for(let id=0;id<4;id++){
+   assert.equal(await readFile(path.join(root,receipts[id].path),"utf8"),`Content ${id}`);
+   assert.deepEqual(manifest[`1:file:${id}`],receipts[id]);
+  }
+ }finally{await rm(root,{recursive:true,force:true})}
+});

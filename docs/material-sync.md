@@ -34,7 +34,7 @@ Names are readable in Finder and agent directory listings. IDs remain suffixes t
 
 ## Transport and UI
 
-`canvasdoc-cli@0.1.4` advertises material support. The browser transfers files in 384 KiB chunks, below native-message limits, with a 100 MiB per-file ceiling. Work occurs outside the agent-turn queue. Older companions still support chat and show an update notice for material downloads.
+`canvasdoc-cli@0.1.4` advertises material support. The browser transfers files in 384 KiB chunks, below native-message limits, with a 100 MiB per-file ceiling. Up to four materials download and transfer concurrently, matching the extension and companion limits. Progress counts completed materials; individual failures do not block the remaining queue. Retries skip receipts whose revisions and paths still match. Local file and receipt commits remain serialized to avoid lost manifest updates. Work occurs outside the agent-turn queue. Older companions still support chat and show an update notice for material downloads.
 
 The extension worker downloads Canvas-authorized files when browser CORS would block a redirect. It resolves file URLs from Canvas metadata rather than accepting arbitrary remote URLs. The development loader uses ordinary browser fetch; cross-origin downloads without CORS may fail there even when an installed extension can fetch them. Other CDN/custom-domain permissions may need extending for a school's deployment.
 
