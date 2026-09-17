@@ -85,3 +85,13 @@ test("extension background serializes concurrent tabs without losing either task
   );
   assert.equal(replied, false);
 });
+
+test("native relay forwards the Canvas account and rejects an account from another origin", async () => {
+ let onConnect:any;let incoming:any;let disconnected=false;const forwarded:any[]=[];const replies:any[]=[];
+ const native={onMessage:{addListener(){}},onDisconnect:{addListener(){}},postMessage:(m:any)=>forwarded.push(m),disconnect(){}};
+ const chrome={runtime:{id:"test-extension",onMessage:{addListener(){}},onConnect:{addListener(fn:any){onConnect=fn}},connectNative:()=>native}};
+ vm.runInNewContext(await readFile("dist/background.js","utf8"),{chrome,console,URL});
+ onConnect({name:"canvasdoc:runtime",sender:{id:"test-extension",url:"https://canvas.calpoly.edu/courses/1"},onMessage:{addListener(fn:any){incoming=fn}},onDisconnect:{addListener(){}},postMessage:(m:any)=>replies.push(m),disconnect(){disconnected=true}});
+ const handshake={type:"connect",account:"canvasdoc:v1:https://canvas.calpoly.edu:123"};incoming(handshake);assert.equal(forwarded[0],handshake);
+ incoming({type:"connect",account:"canvasdoc:v1:http://localhost:3210:123"});assert.equal(forwarded.length,1);assert.equal(disconnected,true);assert.equal(replies[0].code,"account_mismatch");
+});
