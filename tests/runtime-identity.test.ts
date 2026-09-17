@@ -4,7 +4,7 @@ import { build } from "esbuild";
 import vm from "node:vm";
 
 // Bundle the real browser consumer; replace only storage and browser transports.
-async function browser(native = false) {
+async function browser(native = false, persistMessage = async (_message: any) => {}) {
   const result = await build({entryPoints:["src/runtime/client.ts"],bundle:true,write:false,format:"iife",globalName:"client",plugins:[{name:"store",setup(b){
     b.onResolve({filter:/^\.\.\/store$/},()=>({path:"store",namespace:"fixture"}));
     b.onLoad({filter:/.*/,namespace:"fixture"},()=>({contents:"export const store = globalThis.testStore;"}));
@@ -19,6 +19,7 @@ async function browser(native = false) {
       const index=messages.findIndex((m:any)=>m.id===message.id);
       if(index<0)messages.push(message);else messages[index]=message;
       data.threads[thread.id]={...previous,...thread,messages};
+      await persistMessage(message);
       return true;
     },
     cancel:async(id:string)=>{delete data.outbox[id];data.cancelledRequests[id]=true;return true},
@@ -36,6 +37,34 @@ async function browser(native = false) {
   const hello=()=>({type:"connected",account,workspace:{workspaceId:"workspace-one"},runs:[]});
   return {client:context.client,connect,receive,hello,sent,data,sockets,switchAccount:()=>{account="canvasdoc:v1:http://localhost:3210:bob"}};
 }
+
+test("streamed text advances while browser saves are pending; delivery waits for persistence", async () => {
+  const writes: { message: any; finish: () => void }[] = [];
+  const b = await browser(false, message => new Promise<void>(finish => writes.push({ message, finish })));
+  const socket = b.connect();
+  try {
+    b.receive(socket, b.hello());
+    const run = {
+      command: { requestId: "stream", sourceThreadId: "assignment:1:1", text: "Explain", title: "Assignment", href: "/courses/1/assignments/1" },
+      status: "working", text: "First", revision: 1, createdAt: "2026-01-01",
+    };
+    const reply = () => b.data.threads[run.command.sourceThreadId].messages.find((m: any) => m.role === "assistant");
+    b.receive(socket, { type: "run", run });
+    assert.equal(reply()?.text, "First");
+    b.receive(socket, { type: "run", run: { ...run, text: "First and second", revision: 2 } });
+    assert.equal(reply()?.text, "First and second");
+    b.receive(socket, { type: "run", run: { ...run, text: "Finished", status: "completed", revision: 3 } });
+    assert.equal(reply()?.text, "Finished");
+    assert.equal(writes.filter(w => w.message.role === "user").length, 1);
+    assert.equal(b.sent.some(m => m.type === "ack-delivery"), false);
+    for (const write of writes) write.finish();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(b.sent.filter(m => m.type === "ack-delivery").length, 1);
+  } finally {
+    for (const write of writes) write.finish();
+    b.client.disconnect();
+  }
+});
 
 test("browser handshake binds account; replies stay in their source conversation and stale sockets cannot replay",async()=>{
  const b=await browser();const old=b.connect();assert.equal(b.sent[0].account,"canvasdoc:v1:http://localhost:3210:alice");b.receive(old,b.hello());

@@ -131,13 +131,17 @@ async function applyRun(run: any) {
     else messages[index] = message;
   }
   // Each event is a complete response snapshot, so replay does not duplicate deltas.
-  if (JSON.stringify(previous?.messages) !== JSON.stringify(messages))
-    for (const message of messages.filter(m => m.id === c.requestId || m.id === `assistant:${c.requestId}`)) await store.saveMessage({
+  // Publish all changed messages optimistically before waiting for storage.
+  // Awaiting the user-message save first makes every text update queue behind disk I/O.
+  await Promise.all(messages.filter(message =>
+    (message.id === c.requestId || message.id === `assistant:${c.requestId}`) &&
+    JSON.stringify(previous?.messages.find(prior => prior.id === message.id)) !== JSON.stringify(message),
+  ).map(message => store.saveMessage({
       id: c.sourceThreadId,
       title: c.title,
       href: c.href,
       updatedAt: new Date().toISOString(),
-    }, message);
+    }, message)));
   if (account !== connectionAccount || account !== store.account()) return;
   const persisted = store.committed().threads[c.sourceThreadId];
   if (
