@@ -45,10 +45,14 @@ export function Conversation({
   const [sendError, setSendError] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [uploadStates, setUploadStates] = useState<Record<string, AttachmentUploadState>>({});
-  const speechAdapter = useMemo(() =>
-    typeof window.speechSynthesis !== "undefined" && typeof SpeechSynthesisUtterance !== "undefined"
-      ? new WebSpeechSynthesisAdapter()
-      : undefined, []);
+  const speechText = useRef("");
+  const speechAdapter = useMemo(() => {
+    if (typeof window.speechSynthesis === "undefined" || typeof SpeechSynthesisUtterance === "undefined") return;
+    const browserSpeech = new WebSpeechSynthesisAdapter();
+    // assistant-ui supplies all message text by default, including the work trace.
+    // The clicked message's action selects its final answer before playback starts.
+    return { speak: () => browserSpeech.speak(speechText.current) };
+  }, []);
   const attachmentAdapter = useMemo(() => createAttachmentAdapter({
     upload: uploadFile,
     onError: setSendError,
@@ -229,6 +233,7 @@ export function Conversation({
           {(connection.canReconnectAgent || Object.values(connection.runs).some((run: any) => run.command.sourceThreadId === context.threadId && ["uncertain", "recovering"].includes(run.status))) &&
             <div className="approval-card"><p>The agent's last result needs to be checked before continuing.</p><button type="button" onClick={() => { try { reconnectAgent(); } catch (error) { setSendError((error as Error).message); } }}>Reconnect agent</button></div>}
           <ChatGPT
+            onReadAloud={speechAdapter ? text => { speechText.current = text; } : undefined}
             queuedMessages={queuedMessages}
             onCancelQueued={stopRun}
             composerFooter={home && !!saved?.messages.length && <button type="button" className="home-history-toggle" aria-pressed={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? "Hide previous conversation" : "Show previous conversation"}</button>}

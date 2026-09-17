@@ -4,6 +4,7 @@ import {
   presentMessage,
   summarizeActivity,
   formatRunDuration,
+  finalAnswerText,
 } from "../src/runtime/message-presentation.ts";
 import type { DisplayPart } from "../companion/message-parts.ts";
 import { projectItem } from "@harness-sdk/codex/projection";
@@ -22,6 +23,17 @@ const base: SavedMessage = {
   text: "",
   createdAt: "2026-09-16T20:00:00Z",
 };
+
+test("Read Aloud never falls back to a commentary-only work trace", () => {
+  for (const status of ["completed", "interrupted", "error"]) {
+    const message = presentMessage({ ...base, run: { status }, parts: [
+      { type: "text", phase: "commentary", text: "I will create the file." },
+      { type: "reasoning", text: "Checking the assignment requirements." },
+    ] });
+    assert.ok(Array.isArray(message.content));
+    assert.equal(finalAnswerText(message.content), "");
+  }
+});
 
 test("final answers stay outside folded work through completion and offline replay", () => {
   const run = { text: "", parts: [] as DisplayPart[] };

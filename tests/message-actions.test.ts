@@ -38,7 +38,7 @@ test("Read Aloud uses browser speech, supports Stop, and Regenerate sends a fres
     // real. Only replace unrelated network operations and presentation chrome.
     const mocks: Record<string, string> = {
       client: `const state={status:'connected',runs:{},approvals:[]}; export const useConnection=()=>state; export const sendMessage=async(...args)=>{globalThis.sent.push(args)}; export const stopRun=async()=>{}; export const reconnectAgent=()=>{}; export const answerApproval=()=>{}; export const answerQuestions=()=>{}; export const uploadFile=async()=>'';`,
-      chat: `import {ActionBarPrimitive,AuiIf,MessagePrimitive,ThreadPrimitive,useAui} from '@assistant-ui/react'; export function ChatGPT(){globalThis.aui=useAui();return <ThreadPrimitive.Messages>{({message})=>message.role==='assistant'?<MessagePrimitive.Root><ActionBarPrimitive.Copy>Copy</ActionBarPrimitive.Copy><ActionBarPrimitive.Reload>Regenerate</ActionBarPrimitive.Reload><AuiIf condition={s=>s.message.speech==null}><ActionBarPrimitive.Speak>Read aloud</ActionBarPrimitive.Speak></AuiIf><AuiIf condition={s=>s.message.speech!=null}><ActionBarPrimitive.StopSpeaking>Stop reading</ActionBarPrimitive.StopSpeaking></AuiIf></MessagePrimitive.Root>:null}</ThreadPrimitive.Messages>}`,
+      chat: `import {ActionBarPrimitive,AuiIf,MessagePrimitive,ThreadPrimitive,useAui} from '@assistant-ui/react'; import {finalAnswerText} from './src/runtime/message-presentation.ts'; export function ChatGPT({onReadAloud}){globalThis.aui=useAui();return <ThreadPrimitive.Messages>{({message})=>message.role==='assistant'?<MessagePrimitive.Root><ActionBarPrimitive.Copy>Copy</ActionBarPrimitive.Copy><ActionBarPrimitive.Reload>Regenerate</ActionBarPrimitive.Reload><AuiIf condition={s=>s.message.speech==null}><ActionBarPrimitive.Speak disabled={!finalAnswerText(message.parts)} onClick={()=>onReadAloud(finalAnswerText(message.parts))}>Read aloud</ActionBarPrimitive.Speak></AuiIf><AuiIf condition={s=>s.message.speech!=null}><ActionBarPrimitive.StopSpeaking>Stop reading</ActionBarPrimitive.StopSpeaking></AuiIf></MessagePrimitive.Root>:null}</ThreadPrimitive.Messages>}`,
       materials: `export const materialContext=()=>'';`,
       catchup: `export const catchUp=async()=>{};`,
       link: `import {createContext} from 'react'; export const FileLinkThread=createContext('');`,
@@ -53,7 +53,12 @@ test("Read Aloud uses browser speech, supports Stop, and Regenerate sends a fres
     await initializeStore("synthetic");
     const thread = { id: "assignment:1:1", title: "Lab", href: "/courses/1/assignments/1", updatedAt: new Date().toISOString() };
     await store.saveMessage(thread, { id: "question", role: "user", text: "Explain gravity.", createdAt: new Date().toISOString() });
-    await store.saveMessage(thread, { id: "answer", role: "assistant", text: "Gravity attracts masses.", createdAt: new Date().toISOString(), run: {status: "completed"} });
+    await store.saveMessage(thread, { id: "answer", role: "assistant", text: "I will check the notes.\n\nGravity attracts masses.", createdAt: new Date().toISOString(), run: {status: "completed"}, parts: [
+      { type: "text", phase: "commentary", text: "I will check the notes." },
+      { type: "reasoning", text: "Checking the physics explanation." },
+      { type: "tool-call", toolCallId: "read", toolName: "Run command", args: {}, argsText: "{}", result: "Notes read." },
+      { type: "text", phase: "final_answer", text: "Gravity attracts masses." },
+    ], artifacts: [{path:"notes.md",status:"available",checkedAt:new Date().toISOString(),size:100,mime:"text/markdown"}] });
     const React = await import("react");
     const { createRoot } = await import("react-dom/client");
     root = createRoot(document.getElementById("root")!);

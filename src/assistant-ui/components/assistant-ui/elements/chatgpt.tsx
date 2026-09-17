@@ -35,8 +35,10 @@ import { Reasoning } from "./reasoning.aui";
 import { attachmentWorkspaceHref, type AttachmentUploadState } from "../../../../runtime/attachments";
 import { WorkspaceLink } from "../../../../workspace-link";
 import { SelectionQuote, ComposerQuote, AttachmentPreview, QueuedMessages, type QueuedMessage } from "./chat-extras";
+import { finalAnswerText } from "../../../../runtime/message-presentation";
 
 type WorkOptions = {
+  onReadAloud?: (text: string) => void;
   queuedMessages?: readonly QueuedMessage[];
   onCancelQueued?: (id: string) => Promise<void>;
   uploadStates?: Readonly<Record<string, AttachmentUploadState>>;
@@ -359,7 +361,8 @@ const assistantActionClassName =
   "flex size-8 items-center justify-center rounded-lg text-[#5d5d5d] transition-colors hover:bg-black/[0.07] hover:text-[#5d5d5d] dark:text-[#cdcdcd] dark:hover:bg-white/15 dark:hover:text-[#cdcdcd]";
 
 const AssistantMessage: FC = () => {
-  const { queuedMessages } = useContext(WorkContext);
+  const { queuedMessages, onReadAloud } = useContext(WorkContext);
+  const spokenText = useAuiState(s => finalAnswerText(s.message.parts));
   return (
     <MessagePrimitive.Root className="relative mx-auto flex w-full max-w-3xl flex-col">
       <div className="text-[#0d0d0d] dark:text-[#ececec]">
@@ -402,7 +405,7 @@ const AssistantMessage: FC = () => {
             </TooltipIconButton>
           </ActionBarPrimitive.Copy>
           <AuiIf condition={(s) => s.message.speech == null}>
-          <ActionBarPrimitive.Speak asChild>
+          <ActionBarPrimitive.Speak asChild disabled={!spokenText || !onReadAloud} onClick={() => onReadAloud?.(spokenText)}>
             <TooltipIconButton
               tooltip="Read aloud"
               side="top"

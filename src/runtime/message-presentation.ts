@@ -1,4 +1,4 @@
-import type { ThreadMessageLike } from "@assistant-ui/react";
+import type { ThreadMessage, ThreadMessageLike } from "@assistant-ui/react";
 import type { SavedMessage } from "../types.ts";
 import type { DisplayPart } from "../../companion/message-parts.ts";
 
@@ -9,6 +9,11 @@ export const formatRunDuration = (ms: number) => {
     : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 };
 
+export const finalAnswerText = (parts: readonly ThreadMessage["content"][number][]) => parts.flatMap(part =>
+  part.type === "text" && part.providerMetadata?.canvasdoc?.work === false &&
+  part.providerMetadata?.canvasdoc?.itemId !== "artifact-evidence" ? [part.text] : [],
+).join("\n\n").trim();
+
 export function presentMessage(message: SavedMessage): ThreadMessageLike {
   const parts: readonly DisplayPart[] = message.parts?.length
     ? message.parts
@@ -18,7 +23,7 @@ export function presentMessage(message: SavedMessage): ThreadMessageLike {
   );
   if (finalIndex < 0 && (!message.run || message.run.status === "completed")) {
     finalIndex = parts.reduce(
-      (last, p, index) => (p.type === "text" && p.text.trim() ? index : last),
+      (last, p, index) => (p.type === "text" && p.phase !== "commentary" && p.text.trim() ? index : last),
       -1,
     );
   }
