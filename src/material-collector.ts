@@ -18,16 +18,24 @@ export async function collectMaterials(signal: AbortSignal, previous?: MaterialC
   if (onlyCourse) for (const resource of previous?.resources ?? []) if(resource.courseId !== onlyCourse) resources.set(resource.id, resource);
   async function single(endpoint:string,ttl:number):Promise<any> {
     const cached=responses[endpoint];
-    if(!force && cached && Date.now()-cached.at < (cached.error ? 6*60*60*1000 : ttl)) {
+    if(!force && cached && Date.now()-cached.at < (cached.error ? (/\((403|404)\)/.test(cached.error) ? 6*60*60*1000 : 30000) : ttl)) {
       if(cached.error)throw new Error(cached.error);
       return cached.value[0];
     }
-    try {const value=await canvasRead<any>(endpoint,signal);responses[endpoint]={at:Date.now(),value:[value]};return value;}
-    catch(error){signal.throwIfAborted();const message=(error as Error).message;if(/\((403|404)\)/.test(message))responses[endpoint]={at:Date.now(),value:[],error:message};throw error;}
+    try {const value=await canvasRead<any>(endpoint,signal);responses[endpoint]={at:Date.now(),successfulAt:Date.now(),value:[value]};return value;}
+    catch(error){signal.throwIfAborted();const message=(error as Error).message;responses[endpoint]={at:Date.now(),successfulAt:cached?.successfulAt,value:cached?.value || [],error:message};throw error;}
   }
   const courseKey="active-courses";
   let knownCourses=responses[courseKey]?.value as Course[] | undefined;
-  if(!knownCourses || force || Date.now()-responses[courseKey].at>15*60*1000){knownCourses=await readCourses(signal);responses[courseKey]={at:Date.now(),value:knownCourses};}
+  if(!knownCourses || force || responses[courseKey]?.error || Date.now()-responses[courseKey].at>15*60*1000) {
+    try {knownCourses=await readCourses(signal);responses[courseKey]={at:Date.now(),successfulAt:Date.now(),value:knownCourses};}
+    catch(error) {
+      signal.throwIfAborted();
+      const message=(error as Error).message;
+      responses[courseKey]={at:Date.now(),successfulAt:responses[courseKey]?.successfulAt,value:knownCourses || [],error:message};
+      return {checkedAt:new Date().toISOString(),resources:previous?.resources || [],errors:[...(previous?.errors || []).filter(error=>!error.startsWith("Course discovery:")),`Course discovery: ${message}`],notices:previous?.notices,responses};
+    }
+  }
   const courses=onlyCourse ? [knownCourses.find(course=>course.id===onlyCourse) || await single(`/api/v1/courses/${onlyCourse}`,60*60*1000)] : knownCourses;
   for (const course of courses) {
     signal.throwIfAborted();
@@ -40,16 +48,16 @@ export async function collectMaterials(signal: AbortSignal, previous?: MaterialC
     const failed = new Set<string>();
     async function list(endpoint: string, category: string): Promise<any[]> {
       const cached=responses[endpoint];
-      const ttl=cached?.error ? 6*60*60*1000 : category === "assignment" ? 5*60*1000 : 15*60*1000;
+      const ttl=cached?.error ? (/\((403|404)\)/.test(cached.error) ? 6*60*60*1000 : 30000) : category === "assignment" ? 5*60*1000 : 15*60*1000;
       if(!force && cached && Date.now()-cached.at < ttl) {
         if(cached.error){failed.add(category);(cached.notice ? notices : errors).push(`${course.name}: ${category}: ${cached.error}`);}
         return cached.value;
       }
-      try { const value=await canvasPages<any>(endpoint,signal);responses[endpoint]={at:Date.now(),value};return value; }
+      try { const value=await canvasPages<any>(endpoint,signal);responses[endpoint]={at:Date.now(),successfulAt:Date.now(),value};return value; }
       catch(error) {
         signal.throwIfAborted();const message=(error as Error).message;
         const notice = error instanceof CanvasAccessError && (error.unavailable || (category === "file" && error.status === 403));
-        if(/\((403|404)\)/.test(message))responses[endpoint]={at:Date.now(),value:cached?.value || [],error:message,notice};
+        responses[endpoint]={at:Date.now(),successfulAt:cached?.successfulAt,value:cached?.value || [],error:message,notice};
         failed.add(category);
         (notice ? notices : errors).push(`${course.name}: ${category}: ${category === "file" && notice ? "Canvas does not allow listing this folder. Linked files are checked separately." : message}`);
         return cached?.value || [];
@@ -67,11 +75,19 @@ export async function collectMaterials(signal: AbortSignal, previous?: MaterialC
       const detail = await single(`${base}?include[]=syllabus_body`,60*60*1000);
       addDocument("course","materials/course.md",course.name,`${location.origin}/courses/${course.id}`, detail.syllabus_body || "",`Course code: ${course.course_code}\n\nCanvas is authoritative. These are downloaded reference materials. Put drafts in work/ folders; do not edit synced sources.`);
     } catch(error) { signal.throwIfAborted(); failed.add("course"); errors.push(`${course.name}: syllabus: ${(error as Error).message}`); }
-    const assignments = await list(`${base}/assignments?include[]=submission&per_page=100`,"assignment");
-    for(const a of assignments) {
+    const assignmentKey=`${base}/assignments?include[]=submission&per_page=100`;
+    const assignments = new Map((await list(assignmentKey,"assignment")).map(a=>[a.id,a]));
+    // A page read can discover an assignment before the cached listing refreshes.
+    for(const [endpoint,observed] of Object.entries(responses)) {
+      if(endpoint.startsWith(`${base}/assignments/`) && !observed.error && observed.successfulAt && observed.successfulAt > (responses[assignmentKey]?.successfulAt ?? 0)) {
+        const a=observed.value[0];
+        if(a) assignments.set(a.id,a);
+      }
+    }
+    for(const a of assignments.values()) {
       if(a.locked_for_user) continue;
       addDocument(`assignment:${a.id}`,`assignments/${resourceName(a.id,a.name)}/sources/assignment.md`,a.name,a.html_url,a.description,
-        `Due: ${a.due_at || "No due date"}\n\nPoints: ${a.points_possible ?? "None"}\n\nSubmission state: ${a.submission?.workflow_state || "unknown"}\n\nRubric:\n${a.rubric ? JSON.stringify(a.rubric,null,2) : "None provided"}`);
+        `Due: ${a.due_at || "No due date"}\n\nPoints: ${a.points_possible ?? "None"}\n\nSubmission state: ${a.submission?.workflow_state || "unknown"}\n\nRubric:\n${a.rubric ? JSON.stringify(a.rubric,null,2) : "Not returned by Canvas; check the assignment page before assuming there is no rubric"}`);
     }
     const pages = await list(`${base}/pages?per_page=100`,"page");
     for(const page of pages) {
