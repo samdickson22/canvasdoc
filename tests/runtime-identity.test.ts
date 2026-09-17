@@ -46,3 +46,16 @@ test("browser native connection sends its account handshake before commands",asy
  const port=b.sockets[0];port.receive(b.hello());b.client.answerApproval("approval-one","decline");assert.equal(b.sent[1].account,b.hello().account);
  b.switchAccount();assert.throws(()=>b.client.answerApproval("approval-one","accept"),/account changed/);assert.equal(b.sent.length,2);b.client.disconnect();
 });
+
+
+test("native disconnect preserves the connector rejection and reconnect clears it",async()=>{
+ const b=await browser(true);b.client.connectNative();
+ const port=b.sockets[0];
+ const message="This existing Canvasdoc folder has no verified Canvas account binding. Select a new Canvasdoc folder for this account.";
+ port.receive({type:"error",code:"ACCOUNT_BINDING_REQUIRED",message});
+ port.receive({type:"native-disconnected",message:"Native host has exited."});
+ assert.equal(b.client.connectionState().error,message);
+ assert.equal(b.client.connectionState().status,"disconnected");
+ b.client.connectNative();assert.equal(b.client.connectionState().error,undefined);
+ b.sockets[1].receive(b.hello());assert.equal(b.client.connectionState().status,"connected");b.client.disconnect();
+});

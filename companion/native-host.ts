@@ -26,6 +26,7 @@ function send(value: unknown) {
 }
 const socket = new WebSocket(`ws://127.0.0.1:${port}`, { origin });
 let connected = false;
+let reportedError = false;
 let handshake: Record<string, unknown> | undefined;
 function connect() {
   if (handshake && socket.readyState === WebSocket.OPEN)
@@ -34,20 +35,22 @@ function connect() {
 socket.on("open", connect);
 socket.on("message", (data) => {
   const value = JSON.parse(data.toString());
+  if (value.type === "error") reportedError = true;
   if (value.type === "connected") {
     connected = true;
-
+    reportedError = false;
   }
   send(value);
 });
-socket.on("error", () =>
+socket.on("error", () => {
+  reportedError = true;
   send({
     type: "error",
     message: "Start the Canvasdoc connector from your selected folder.",
-  }),
-);
+  });
+});
 socket.on("close", (code, reason) => {
-  send({type:"error", message: code === 1008 ? `Connector rejected the connection: ${reason.toString()}` : `Local connector closed (${code}). Restart Canvasdoc and reconnect.`});
+  if (!reportedError) send({type:"error", message: code === 1008 ? `Connector rejected the connection: ${reason.toString()}` : `Local connector closed (${code}). Restart Canvasdoc and reconnect.`});
   process.stdout.write("", () => process.exit(0));
 });
 let buffer = Buffer.alloc(0);

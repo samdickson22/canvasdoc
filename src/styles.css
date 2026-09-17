@@ -665,9 +665,15 @@ select {
   font-size: 12px;
   margin-bottom: 18px;
 }
-.connection-content .primary-button {
-  float: right;
+.connection-content {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
 }
+.connection-content > p { margin: 0; }
+.connection-content > button { align-self: flex-start; }
+.connection-content .error { margin: 0; overflow-wrap: anywhere; }
 .personal-page {
   padding: 35px 42px;
   max-width: 850px;
