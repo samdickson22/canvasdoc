@@ -309,7 +309,7 @@ function receive(event: { data: string }) {
   if (m.type === "native-disconnected") {
     const previous = nativePort;
     nativePort = undefined;
-    update({ status: "disconnected", error: m.message });
+    update({ status: "disconnected", error: state.error || m.message, canReconnectAgent: false });
     previous?.disconnect();
     return;
   }
@@ -356,7 +356,7 @@ export function connectNative() {
     const error = chrome.runtime.lastError;
     if (nativePort !== current) return;
     nativePort = undefined;
-    update({ status: "disconnected", error: error?.message || state.error || "Chrome's connection to Canvasdoc closed. Reconnect to try again." });
+    update({ status: "disconnected", error: state.error || error?.message || "Chrome's connection to Canvasdoc closed. Reconnect to try again." });
   });
 }
 export const usesNativeConnection = isExtension;

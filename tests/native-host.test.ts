@@ -57,3 +57,22 @@ test('native host splits a 25 MB file into bounded Chrome frames without losing 
   assert.equal(chunks.join(''),original);
  }finally{child?.kill();for(const socket of server.clients)socket.terminate();server.close();await rm(temp,{recursive:true,force:true});}
 });
+
+test('native host keeps the account rejection instead of replacing it on socket close', {timeout:10000}, async()=>{
+ const temp=await mkdtemp(path.join(os.tmpdir(),'canvasdoc-native-rejection-'));
+ const server=new WebSocketServer({host:'127.0.0.1',port:0});await new Promise<void>(r=>server.on('listening',r));
+ const port=(server.address() as {port:number}).port;
+ const rejection={type:'error',code:'ACCOUNT_BINDING_REQUIRED',message:'This existing Canvasdoc folder has no verified Canvas account binding.'};
+ server.on('connection',socket=>socket.once('message',()=>{socket.send(JSON.stringify(rejection));socket.close(1008,'Account connection rejected')}));
+ let child:ReturnType<typeof spawn>|undefined;
+ try{
+  await build({entryPoints:['companion/native-host.ts'],outfile:path.join(temp,'host.mjs'),bundle:true,platform:'node',format:'esm',banner:{js:'import {createRequire} from "node:module";const require=createRequire(import.meta.url);'}});
+  await writeFile(path.join(temp,'connection.json'),JSON.stringify({origin:'http://localhost:3210',port,token:'synthetic'}));
+  child=spawn(process.execPath,[path.join(temp,'host.mjs'),'--connection-config',path.join(temp,'connection.json')],{stdio:['pipe','pipe','pipe']});
+  const frames:any[]=[];let buffer=Buffer.alloc(0);
+  child.stdout!.on('data',chunk=>{buffer=Buffer.concat([buffer,chunk]);while(buffer.length>=4&&buffer.length>=4+buffer.readUInt32LE(0)){const n=buffer.readUInt32LE(0);frames.push(JSON.parse(buffer.subarray(4,4+n).toString()));buffer=buffer.subarray(4+n)}});
+  const exited=new Promise<void>((resolve,reject)=>{child!.once('error',reject);child!.once('close',code=>code===0?resolve():reject(Error(`Native host exited ${code}`)))});
+  const hello=Buffer.from(JSON.stringify({type:'connect',account:'canvasdoc:v1:http://localhost:3210:synthetic'}));const header=Buffer.alloc(4);header.writeUInt32LE(hello.length);child.stdin!.write(Buffer.concat([header,hello]));
+  await exited;assert.deepEqual(frames,[rejection]);
+ }finally{child?.kill();for(const socket of server.clients)socket.terminate();server.close();await rm(temp,{recursive:true,force:true})}
+});
