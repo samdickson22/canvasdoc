@@ -74,7 +74,7 @@ export const useCodexRealtime = (
               events.closed("Codex realtime connection lost");
               return;
             }
-            if (event.type !== "notification") return;
+            if (event.type !== "notification" || !event.supported) return;
             const { notification } = event;
             if (
               !("threadId" in notification.params) ||

@@ -431,7 +431,7 @@ const useUIMessageTransport = <
   };
 
   const host = useRunHost<Cmd>({
-    admission: (cmd, { running, suspended }) => {
+    admission: (cmd, { running }) => {
       if (cmd.kind === "resume" || cmd.kind === "rejoin")
         throw new Error("harness: internal commands are not dispatchable");
       // an input during an open stream or a restored suspended run buffers
@@ -441,7 +441,6 @@ const useUIMessageTransport = <
           ? "deliver"
           : "drop";
       if (!running) return "start";
-      if (suspended) return "preempt";
       return cmd.steer ? "preempt" : "enqueue";
     },
     onAdmit: (cmd) => {
@@ -469,7 +468,7 @@ const useUIMessageTransport = <
     onEnqueue: (cmd) => {
       if (cmd.kind !== "send") return;
       mutate((s) => {
-        const item = { message: cmd.message, parentId: cmd.parentId };
+        const item = { message: cmd.message };
         const { insertAfter, insertBefore } = cmd.placement ?? {};
         const anchor = insertAfter ?? insertBefore;
         if (anchor === undefined) {
@@ -494,7 +493,7 @@ const useUIMessageTransport = <
       return {
         kind: "send",
         message: next.message,
-        parentId: next.parentId,
+        parentId: cell.source.headId,
         steer: false,
         runId,
       };

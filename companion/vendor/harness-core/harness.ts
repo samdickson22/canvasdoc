@@ -77,12 +77,13 @@ export class Harness {
     };
   }
 
-  sendMessage(message: Harness.SendMessageInput): Promise<void> {
-    return flushTapSync(() => this.root.getValue().sendMessage(message));
-  }
-
-  edit(sourceId: string, message: Harness.SendMessageInput): Promise<void> {
-    return flushTapSync(() => this.root.getValue().edit(sourceId, message));
+  sendMessage(
+    message: Harness.SendMessageInput,
+    options?: Harness.SendOptions,
+  ): Promise<void> {
+    return flushTapSync(() =>
+      this.root.getValue().sendMessage(message, options),
+    );
   }
 
   reload(messageId: string): Promise<void> {
@@ -149,9 +150,10 @@ export namespace Harness {
     readonly inputRequests: readonly ReadonlyDeep<InputRequest>[];
     readonly rawState: ReadonlyDeep<State>;
     /** Settles at dispatch: rejects with the send failure; a later run failure lands on `error` only. */
-    sendMessage(message: SendMessageInput): Promise<void>;
-    /** Replaces `sourceId` with a new sibling and runs from there. */
-    edit(sourceId: string, message: SendMessageInput): Promise<void>;
+    sendMessage(
+      message: SendMessageInput,
+      options?: SendOptions,
+    ): Promise<void>;
     /** Regenerates the assistant message as a new sibling. */
     reload(messageId: string): Promise<void>;
     /** View the branch through that sibling; the next send returns to the head. */
@@ -393,9 +395,14 @@ export namespace Harness {
     export type Document = Omit<User, "siblings"> | Omit<Assistant, "siblings">;
   }
 
-  export type SendPart =
-    | { type: "text"; text: string }
-    | { type: "file"; mediaType: string; url: string; filename?: string };
+  export type FilePart = {
+    type: "file";
+    mediaType: string;
+    url: string;
+    filename?: string;
+  };
+
+  export type SendPart = { type: "text"; text: string } | FilePart;
 
   export type UserMessage = {
     id: string;
@@ -405,15 +412,25 @@ export namespace Harness {
   };
 
   export type SendMessage = {
-    parts: SendPart[];
-    /** "steer" interrupts the live run; default "queue". */
+    text?: string;
+    /** A `FileList` is read into data URLs before the send. */
+    files?: FileList | FilePart[];
+    /** Stored on the message. */
+    metadata?: Record<string, unknown>;
+    /** Replaces that user message with a new sibling and runs from there (`run/edit`). */
+    messageId?: string;
+    /** "steer" interrupts the live run; default "queue". Exclusive with `messageId`: an edit always preempts. */
     behavior?: "queue" | "steer";
-    /** Anchor to grow after (a send off the head forks there); defaults to the viewed leaf. */
-    parentId?: string;
   };
 
-  /** A bare string is shorthand for a single text part. */
+  /** A bare string is shorthand for `{ text }`. */
   export type SendMessageInput = string | SendMessage;
+
+  /** Per-request options; the wire message's `metadata` is `{ headers?, body?, metadata? }` and the AI SDK transport lifts `headers` and `body` onto the request. */
+  export type SendOptions = {
+    headers?: Record<string, string>;
+    body?: Record<string, unknown>;
+  };
 
   /** The harness backend's command vocabulary (runs and voice); one params object per method. */
   export type Commands = {

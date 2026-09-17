@@ -314,10 +314,7 @@ export namespace RunCommands {
     readonly headId: string | null;
   };
 
-  export type QueueItem = {
-    message: Harness.UserMessage;
-    parentId: string | null;
-  };
+  export type QueueItem = { message: Harness.UserMessage };
 
   export type SendParams = {
     runId: string;

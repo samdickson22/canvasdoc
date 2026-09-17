@@ -113,7 +113,7 @@ export const useCodexTransport = (
     savingError: undefined as unknown,
     reconciling: false,
     stopEpoch: 0,
-    events: [] as CodexClient.Notification[],
+    events: [] as Extract<CodexClient.Notification, { supported: true }>[],
     liveRealtime: new Set<string>(),
   }));
   if (cell.threadId !== options.threadId)
@@ -159,7 +159,13 @@ export const useCodexTransport = (
       );
   const requests = () =>
     latest.current.client.requests.filter((request) =>
-      belongsToCurrent(record(request.params).threadId),
+      belongsToCurrent(
+        request.params &&
+          typeof request.params === "object" &&
+          !Array.isArray(request.params)
+          ? record(request.params).threadId
+          : undefined,
+      ),
     );
   const head = () =>
     Object.keys(
@@ -196,7 +202,11 @@ export const useCodexTransport = (
           projectThread(
             t,
             latest.current.client.requests.filter(
-              (r) => record(r.params).threadId === t.id,
+              (r) =>
+                r.params !== null &&
+                typeof r.params === "object" &&
+                !Array.isArray(r.params) &&
+                record(r.params).threadId === t.id,
             ),
             s.completed,
             s.timelines?.[t.id],
@@ -1140,6 +1150,7 @@ export const useCodexTransport = (
         return;
       }
       if (event.type === "notification") {
+        if (!event.supported) return;
         if (notificationThreadId(event.notification) === undefined) {
           if (event.notification.method === "serverRequest/resolved") publish();
           return;
@@ -1495,8 +1506,15 @@ export namespace CodexTransport {
     usage?: CodexProtocol.ThreadTokenUsageUpdatedNotification;
     settings?: CodexProtocol.ThreadSettings;
   };
-  export type Thread = { id: string; turns: CodexProtocol.Turn[] } & Partial<
-    Omit<CodexProtocol.Thread, "id" | "turns">
+  export type Thread = {
+    id: string;
+    turns: CodexProtocol.Turn[];
+    [key: string]: unknown;
+  } & Partial<
+    Pick<
+      CodexProtocol.Thread,
+      "name" | "parentThreadId" | "status" | "historyMode"
+    >
   >;
 
   export type Queued = {

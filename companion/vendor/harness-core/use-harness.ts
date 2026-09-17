@@ -36,14 +36,58 @@ const newId = () => crypto.randomUUID();
 const sameIds = (a: readonly string[], b: readonly string[]) =>
   a.length === b.length && a.every((id, i) => id === b[i]);
 
-const toUserMessage = (
+const base64 = (bytes: Uint8Array) => {
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000)
+    binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+};
+
+const readFiles = (files: FileList): Promise<Harness.FilePart[]> =>
+  Promise.all(
+    Array.from(files, async (file) => ({
+      type: "file" as const,
+      mediaType: file.type,
+      url: `data:${file.type};base64,${base64(new Uint8Array(await file.arrayBuffer()))}`,
+      ...(file.name !== "" && { filename: file.name }),
+    })),
+  );
+
+/** Runs `send` with a `FileList` read into file parts; other inputs run synchronously so validation throws. */
+const withFiles = (
   input: Harness.SendMessageInput,
-): Harness.UserMessage => ({
-  id: newId(),
-  role: "user",
-  parts:
-    typeof input === "string" ? [{ type: "text", text: input }] : input.parts,
-});
+  send: (input: Harness.SendMessage) => Promise<void>,
+) => {
+  const message = typeof input === "string" ? { text: input } : input;
+  return message.files === undefined || Array.isArray(message.files)
+    ? send(message)
+    : readFiles(message.files).then((files) => send({ ...message, files }));
+};
+
+const toUserMessage = (
+  { text, files, metadata }: Harness.SendMessage,
+  options: Harness.SendOptions | undefined,
+): Harness.UserMessage => {
+  if (files !== undefined && !Array.isArray(files))
+    throw new Error("harness: FileList must be read before the send");
+  const parts: Harness.SendPart[] = [
+    ...(files ?? []),
+    ...(text !== undefined ? [{ type: "text" as const, text }] : []),
+  ];
+  if (parts.length === 0)
+    throw new Error("harness: a message needs text or files");
+  const wire = {
+    ...(options?.headers !== undefined && { headers: options.headers }),
+    ...(options?.body !== undefined && { body: options.body }),
+    ...(metadata !== undefined && { metadata }),
+  };
+  return {
+    id: newId(),
+    role: "user",
+    parts,
+    ...(Object.keys(wire).length > 0 && { metadata: wire }),
+  };
+};
 
 const NO_WINDOWS: readonly Resolution[] = [];
 const PRELOADED = JSON.stringify([headRequest(DEFAULT_WINDOW)]);
@@ -266,39 +310,49 @@ const useHarnessValue = ({
       if (runId === undefined) throw new Error("harness: no run is live");
       return runId;
     };
-    const send = (
-      input: Harness.SendMessageInput,
-      method: "run/enqueue" | "run/steer",
-    ) => {
-      const message = toUserMessage(input);
-      const parentId = typeof input === "string" ? undefined : input.parentId;
-      const runId = liveRunId();
-      followHead();
-      if (runId !== undefined) {
-        if (parentId !== undefined)
-          throw new Error("harness: parentId requires an idle thread");
-        return dispatch(
-          message,
-          messagesRef.current.at(-1)?.id ?? null,
-          commands[method]({ runId, message }),
-        );
-      }
-      const anchor = parentId ?? messagesRef.current.at(-1)?.id ?? null;
-      return dispatch(
-        message,
-        anchor,
-        commands[method]({
-          runId: newId(),
-          message,
-          runAnchorMessageId: anchor,
-        }),
-      );
-    };
     const find = (messageId: string) => {
       const message = messagesRef.current.find((m) => m.id === messageId);
       if (message === undefined)
         throw new Error(`harness: message "${messageId}" is not in view`);
       return message;
+    };
+    const send = (
+      input: Harness.SendMessage,
+      options: Harness.SendOptions | undefined,
+    ) => {
+      const message = toUserMessage(input, options);
+      const { messageId, behavior } = input;
+      if (messageId !== undefined) {
+        if (behavior !== undefined)
+          throw new Error("harness: messageId and behavior are exclusive");
+        const source = find(messageId);
+        followHead();
+        return dispatch(
+          message,
+          source.parentId,
+          commands["run/edit"]({
+            runId: liveRunId() ?? newId(),
+            message,
+            sourceId: messageId,
+            runAnchorMessageId: source.parentId,
+          }),
+        );
+      }
+      const method = behavior === "steer" ? "run/steer" : "run/enqueue";
+      const runId = liveRunId();
+      const anchor = messagesRef.current.at(-1)?.id ?? null;
+      followHead();
+      return dispatch(
+        message,
+        anchor,
+        runId !== undefined
+          ? commands[method]({ runId, message })
+          : commands[method]({
+              runId: newId(),
+              message,
+              runAnchorMessageId: anchor,
+            }),
+      );
     };
     return {
       transport: {
@@ -322,28 +376,8 @@ const useHarnessValue = ({
       queue: run?.queue ?? [],
       inputRequests: run?.inputRequests ?? [],
       rawState: state,
-      sendMessage: (input) =>
-        send(
-          input,
-          typeof input !== "string" && input.behavior === "steer"
-            ? "run/steer"
-            : "run/enqueue",
-        ),
-      edit: (sourceId, input) => {
-        const source = find(sourceId);
-        const message = toUserMessage(input);
-        followHead();
-        return dispatch(
-          message,
-          source.parentId,
-          commands["run/edit"]({
-            runId: liveRunId() ?? newId(),
-            message,
-            sourceId,
-            runAnchorMessageId: source.parentId,
-          }),
-        );
-      },
+      sendMessage: (input, options) =>
+        withFiles(input, (message) => send(message, options)),
       reload: (messageId) => {
         const source = find(messageId);
         followHead();

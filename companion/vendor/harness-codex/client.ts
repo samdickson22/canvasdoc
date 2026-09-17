@@ -1,6 +1,7 @@
 import { resource } from "@assistant-ui/tap";
 import { useEffect, useRef, useState } from "react";
 import type { CodexProtocol } from "./protocol.ts";
+import { checkNotification, checkRequest, checkResult } from "./guards.ts";
 
 const errorOf = (error: unknown) =>
   error instanceof Error ? error : new Error(String(error));
@@ -53,7 +54,12 @@ export const useCodexClient = (
       cell.pending.set(id, {
         resolve: (value) => {
           clearTimeout(timer);
-          resolve({ result: value as T, sequence: cell.sequence });
+          try {
+            checkResult(method, value);
+            resolve({ result: value as T, sequence: cell.sequence });
+          } catch (error) {
+            reject(errorOf(error));
+          }
         },
         reject: (error) => {
           clearTimeout(timer);
@@ -123,13 +129,21 @@ export const useCodexClient = (
             if (aborter.signal.aborted || current !== attempt) return;
             cell.sequence++;
             try {
-              if (typeof value !== "object" || value === null)
+              if (
+                typeof value !== "object" ||
+                value === null ||
+                Array.isArray(value)
+              )
                 throw new Error("codex: invalid RPC envelope");
               const msg = value as Record<string, unknown>;
               if (typeof msg.method === "string") {
                 if (msg.id !== undefined) {
-                  if (typeof msg.id !== "string" && typeof msg.id !== "number")
+                  if (
+                    typeof msg.id !== "string" &&
+                    (typeof msg.id !== "number" || !Number.isFinite(msg.id))
+                  )
                     throw new Error("codex: invalid request id");
+                  checkRequest(msg.method, msg.params);
                   const key = `${cell.generation}:${JSON.stringify(msg.id)}`;
                   const entry = {
                     id: msg.id,
@@ -140,28 +154,37 @@ export const useCodexClient = (
                   cell.requests.set(key, entry);
                   publish({ type: "request", request: entry });
                 } else {
-                  const notification = msg as CodexProtocol.ServerNotification;
-                  if (notification.method === "turn/completed") {
+                  const notification = {
+                    method: msg.method,
+                    params: msg.params,
+                  };
+                  const supported = checkNotification(notification);
+                  if (supported && notification.method === "turn/completed") {
                     for (const [key, entry] of cell.requests) {
                       const params = entry.params as {
                         threadId?: string;
                         turnId?: string;
                       };
                       if (
-                        params.threadId === notification.params.threadId &&
-                        params.turnId === notification.params.turn.id
+                        params?.threadId === notification.params.threadId &&
+                        params?.turnId === notification.params.turn.id
                       )
                         cell.requests.delete(key);
                     }
                   }
-                  if (notification.method === "serverRequest/resolved") {
+                  if (
+                    supported &&
+                    notification.method === "serverRequest/resolved"
+                  ) {
                     for (const [key, entry] of cell.requests)
                       if (entry.id === notification.params.requestId)
                         cell.requests.delete(key);
                   }
                   publish({
                     type: "notification",
-                    notification,
+                    ...(supported
+                      ? { supported: true, notification }
+                      : { supported: false, notification }),
                     sequence: cell.sequence,
                   });
                 }
@@ -169,12 +192,26 @@ export const useCodexClient = (
                 const pending = cell.pending.get(msg.id);
                 if (!pending) return;
                 cell.pending.delete(msg.id);
-                if (msg.error) {
-                  const detail = msg.error as {
-                    message: string;
-                    code: number;
-                    data?: unknown;
-                  };
+                if ("error" in msg) {
+                  if (
+                    typeof msg.error !== "object" ||
+                    msg.error === null ||
+                    Array.isArray(msg.error)
+                  ) {
+                    pending.reject(new Error("codex: invalid RPC error"));
+                    return;
+                  }
+                  const detail = msg.error as Record<string, unknown>;
+                  if (
+                    typeof detail.message !== "string" ||
+                    typeof detail.code !== "number" ||
+                    !Number.isFinite(detail.code)
+                  ) {
+                    pending.reject(
+                      new Error("codex: invalid RPC error message or code"),
+                    );
+                    return;
+                  }
                   pending.reject(
                     Object.assign(new Error(detail.message), {
                       code: detail.code,
@@ -336,9 +373,11 @@ export namespace CodexClient {
     | { type: "responded"; key: string };
   export type Notification = {
     type: "notification";
-    notification: CodexProtocol.ServerNotification;
     sequence: number;
-  };
+  } & (
+    | { supported: true; notification: CodexProtocol.ServerNotification }
+    | { supported: false; notification: CodexProtocol.Notification }
+  );
   export type Receipt<T> = { result: T; sequence: number };
   export type Instance = {
     readonly id: string;

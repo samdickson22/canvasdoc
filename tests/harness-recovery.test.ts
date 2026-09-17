@@ -45,6 +45,8 @@ test("migrates a used legacy session from native history without replay or a new
     path.join(root, "native-state.json"),
     JSON.stringify({
       id: threadId,
+      historyMode: "legacy",
+      status: { type: "idle" },
       turns: [
         {
           id: "legacy-turn",

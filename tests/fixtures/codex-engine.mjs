@@ -6,7 +6,7 @@ export async function serve(mode, threadId) {
   try {
     thread = JSON.parse(readFileSync("native-state.json", "utf8"));
   } catch {
-    thread = { id: threadId, turns: [], historyMode: "full" };
+    thread = { id: threadId, turns: [], historyMode: "legacy", status: { type: "idle" } };
   }
   for (const turn of thread.turns)
     if (turn.status === "inProgress") turn.status = "interrupted";

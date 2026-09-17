@@ -299,7 +299,11 @@ export class CodexRuntime {
           }
         },
         onEvent: (event) => {
-          if (event.type === "notification") this.emit(event.notification);
+          if (event.type === "notification") {
+            const { method, params } = event.notification;
+            if (params && typeof params === "object" && !Array.isArray(params))
+              this.emit({ method, params });
+          }
           if (event.type === "request")
             this.emit({
               id: `${this.client.id}:${event.request.key}`,
