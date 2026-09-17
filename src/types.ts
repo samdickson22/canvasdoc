@@ -38,6 +38,7 @@ export type PersonalTask = {
 export type SavedMessage = {
   run?: { status: string; startedAt?: string; completedAt?: string; error?: string };
   files?: string[];
+  artifacts?: import("./workspace-files").ArtifactEvidence[];
   parts?: import("../companion/message-parts").DisplayPart[];
   attachments?: import("@assistant-ui/react").CompleteAttachment[];
   id: string;

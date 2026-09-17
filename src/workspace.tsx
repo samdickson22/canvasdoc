@@ -71,6 +71,8 @@ export function Workspace({
   const [files, setFiles] = useState<Entry[]>([]);
   const [previews, setPreviews] = useState<Record<string, Preview>>({});
   const [error, setError] = useState("");
+  const [readError, setReadError] = useState("");
+  const [readVersion, reread] = useReducer((n: number) => n + 1, 0);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<"outputs" | "sources">("outputs");
@@ -80,6 +82,7 @@ export function Workspace({
   const showExplorer = explorerOpen || !selected;
   const openFile = useCallback((path: string) => {
     dispatchTab({ type: "open", path });
+    reread();
     setInspectorOpen(true);
   }, []);
   const hideViewer = () => {
@@ -109,9 +112,14 @@ export function Workspace({
     if (!selected) {
       return;
     }
+    setPreviews(previous => {
+      const next = { ...previous };
+      delete next[selected];
+      return next;
+    });
     if (connection.status !== "connected") return;
     setLoading(true);
-    setError("");
+    setReadError("");
     workspaceRequest<Preview>("files-read", selected)
       .then((result) => {
         if (!cancelled)
@@ -122,7 +130,7 @@ export function Workspace({
           );
       })
       .catch((e) => {
-        if (!cancelled) setError(e.message);
+        if (!cancelled) setReadError("File unavailable. It may have been removed or moved. " + e.message);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -130,7 +138,7 @@ export function Workspace({
     return () => {
       cancelled = true;
     };
-  }, [selected, modified, connection.status]);
+  }, [selected, modified, connection.status, readVersion]);
   const attach = useCallback(
     (node: HTMLDivElement | null) => {
       if (active && node && conversationHost.parentNode !== node)
@@ -354,9 +362,9 @@ export function Workspace({
                 <FolderTree size={16} />
               </button>
             </div>
-            {error && (
+            {(error || readError) && (
               <p className="error workspace-file-error" role="alert">
-                {error}
+                {readError || error}
               </p>
             )}
             <div
@@ -388,7 +396,7 @@ export function Workspace({
                         <p className="workspace-file-hint">Loading preview…</p>
                       ) : (
                         <p className="workspace-file-hint">
-                          Connect your computer to view this file.
+                          {connection.status === "connected" ? "File unavailable." : "Connect your computer to view this file."}
                         </p>
                       )}
                     </div>
@@ -432,7 +440,7 @@ export function Workspace({
                     <button
                       aria-label="Refresh workspace files"
                       title="Refresh files"
-                      onClick={() => void refresh()}
+                      onClick={() => { void refresh(); reread(); }}
                     >
                       <RefreshCw size={14} />
                     </button>
