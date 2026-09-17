@@ -6,6 +6,14 @@ Canvas owns official course data and submission state. Browser extension storage
 
 One main Codex agent runs from that root through Harness SDK. Assignment directories organize files; they do not create independent main sessions. Harness owns execution and recovery, while Canvasdoc routes messages and tracks browser delivery. See [transport ownership](../companion/vendor/harness-codex/README.md).
 
+## Agent guidance and learned skills
+
+The companion loads [AGENT.md](../companion/AGENT.md) as the coursework agent's developer instructions on startup and recovery. This is separate from the repository's development instructions and does not overwrite a user's workspace `AGENTS.md`.
+
+Bundled skills install into the selected workspace's `.agents/skills/` before provider startup. They cover prose, assignment review, source checking, study preparation, artifact creation, and preference maintenance. The installer updates files only while their bytes still match its ownership manifest; pre-existing and user-edited files are preserved.
+
+The coursework agent maintains separate learned skills for writing, relevant coding preferences, classes, and recurring assignment types. These are workspace files, distinct from browser-owned application settings. Its role instructions explain where to find them and how to maintain their scope and currency. The agent chooses which skills and references to read; Canvasdoc does not inject skill bodies or select preferences by course in code. The installer only places files on disk for native skill discovery. Codex memory settings are inherited unchanged; Canvasdoc does not mirror learned skills into its generated memories.
+
 ## Root identity and file access
 
 Setup records the selected folder's resolved path and stable identity. The launcher uses that working directory regardless of where it was invoked. A missing or moved folder must be relocated explicitly instead of silently replaced. Browser references use root-relative paths; a browser directory handle is not a host filesystem path.

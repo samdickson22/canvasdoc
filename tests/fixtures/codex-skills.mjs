@@ -5,6 +5,9 @@ for (const name of [
   "canvasdoc-assignment-review",
   "canvasdoc-study-preparation",
   "canvasdoc-artifacts",
+  "canvasdoc-source-checking",
+  "canvasdoc-preference-maintenance",
+  "unslop",
 ]) {
   assert.match(
     await readFile(`.agents/skills/${name}/SKILL.md`, "utf8"),
