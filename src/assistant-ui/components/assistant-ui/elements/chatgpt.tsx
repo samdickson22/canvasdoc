@@ -38,6 +38,7 @@ import { SelectionQuote, ComposerQuote, AttachmentPreview, QueuedMessages, type 
 import { finalAnswerText } from "../../../../runtime/message-presentation";
 
 type WorkOptions = {
+  compact?: boolean;
   onReadAloud?: (text: string) => void;
   queuedMessages?: readonly QueuedMessage[];
   onCancelQueued?: (id: string) => Promise<void>;
@@ -56,6 +57,7 @@ export const ChatGPT: FC<WorkOptions> = (options) => {
         data-work-mode={options.workMode || undefined}
         className="aui-root min-h-0 flex h-full flex-col items-stretch bg-white px-4 text-[#0d0d0d] dark:bg-black dark:text-[#ececec]"
       >
+        {options.compact ? <Composer placeholder="Ask Canvasdoc…" /> : <>
         <SelectionQuote />
         <AuiIf condition={(s) => s.thread.isEmpty}>
           <EmptyState />
@@ -81,6 +83,7 @@ export const ChatGPT: FC<WorkOptions> = (options) => {
             </ThreadPrimitive.ViewportFooter>
           </ThreadPrimitive.Viewport>
         </AuiIf>
+        </>}
       </ThreadPrimitive.Root>
     </WorkContext.Provider>
   );
@@ -167,7 +170,13 @@ const ComposerDropzone: FC<PropsWithChildren> = ({ children }) => {
 };
 
 const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
-  const { workMode, composerPlaceholder } = useContext(WorkContext);
+  const { workMode, composerPlaceholder, compact } = useContext(WorkContext);
+  if (compact) return (
+    <ComposerPrimitive.Root className="home-inline-composer">
+      <ComposerPrimitive.Input placeholder="Ask Canvasdoc…" aria-label="Ask Canvasdoc" rows={1} className="home-inline-input" />
+      <ComposerPrimaryAction />
+    </ComposerPrimitive.Root>
+  );
   if (workMode)
     return (
       <ComposerDropzone>

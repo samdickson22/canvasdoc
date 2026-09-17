@@ -50,7 +50,7 @@ export async function canvasPages<T>(
 
 export const readCourses = (signal?: AbortSignal) =>
   canvasPages<Course>(
-    "/api/v1/courses?enrollment_state=active&per_page=100",
+    "/api/v1/courses?enrollment_state=active&include[]=total_scores&per_page=100",
     signal,
   );
 export async function readDashboardWork(

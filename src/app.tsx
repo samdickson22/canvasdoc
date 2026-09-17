@@ -21,6 +21,7 @@ import { Workspace } from "./workspace";
 import { Navigation } from "./navigation";
 import { TodoList } from "./todo-panel";
 import { Conversation } from "./conversation";
+import { showDashboardGrades } from "./dashboard-grades";
 import { readAssignment, readCourses, readDashboardWork } from "./canvas";
 import { newTask, safeLink } from "./model";
 import { store, useData, useStorageError } from "./store";
@@ -80,10 +81,9 @@ export function App({
   }, [initialContext.kind]);
   const [homeChatOpen, setHomeChatOpen] = useState(false);
   const homeChatPanel = useRef<HTMLDivElement>(null);
-  const homeChatButton = useRef<HTMLButtonElement>(null);
   const closeHomeChat = () => {
     setHomeChatOpen(false);
-    homeChatButton.current?.focus();
+    requestAnimationFrame(() => homeChatPanel.current?.querySelector<HTMLTextAreaElement>("textarea")?.focus());
   };
   useEffect(() => {
     if (homeChatOpen) homeChatPanel.current?.querySelector<HTMLTextAreaElement>("textarea")?.focus();
@@ -97,6 +97,10 @@ export function App({
         : "Connect your computer";
   const storageError = useStorageError();
   const [courses, setCourses] = useState<Course[]>(() => data.canvasCache?.courses ?? []);
+  useEffect(() => {
+    const content = document.querySelector<HTMLElement>("#content");
+    if (initialContext.kind === "home" && content) return showDashboardGrades(content, courses);
+  }, [initialContext.kind, courses]);
   const [todos, setTodos] = useState<Todo[]>(() => data.canvasCache?.todos ?? []);
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [error, setError] = useState("");
@@ -289,17 +293,15 @@ export function App({
         createPortal(
           context.kind === "home" ? (
             <section className="home-agent" aria-label="Canvasdoc assistant">
-              <div ref={homeChatPanel} id="home-agent-panel" className="home-agent-panel" hidden={!homeChatOpen} onKeyDown={event => { if (event.key === "Escape") closeHomeChat(); }}>
-                <header className="home-agent-header">
+              <div ref={homeChatPanel} id="home-agent-panel" className={`home-agent-panel ${homeChatOpen ? "" : "home-agent-compact"}`} onKeyDown={event => { if (event.key === "Escape") closeHomeChat(); }}>
+                <header className="home-agent-header" hidden={!homeChatOpen}>
                   <strong>Canvasdoc</strong>
                   <button className="connection-status" data-status={connection.status} onClick={onConnect}><i /> {connectionLabel}</button>
                   <button aria-label="Close chat" onClick={closeHomeChat}><X size={18} /></button>
                 </header>
-                <Conversation context={context} home onConnect={onConnect} />
+                <Conversation context={context} home compact={!homeChatOpen} onSend={() => setHomeChatOpen(true)} onConnect={onConnect} />
               </div>
-              <button ref={homeChatButton} className="home-agent-bar" aria-expanded={homeChatOpen} aria-controls="home-agent-panel" onClick={() => setHomeChatOpen(value => !value)}>
-                <MessageSquare size={18} /><span>Ask Canvasdoc</span><span className="home-agent-hint">Help with your courses</span>
-              </button>
+
             </section>
           ) : (
             <PersonalPage task={personal} />

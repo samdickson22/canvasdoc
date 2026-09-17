@@ -1,4 +1,14 @@
-export type Course = { id: number; name: string; course_code: string };
+export type Course = {
+  id: number;
+  name: string;
+  course_code: string;
+  enrollments?: {
+    type: string;
+    computed_current_score?: number | null;
+    computed_current_grade?: string | null;
+    computed_current_letter_grade?: string | null;
+  }[];
+};
 export type Assignment = {
   id: number;
   course_id: number;

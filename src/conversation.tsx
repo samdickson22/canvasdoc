@@ -26,11 +26,15 @@ export function Conversation({
   context,
   home = false,
   workMode = false,
+  compact = false,
+  onSend,
   onConnect,
 }: {
   context: PageContext;
   home?: boolean;
   workMode?: boolean;
+  compact?: boolean;
+  onSend?: () => void;
   onConnect: () => void;
 }) {
   const data = useData();
@@ -91,6 +95,7 @@ export function Conversation({
         .filter((part) => part.type === "text")
         .map((part) => part.text)
         .join("\n");
+      onSend?.();
       setSendError("");
       const requestId = crypto.randomUUID();
       const quote = message.metadata.custom.quote as import("./types").SavedMessage["quote"];
@@ -233,6 +238,7 @@ export function Conversation({
           {(connection.canReconnectAgent || Object.values(connection.runs).some((run: any) => run.command.sourceThreadId === context.threadId && ["uncertain", "recovering"].includes(run.status))) &&
             <div className="approval-card"><p>The agent's last result needs to be checked before continuing.</p><button type="button" onClick={() => { try { reconnectAgent(); } catch (error) { setSendError((error as Error).message); } }}>Reconnect agent</button></div>}
           <ChatGPT
+            compact={compact}
             onReadAloud={speechAdapter ? text => { speechText.current = text; } : undefined}
             queuedMessages={queuedMessages}
             onCancelQueued={stopRun}
