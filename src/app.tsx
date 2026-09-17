@@ -186,6 +186,11 @@ export function App({
     return () => document.body.classList.remove("canvasdoc-sidebar-open");
   }, [open, workspace]);
   useLayoutEffect(() => {
+    // This host moves between shadow roots, so visibility must travel with it.
+    if (mounts.conversationHost)
+      mounts.conversationHost.style.display = open || workspace ? "flex" : "none";
+  }, [open, workspace, mounts.conversationHost]);
+  useLayoutEffect(() => {
     document.body.classList.toggle("canvasdoc-workspace-open", workspace);
     document.body.classList.toggle("canvasdoc-navigation-collapsed", workspace && navigationCollapsed);
     const navigationHost = (mounts.navigation.getRootNode() as ShadowRoot).host as HTMLElement;
