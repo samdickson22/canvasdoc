@@ -5,6 +5,7 @@ async function within(root: string, relative: string) {
   if (typeof relative !== "string" || path.isAbsolute(relative) || relative.split(/[\\/]/).some(p => p.startsWith("."))) throw new Error("Choose a workspace file.");
   const target = await realpath(path.join(root, relative));
   if (!target.startsWith(root + path.sep)) throw new Error("File is outside the Canvasdoc folder.");
+  if (path.relative(root, target).split(path.sep).some(p => p.startsWith("."))) throw new Error("Choose a workspace file.");
   return target;
 }
 export async function listWorkspaceFiles(root: string) {
@@ -26,16 +27,30 @@ export async function listWorkspaceFiles(root: string) {
   await walk("", 0);
   return files.sort((a,b)=>a.path.localeCompare(b.path));
 }
+const mimeTypes: Record<string, string> = {
+  '.pdf':'application/pdf', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg',
+  '.webp':'image/webp', '.gif':'image/gif', '.html':'text/html', '.htm':'text/html',
+  '.csv':'text/csv', '.tsv':'text/tab-separated-values',
+  '.docx':'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.xlsx':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.pptx':'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  '.doc':'application/msword', '.xls':'application/vnd.ms-excel', '.ppt':'application/vnd.ms-powerpoint',
+  '.odt':'application/vnd.oasis.opendocument.text', '.ods':'application/vnd.oasis.opendocument.spreadsheet',
+  '.odp':'application/vnd.oasis.opendocument.presentation',
+};
+export async function inspectWorkspaceFile(root: string, relative: string) {
+  const info = await stat(await within(root, relative));
+  if (!info.isFile()) throw new Error("Path is a directory, not an output file.");
+  return { size: info.size, modified: info.mtimeMs, mime: mimeTypes[path.extname(relative).toLowerCase()] || 'text/plain' };
+}
 export async function readWorkspaceFile(root: string, relative: string) {
   const target = await within(root, relative);
-  const info = await stat(target);
-  if (!info.isFile()) throw new Error("Choose a file to preview.");
+  const info = await inspectWorkspaceFile(root, relative);
   const ext = path.extname(relative).toLowerCase();
-  const mime: Record<string,string> = {'.pdf':'application/pdf','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.gif':'image/gif','.html':'text/html','.htm':'text/html'};
-  const metadata = {path:relative,size:info.size,modified:info.mtimeMs,mime:mime[ext] || 'text/plain'};
+  const metadata = {path:relative,...info};
   if (info.size > 25 * 1024 * 1024) return {...metadata,base64:'',previewKind:'unavailable',notice:'This file exceeds the 25 MB preview and download limit. Open it from your Canvasdoc folder.'};
   const bytes = await readFile(target);
-  const binary = !mime[ext] && (bytes.includes(0) || ['.docx','.xlsx','.pptx','.zip','.gz','.exe'].includes(ext));
-  const previewKind = binary ? 'download' : metadata.mime.startsWith('image/') ? 'image' : ext === '.pdf' ? 'pdf' : ['.html','.htm'].includes(ext) ? 'html' : /\.(md|markdown)$/i.test(relative) ? 'markdown' : 'text';
-  return {...metadata,mime:binary?'application/octet-stream':metadata.mime,base64:bytes.toString('base64'),previewKind};
+  const binary = bytes.includes(0) || ['.docx','.xlsx','.pptx','.doc','.xls','.ppt','.odt','.ods','.odp','.zip','.gz','.exe'].includes(ext);
+  const previewKind = metadata.mime.startsWith('image/') ? 'image' : ext === '.pdf' ? 'pdf' : binary ? 'download' : ['.html','.htm'].includes(ext) ? 'html' : /\.(md|markdown)$/i.test(relative) ? 'markdown' : 'text';
+  return {...metadata,mime:binary && !mimeTypes[ext]?'application/octet-stream':metadata.mime,base64:bytes.toString('base64'),previewKind};
 }

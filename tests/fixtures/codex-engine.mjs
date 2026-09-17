@@ -174,6 +174,15 @@ export async function serve(mode, threadId) {
       later(() => delta("Synthetic streaming started.\n"), 100);
       if (scenario === "crash") later(() => process.exit(1), 500);
       else if (scenario === "fail") later(() => finish("failed", ""), 500);
+      else if (scenario === "artifacts") later(() => {
+        writeFileSync("created.csv", "name,score\nSynthetic,7\n");
+        const changed = ["growth%2026.csv", "chapter#1.md"];
+        for (const name of changed) writeFileSync(name, "Synthetic literal path");
+        const item = { type: "fileChange", id: "changed-artifacts", status: "completed", changes: changed.map(path => ({ path, kind: { type: "add" }, diff: "+Synthetic literal path" })) };
+        active.items.splice(active.items.length - 1, 0, item);
+        emit({ method: "item/completed", params: { threadId, turnId: active.id, item } });
+        finish("completed", "[Chapter](chapter%231.md) [Created](created.csv) [Missing](missing.md) [Directory](folder) [Escape](../outside.md) [Symlink](escape.md) [Office](table.xlsx) [Source](uploads/source.txt) [Assignment](/courses/1/assignments/1) [Section](#requirements) [Canvas file](/files/123/download) [Web](//example.com/report.pdf)");
+      }, 350);
       else if (scenario === "complete") later(() => finish(), 350);
       else if (["approval", "question", "resolve"].includes(scenario))
         later(() => {

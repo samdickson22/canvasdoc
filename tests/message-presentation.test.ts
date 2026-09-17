@@ -153,3 +153,15 @@ test("an interrupted commentary is retained in stopped work rather than promoted
     true,
   );
 });
+
+test("file evidence stays visible and distinguishes availability from correctness", () => {
+  const message = presentMessage({ ...base, text: "[Report](report.pdf)", run: { status: "completed" }, artifacts: [
+    { path: "report.pdf", status: "available", checkedAt: "2026-09-16T20:00:00Z", size: 123, mime: "application/pdf" },
+    { path: "missing.md", status: "unavailable", checkedAt: "2026-09-16T20:00:00Z", reason: "File does not exist." },
+  ] });
+  const evidence = (message.content as any[]).at(-1);
+  assert.equal(evidence.providerMetadata.canvasdoc.work, false);
+  assert.match(evidence.text, /Files available at delivery: 1/);
+  assert.doesNotMatch(evidence.text, /correct|submitted/i);
+  assert.match(evidence.text, /Unavailable: "missing.md". File does not exist/);
+});

@@ -38,6 +38,15 @@ export function presentMessage(message: SavedMessage): ThreadMessageLike {
       },
     },
   }));
+  if (message.artifacts?.length) {
+    const unavailable = message.artifacts.filter(file => file.status === "unavailable");
+    const available = message.artifacts.filter(file => file.status === "available").length;
+    const summary = [
+      available ? `Files available at delivery: ${available}.` : "File check at delivery: no output files found.",
+      ...unavailable.map(file => `Unavailable: ${JSON.stringify(file.path)}. ${file.reason}`),
+    ].join("\n\n");
+    content.push({ type: "text", text: summary, providerMetadata: { canvasdoc: { work: false, itemId: "artifact-evidence" } } });
+  }
   const status = message.run?.status;
   return {
     id: message.id,
