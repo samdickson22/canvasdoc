@@ -16,7 +16,7 @@ Canvasdoc is a local coursework agent inside Canvas. These instructions guide de
 - Add all the value with the minimum increase in complexity. Preserve the persistent agent, real filesystem and tools, coursework and study support, personal tasks, and open-source extensibility. A quiet UI must not reduce capability.
 - Canvas owns official course data and submission state. Personal tasks and local work must not masquerade as Canvas records.
 - One main agent works across courses. Each assignment and personal task has one attached conversation; assignment folders do not create separate main agents. Bounded runtime delegation remains part of the product's capability.
-- Home preserves Canvas’s native course dashboard with a small bottom bar that opens the Home conversation, plus a side to-do panel. Do not duplicate assignments in the center, expand assignment conversations inline in to-dos, or add a parallel Threads list.
+- Home preserves Canvas’s native course dashboard with a compact bottom composer; sending switches the center pane to the Home conversation with a Back to dashboard control, plus a side to-do panel. Do not duplicate assignments in the center, expand assignment conversations inline in to-dos, or add a parallel Threads list.
 - An assignment to-do opens its real Canvas page with the attached conversation in the sidebar. Assignment is the default view; preserve Canvas's actual content and controls.
 - Workspace expands that same conversation into the main area. Its resizable Outputs/Sources inspector starts collapsed. Keep one conversation instance and preserve drafts, history, approvals, and running work across layout changes.
 - Separate study workspaces are outside v1. Study work can use the conversation attached to the quiz listing.

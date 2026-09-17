@@ -499,12 +499,13 @@ select {
 .approval-card input { display: block; width: 100%; margin: 8px 0; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); }
 
 /* Home keeps coursework visible while its single conversation opens on demand. */
-.home-agent { max-width: 820px; margin: 0 auto; }
-.home-agent-panel { display:flex; flex-direction:column; height:min(620px, calc(100dvh - 120px)); margin-bottom:10px; border:1px solid var(--line); border-radius:16px; background:var(--paper, white); box-shadow:0 8px 36px #163d2420; overflow:hidden; }
+.home-agent { margin:0 auto; }
+.home-agent:has(.home-agent-compact) { max-width:820px; }
+.home-agent-panel { display:flex; flex-direction:column; height:100dvh; background:white; overflow:hidden; }
 .home-agent-panel[hidden] { display:none; }
 .home-agent-header { display:flex; align-items:center; gap:12px; padding:14px 18px; border-bottom:1px solid var(--line); }
 .home-agent-header .connection-status { margin-left:auto; }
-.home-agent-header > button:last-child { display:flex; padding:6px; }
+.home-back { display:flex; align-items:center; gap:8px; padding:6px; }
 .home-agent-panel .conversation { overflow:hidden; }
 .bc-todos { padding: 18px 20px 28px; overflow-y: auto; flex: 1; min-height: 0; }
 .bc-period { display:flex; gap:6px; align-items:center; color:#737b76; }

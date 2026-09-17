@@ -81,6 +81,10 @@ export function App({
   }, [initialContext.kind]);
   const [homeChatOpen, setHomeChatOpen] = useState(false);
   const homeChatPanel = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle("canvasdoc-home-workspace", homeChatOpen);
+    return () => document.documentElement.classList.remove("canvasdoc-home-workspace");
+  }, [homeChatOpen]);
   const closeHomeChat = () => {
     setHomeChatOpen(false);
     requestAnimationFrame(() => homeChatPanel.current?.querySelector<HTMLTextAreaElement>("textarea")?.focus());
@@ -295,9 +299,8 @@ export function App({
             <section className="home-agent" aria-label="Canvasdoc assistant">
               <div ref={homeChatPanel} id="home-agent-panel" className={`home-agent-panel ${homeChatOpen ? "" : "home-agent-compact"}`} onKeyDown={event => { if (event.key === "Escape") closeHomeChat(); }}>
                 <header className="home-agent-header" hidden={!homeChatOpen}>
-                  <strong>Canvasdoc</strong>
+                  <button className="home-back" onClick={closeHomeChat}><ArrowLeft size={16} /> Back to dashboard</button>
                   <button className="connection-status" data-status={connection.status} onClick={onConnect}><i /> {connectionLabel}</button>
-                  <button aria-label="Close chat" onClick={closeHomeChat}><X size={18} /></button>
                 </header>
                 <Conversation context={context} home compact={!homeChatOpen} onSend={() => setHomeChatOpen(true)} onConnect={onConnect} />
               </div>
