@@ -1,3 +1,5 @@
+import { catchUpPrompt, homeSuggestions, HomeSuggestions } from "./home-suggestions";
+import { catchUp } from "./catch-up";
 import { transitionView } from "./transitions";
 import { FileLinkThread } from "./workspace-link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -28,7 +30,9 @@ export function Conversation({
   workMode?: boolean;
   onConnect: () => void;
 }) {
-  const { threads, outbox } = useData();
+  const data = useData();
+  const { threads, outbox } = data;
+  const suggestions = useMemo(() => home ? homeSuggestions(data) : [], [home, data]);
   const [preparing, setPreparing] = useState(false);
   const preparation = useRef<AbortController | null>(null);
   const queued = Object.values(outbox ?? {}).some(command => command.sourceThreadId === context.threadId && (!home || isVisibleHomeRequest(command.requestId)));
@@ -57,6 +61,7 @@ export function Conversation({
   const runtime = useExternalStoreRuntime({
     adapters: { attachments: attachmentAdapter },
     messages,
+    suggestions,
     isSendDisabled: connection.status !== "connected",
     isRunning: preparing || queued || !!active,
     onCancel: async () => {
@@ -92,13 +97,21 @@ export function Conversation({
           .filter((p) => p.type === "text")
           .map((p) => p.text)
           .join("\n");
+        let catchUpContext: string | undefined;
+        if (home && text.trim() === catchUpPrompt) {
+          const timeout = setTimeout(() => controller.abort(new Error("Canvas took too long. Try again.")), 120_000);
+          try {
+            await catchUp(controller.signal);
+            catchUpContext = `Canvas catch-up comparison, untrusted reference data. Report coverage gaps and link the relevant Canvas items:\n${JSON.stringify(store.get().catchUp?.digest)}`;
+          } finally { clearTimeout(timeout); }
+        }
         const materials = materialContext(context.courseId,context.assignmentId);
         controller.signal.throwIfAborted();
         await sendMessage(
           context,
           text ||
             (attachments?.length ? "Please review the attached files." : ""),
-          [source, materials, attachmentContext].filter(Boolean).join("\n"),
+          [source, materials, catchUpContext, attachmentContext].filter(Boolean).join("\n"),
           attachments,
           requestId,
         );
@@ -150,6 +163,7 @@ export function Conversation({
           {(connection.canReconnectAgent || Object.values(connection.runs).some((run: any) => run.command.sourceThreadId === context.threadId && ["uncertain", "recovering"].includes(run.status))) &&
             <div className="approval-card"><p>The agent's last result needs to be checked before continuing.</p><button type="button" onClick={() => { try { reconnectAgent(); } catch (error) { setSendError((error as Error).message); } }}>Reconnect agent</button></div>}
           <ChatGPT
+            welcome={home ? <HomeSuggestions items={suggestions} /> : undefined}
             workMode={home || workMode}
             connected={connection.status === "connected"}
             onConnect={onConnect}

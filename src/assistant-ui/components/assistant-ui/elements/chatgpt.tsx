@@ -13,7 +13,7 @@ import {
   useAui,
 
 } from "@assistant-ui/react";
-import { type FC, type PropsWithChildren, useContext, createContext, useEffect, useRef, useState } from "react";
+import { type FC, type PropsWithChildren, type ReactNode, useContext, createContext, useEffect, useRef, useState } from "react";
 import { PortalContainerContext } from "../../../lib/portal-container";
 import { TooltipIconButton } from "./tooltip-icon-button";
 import { useAttachmentSrc } from "../../../hooks/use-attachment-src";
@@ -46,6 +46,7 @@ import { WorkHistory, ActivityGroup, ActivityTool, RunData, RunOutcome } from ".
 import { Reasoning } from "./reasoning.aui";
 
 type WorkOptions = {
+  welcome?: ReactNode;
   workMode?: boolean;
   connected?: boolean;
   onConnect?: () => void;
@@ -87,7 +88,7 @@ export const ChatGPT: FC<WorkOptions> = (options) => {
 };
 
 const EmptyState: FC = () => {
-  const { workMode } = useContext(WorkContext);
+  const { workMode, welcome } = useContext(WorkContext);
   return (
     <div className="aui-chatgpt-empty flex grow flex-col items-center justify-center px-4 pb-[16vh]">
       <div className="mx-auto flex w-full max-w-3xl flex-col items-stretch gap-6">
@@ -95,6 +96,7 @@ const EmptyState: FC = () => {
           {workMode ? "What should we work on?" : "Where should we begin?"}
         </h1>
         <Composer placeholder="Ask anything" />
+        {welcome}
       </div>
     </div>
   );
