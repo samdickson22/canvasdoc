@@ -1,3 +1,4 @@
+import { CatchUp } from "./catch-up-view";
 import { transitionView } from "./transitions";
 import { localFilePath } from "./workspace-files";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -295,6 +296,7 @@ export function App({
               </header>
               <div className="dashboard-center">
                 <Conversation context={context} home onConnect={onConnect} />
+                <CatchUp />
                 <RecentWork />
               </div>
               <footer className="dashboard-footer">

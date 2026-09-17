@@ -1083,3 +1083,11 @@ select {
   .workspace-toolbar-content .connection-status { font-size:0; gap:0; }
   .workspace-toolbar-content .connection-status i { width:7px; height:7px; }
 }
+
+.catch-up { width: 100%; max-width: 760px; margin: 16px auto; font-size: 13px; }
+.catch-up p { margin: 10px 0; color: var(--muted-foreground); }
+.catch-up ul { padding-left: 20px; }
+.catch-up li { margin: 9px 0; }
+.catch-up li small { display: block; color: var(--muted-foreground); }
+.catch-up a { color: inherit; text-decoration: underline; }
+.catch-up summary { cursor: pointer; }

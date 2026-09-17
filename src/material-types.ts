@@ -5,6 +5,7 @@ export type Material = {
   title: string;
   sourceUrl: string;
   revision: string;
+  contentRevision?: string;
   text?: string;
   downloadUrl?: string;
   size?: number;
