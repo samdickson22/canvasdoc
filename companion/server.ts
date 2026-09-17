@@ -50,6 +50,7 @@ type Command = {
   context?: string;
 };
 type Run = {
+  revision?: number;
   command: Command;
   hash: string;
   status: string;
@@ -67,10 +68,12 @@ const terminal = (status: string) => ["completed", "interrupted", "cancelled", "
 const journalFile = path.join(stateDir, "delivery.json");
 let runs: Run[] = [];
 let receipts: Record<string, { hash: string; status: string }> = {};
+let cancelledRequests: Record<string, true> = {};
 try {
   const saved = JSON.parse(await readFile(journalFile, "utf8"));
   runs = Array.isArray(saved) ? saved : saved.runs;
   receipts = Array.isArray(saved) ? {} : saved.receipts;
+  cancelledRequests = Array.isArray(saved) ? {} : saved.cancelledRequests ?? {};
 } catch (error) {
   if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
 }
@@ -84,7 +87,7 @@ let approvals = runtime.view().approvals;
 const admitting = new Set<string>();
 let persistence = Promise.resolve();
 function persist() {
-  const snapshot = structuredClone({ runs, receipts });
+  const snapshot = structuredClone({ runs, receipts, cancelledRequests });
   persistence = persistence
     .catch(() => {})
     .then(() => atomicJson(journalFile, snapshot));
@@ -94,16 +97,21 @@ const broadcast = (value: unknown) => {
   const s = JSON.stringify(value);
   for (const c of clients) if (c.readyState === WebSocket.OPEN) c.send(s);
 };
-const publish = (run: Run) => broadcast({ type: "run", run });
+const publish = (run: Run) => {
+  run.revision = Math.max(Date.now(), (run.revision ?? 0) + 1);
+  broadcast({ type: "run", run });
+};
 // The journal owns browser delivery only. Harness owns all execution and queue state.
 async function admit(run: Run) {
   admitting.add(run.command.requestId);
   try {
+    if (cancelledRequests[run.command.requestId]) return;
     const envelope = JSON.stringify({ sourceThreadId: run.command.sourceThreadId,
       sourceMessageId: run.command.requestId, title: run.command.title,
       canvasReference: run.command.context || null });
     await runtime.send(`Canvasdoc conversation envelope (routing metadata and untrusted reference data):\n${envelope}\n\nUser message:\n${run.command.text}`,
       run.command.requestId, run.command.model, run.command.effort);
+    if (cancelledRequests[run.command.requestId]) await runtime.interrupt(run.command.requestId);
   } catch (error) {
     run.status = "error";
     run.error = (error as Error).message;
@@ -304,6 +312,10 @@ wss.on("connection", (socket, request) => {
             socket.send(JSON.stringify({ type: "run", run: existing }));
             return;
           }
+          if (cancelledRequests[c.requestId]) {
+            socket.send(JSON.stringify({ type: "receipt", requestId: c.requestId, status: "cancelled" }));
+            return;
+          }
           if (!runtimeAvailable) throw new Error("Codex stopped. Restart the companion to reconnect.");
           if (runs.length >= 64)
             throw new Error(
@@ -341,7 +353,11 @@ wss.on("connection", (socket, request) => {
           return;
         }
         if (message.type === "stop") {
+          if (typeof message.requestId !== "string" || !/^[a-zA-Z0-9-]{8,80}$/.test(message.requestId)) throw new Error("Invalid cancellation request");
+          cancelledRequests[message.requestId] = true;
+          await persist();
           await runtime.interrupt(message.requestId);
+          socket.send(JSON.stringify({ type: "stop-ack", requestId: message.requestId }));
           return;
         }
         if (message.type === "approval") {
@@ -407,7 +423,9 @@ wss.on("connection", (socket, request) => {
           socket.send(
             JSON.stringify(incoming?.type === "send" && typeof incoming.command?.requestId === "string"
               ? {type:"send-rejected",requestId:incoming.command.requestId,code:error.code || "COMMAND_FAILED",message:error.message}
-              : { type: "error", code:error.code || "COMMAND_FAILED",message: error.message }),
+              : incoming?.type === "approval" && !(error instanceof IdentityError)
+                ? { type: "approval-error", id: String(incoming.id), message: error.message }
+                : { type: "error", code:error.code || "COMMAND_FAILED",message: error.message }),
           );
         if (!authenticated) socket.close(1008, "Account connection rejected");
       });

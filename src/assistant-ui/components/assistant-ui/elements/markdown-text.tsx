@@ -1,7 +1,6 @@
-import { WorkspaceLink } from "../../../../workspace-link";
 "use client";
-
-
+import { MarkdownLink, MarkdownImage, MarkdownStyles, markdownPlugins, markdownRehypePlugins, preprocessMarkdown } from "../../../../markdown-rendering";
+import { AssistantMarkdownHighlighter } from "../../../../markdown-highlighter";
 
 import {
   type CodeHeaderProps,
@@ -9,7 +8,7 @@ import {
   unstable_memoizeMarkdownComponents as memoizeMarkdownComponents,
   useIsMarkdownCodeBlock,
 } from "@assistant-ui/react-markdown";
-import remarkGfm from "remark-gfm";
+
 import { type FC, memo, useState } from "react";
 import { CheckIcon, CopyIcon } from "lucide-react";
 
@@ -18,12 +17,17 @@ import { cn } from "../../../lib/utils";
 
 const MarkdownTextImpl = () => {
   return (
+    <>
+    <MarkdownStyles />
     <MarkdownTextPrimitive
-      remarkPlugins={[remarkGfm]}
+      remarkPlugins={markdownPlugins}
+      rehypePlugins={markdownRehypePlugins}
+      preprocess={preprocessMarkdown}
       className="aui-md"
       components={defaultComponents}
       defer
     />
+    </>
   );
 };
 
@@ -77,7 +81,9 @@ const useCopyToClipboard = ({
   return { isCopied, copyToClipboard };
 };
 
-const defaultComponents = memoizeMarkdownComponents({
+const markdownComponents: NonNullable<Parameters<typeof memoizeMarkdownComponents>[0]> = {
+  img: MarkdownImage,
+  SyntaxHighlighter: AssistantMarkdownHighlighter,
   h1: ({ className, ...props }) => (
     <h1
       className={cn(
@@ -142,7 +148,7 @@ const defaultComponents = memoizeMarkdownComponents({
     />
   ),
   a: ({ className, ...props }) => (
-    <WorkspaceLink
+    <MarkdownLink
       className={cn(
         "aui-md-a text-primary hover:text-primary/80 underline underline-offset-2",
         className,
@@ -259,4 +265,12 @@ const defaultComponents = memoizeMarkdownComponents({
     );
   },
   CodeHeader,
-});
+};
+
+// Code tokenization updates React children without changing the Markdown AST.
+// The node-only memoizer would otherwise keep the initial plain-code children.
+const defaultComponents = {
+  ...memoizeMarkdownComponents(markdownComponents),
+  pre: markdownComponents.pre,
+  code: markdownComponents.code,
+};

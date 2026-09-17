@@ -141,7 +141,11 @@ function ToolFallbackTrigger({
     status?.type === "incomplete" && status.reason === "cancelled";
 
   const Icon = statusIconMap[statusType];
-  const label = isCancelled ? "Cancelled tool" : "Used tool";
+  const label = isCancelled
+    ? "Cancelled tool"
+    : statusType === "incomplete"
+      ? "Failed tool"
+      : "Used tool";
 
   return (
     <CollapsibleTrigger
@@ -674,13 +678,22 @@ const ToolFallbackImpl: ToolCallMessagePartComponent = ({
   toolName,
   argsText,
   result,
-  status,
+  status: incomingStatus,
+  isError,
   addResult,
   resume,
   interrupt,
   approval,
   respondToApproval,
 }) => {
+  const status: ToolCallMessagePartStatus =
+    isError && incomingStatus?.type !== "incomplete"
+      ? {
+          type: "incomplete",
+          reason: "error",
+          error: "The tool reported a failure. Review its output below.",
+        }
+      : incomingStatus;
   const isCancelled =
     status?.type === "incomplete" && status.reason === "cancelled";
   const isRequiresAction = status?.type === "requires-action";

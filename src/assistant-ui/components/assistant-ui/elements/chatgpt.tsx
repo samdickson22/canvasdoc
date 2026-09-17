@@ -11,6 +11,7 @@ import {
   MessagePrimitive,
   ThreadPrimitive,
   useAui,
+  useAuiState,
 
 } from "@assistant-ui/react";
 import { type FC, type PropsWithChildren, type ReactNode, useContext, createContext, useEffect, useRef, useState } from "react";
@@ -44,8 +45,11 @@ import { ToolFallback } from "./tool-fallback.aui";
 
 import { WorkHistory, ActivityGroup, ActivityTool, RunData, RunOutcome } from "./run-activity";
 import { Reasoning } from "./reasoning.aui";
+import { attachmentWorkspaceHref, type AttachmentUploadState } from "../../../../runtime/attachments";
+import { WorkspaceLink } from "../../../../workspace-link";
 
 type WorkOptions = {
+  uploadStates?: Readonly<Record<string, AttachmentUploadState>>;
   welcome?: ReactNode;
   workMode?: boolean;
   connected?: boolean;
@@ -537,6 +541,11 @@ const ChatGPTAttachmentUI: FC = () => {
   const aui = useAui();
   const isComposer = aui.attachment.source !== "message";
   const src = useAttachmentSrc();
+  const attachment = useAuiState((s) => s.attachment);
+  const { uploadStates } = useContext(WorkContext);
+  const uploadState = isComposer ? uploadStates?.[attachment.id] : undefined;
+  const href = !isComposer ? attachmentWorkspaceHref(attachment) : undefined;
+  const name = <AttachmentPrimitive.Name />;
 
   return (
     <AttachmentPrimitive.Root className="group/attachment relative">
@@ -559,7 +568,14 @@ const ChatGPTAttachmentUI: FC = () => {
             <AttachmentPrimitive.unstable_Thumb className="text-xs" />
           </div>
         </AuiIf>
-        <span className="max-w-48 truncate py-3 pr-4 text-sm"><AttachmentPrimitive.Name /></span>
+        <div className="min-w-0 py-3 pr-4 text-sm">
+          {href ? (
+            <WorkspaceLink href={href} className="block max-w-48 truncate underline" title={`Open ${attachment.name}`}>{name}</WorkspaceLink>
+          ) : <span className="block max-w-48 truncate">{name}</span>}
+          {uploadState?.type === "uploading" && <span role="status" className="block text-xs text-neutral-500">Uploading…</span>}
+          {uploadState?.type === "complete" && <span role="status" className="block text-xs text-neutral-500">Uploaded</span>}
+          {uploadState?.type === "error" && <span role="alert" className="block max-w-64 text-xs text-red-700">{uploadState.message}</span>}
+        </div>
       </div>
       {isComposer && (
         <AttachmentPrimitive.Remove aria-label="Remove attachment" className="absolute -top-1.5 -right-1.5 flex size-7 items-center justify-center rounded-full border border-[#e5e5e5] bg-white text-[#6b6b6b] transition-all hover:bg-[#f5f5f5] hover:text-[#0d0d0d] dark:border-[#3a3a3a] dark:bg-[#1a1a1a] dark:text-[#9a9a9a] dark:hover:bg-[#252525] dark:hover:text-white">

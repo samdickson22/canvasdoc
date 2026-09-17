@@ -1,8 +1,8 @@
 import { context, build as bundle } from "esbuild";
-import { mkdir, writeFile, copyFile } from "node:fs/promises";
+import { mkdir, writeFile, copyFile, readFile } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
-import { resolve } from "node:path";
+import { resolve, dirname } from "node:path";
 
 const watch = process.argv.includes("--watch");
 const output = resolve("dist");
@@ -19,6 +19,20 @@ const build = await context({
   define: { "process.env.NODE_ENV": '"production"' },
   minify: true,
   plugins: [
+    {
+      name: "katex-embedded-fonts",
+      setup(build) {
+        build.onLoad({filter: /katex\.min\.css$/}, async ({path}) => {
+          let css = (await readFile(path, "utf8")).replace(/,url\([^)]+\) format\("(?:woff|truetype)"\)/g, "");
+          for (const match of [...css.matchAll(/url\(([^)]+)\)/g)]) {
+            const font = await readFile(resolve(dirname(path), match[1]));
+            const mime = match[1].endsWith(".woff2") ? "font/woff2" : match[1].endsWith(".woff") ? "font/woff" : "font/ttf";
+            css = css.replace(match[0], `url(data:${mime};base64,${font.toString("base64")})`);
+          }
+          return {contents: css, loader: "text"};
+        });
+      },
+    },
     {
       name: "copy-to-dev-canvas",
       setup(build) {

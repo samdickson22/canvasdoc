@@ -8,16 +8,16 @@ import {
   useExternalStoreRuntime,
   type ThreadMessageLike,
 } from "@assistant-ui/react";
-import { useConnection, sendMessage, stopRun, reconnectAgent, answerApproval, answerQuestions, type Approval } from "./runtime/client";
+import { useConnection, sendMessage, stopRun, reconnectAgent, answerApproval, answerQuestions, uploadFile, type Approval } from "./runtime/client";
 import { ChatGPT } from "./assistant-ui/components/assistant-ui/elements/chatgpt";
 import { PortalContainerContext } from "./assistant-ui/lib/portal-container";
-import { attachmentAdapter } from "./runtime/attachments";
+import { createAttachmentAdapter, type AttachmentUploadState } from "./runtime/attachments";
 import { isVisibleHomeRequest, rememberHomeRequest, visibleHomeMessages } from "./runtime/home-view";
-import { pageReference } from "./runtime/chat-context";
+import { pageReference, personalTaskContext } from "./runtime/chat-context";
 import { presentMessage } from "./runtime/message-presentation";
 import { materialContext } from "./material-sync";
 import { store, useData } from "./store";
-import type { PageContext, ThreadRecord } from "./types";
+import type { PageContext } from "./types";
 
 export function Conversation({
   context,
@@ -41,6 +41,13 @@ export function Conversation({
   );
   const connection = useConnection();
   const [sendError, setSendError] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
+  const [uploadStates, setUploadStates] = useState<Record<string, AttachmentUploadState>>({});
+  const attachmentAdapter = useMemo(() => createAttachmentAdapter({
+    upload: uploadFile,
+    onError: setSendError,
+    onUploadState: (id, status) => setUploadStates(previous => ({ ...previous, [id]: status })),
+  }), []);
   const active = Object.values(connection.runs).find(
     (run: any) =>
       run.command.sourceThreadId === context.threadId &&
@@ -52,11 +59,11 @@ export function Conversation({
   const failedRun = Object.values(connection.runs).find((run:any)=>run.command.requestId===latestUserId && (!home || isVisibleHomeRequest(run.command.requestId)) && run.error);
   const messages = useMemo<ThreadMessageLike[]>(
     () =>
-      (home
+      (home && !showHistory
         ? visibleHomeMessages(saved?.messages)
         : (saved?.messages ?? [])
       ).map(presentMessage),
-    [saved?.messages, home],
+    [saved?.messages, home, showHistory],
   );
   const runtime = useExternalStoreRuntime({
     adapters: { attachments: attachmentAdapter },
@@ -66,7 +73,12 @@ export function Conversation({
     isRunning: preparing || queued || !!active,
     onCancel: async () => {
       preparation.current?.abort();
-      if (active) stopRun(active.command.requestId);
+      const ids = new Set(Object.values(store.get().outbox ?? {})
+        .filter(command => command.sourceThreadId === context.threadId && (!home || isVisibleHomeRequest(command.requestId)))
+        .map(command => command.requestId));
+      if (active) ids.add(active.command.requestId);
+      try { await Promise.all([...ids].map(stopRun)); }
+      catch (error) { setSendError((error as Error).message); }
     },
     convertMessage: (message) => message,
     onNew: async (message) => {
@@ -82,16 +94,17 @@ export function Conversation({
       const controller = new AbortController();
       preparation.current = controller;
       setPreparing(true);
-      const previous = store.get().threads[context.threadId];
-      const saveMessage = () => store.saveThread({
-        id: context.threadId, title: context.title, href: context.href, draft: "",
+      const saveMessage = () => store.saveMessage({
+        id: context.threadId, title: context.title, href: context.href,
         updatedAt: new Date().toISOString(),
-        messages: [...(previous?.messages ?? []), { id: requestId, role: "user", text: displayText, attachments, createdAt: new Date().toISOString() }],
-      });
+      }, { id: requestId, role: "user", text: displayText, attachments, createdAt: new Date().toISOString() });
       const savedImmediately = home && messages.length === 0 ? transitionView(saveMessage) : saveMessage();
       try {
         if (!(await savedImmediately)) throw new Error(store.error());
         const source = pageReference(location.origin,context);
+        const personal = context.kind === "personal"
+          ? personalTaskContext(store.get().tasks.find(task => task.id === context.taskId))
+          : undefined;
         const attachmentContext = attachments
           ?.flatMap((a) => a.content)
           .filter((p) => p.type === "text")
@@ -111,13 +124,13 @@ export function Conversation({
           context,
           text ||
             (attachments?.length ? "Please review the attached files." : ""),
-          [source, materials, catchUpContext, attachmentContext].filter(Boolean).join("\n"),
+          [source, personal, materials, catchUpContext, attachmentContext].filter(Boolean).join("\n"),
           attachments,
           requestId,
         );
       } catch (error) {
         setSendError(controller.signal.aborted ? "Message stopped before sending to the agent." : `Message was saved but could not be sent: ${(error as Error).message}`);
-        runtime.thread.composer.setText(text);
+        if (!runtime.thread.composer.getState().text) runtime.thread.composer.setText(text);
       } finally {
         preparation.current = null;
         setPreparing(false);
@@ -131,21 +144,23 @@ export function Conversation({
   }, [runtime]);
   useEffect(() => {
     runtime.thread.composer.setText(
-      home ? "" : (store.get().threads[context.threadId]?.draft ?? ""),
+      store.get().threads[context.threadId]?.draft ?? "",
     );
     return runtime.thread.composer.subscribe(() => {
       const draft = runtime.thread.composer.getState().text;
       const previous = store.get().threads[context.threadId];
       if (draft === (previous?.draft ?? "")) return;
-      const next: ThreadRecord = {
+      const next = {
         id: context.threadId,
         title: context.title,
         href: context.href,
-        messages: previous?.messages ?? [],
         draft,
         updatedAt: new Date().toISOString(),
       };
-      store.saveThread(next);
+      // Let assistant-ui finish its synchronous input update before publishing
+      // browser-store state. An external-store render inside that update briefly
+      // restores the old textarea value, which moves the caret to the end.
+      queueMicrotask(() => { void store.saveDraft(next); });
     });
   }, [runtime, context.threadId, context.title, context.href]);
   return (
@@ -156,6 +171,7 @@ export function Conversation({
         className={`conversation ${home ? "conversation-home" : ""} ${messages.length ? "conversation-active" : ""}`}
       >
         <PortalContainerContext.Provider value={portalContainer}>
+          {home && !!saved?.messages.length && <button type="button" className="home-history-toggle" aria-pressed={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? "Hide previous conversation" : "Show previous conversation"}</button>}
           {(sendError || (failedRun?.error && !saved?.messages.some(m => m.id === `assistant:${failedRun.command.requestId}` && m.run?.error))) && <p className="error" role="alert">{sendError || failedRun?.error}</p>}
           {connection.approvals.filter(approval => approval.requestId && approval.requestId === active?.command.requestId).map(approval => (
             <RuntimeApproval key={approval.id} approval={approval} connected={connection.status === "connected"} />
@@ -165,6 +181,7 @@ export function Conversation({
           <ChatGPT
             welcome={home ? <HomeSuggestions items={suggestions} /> : undefined}
             workMode={home || workMode}
+            uploadStates={uploadStates}
             connected={connection.status === "connected"}
             onConnect={onConnect}
           />
@@ -178,11 +195,15 @@ export function Conversation({
 function RuntimeApproval({ approval, connected }: { approval: Approval; connected: boolean }) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
+  const [sending, setSending] = useState(false);
   const questions = approval.method === "item/tool/requestUserInput" ? approval.params.questions ?? [] : [];
   const canApprove = ["item/commandExecution/requestApproval", "item/fileChange/requestApproval"].includes(approval.method);
-  const respond = (decision: "accept" | "decline") => {
-    try { answerApproval(approval.id, decision); }
+  const respond = async (decision: "accept" | "decline") => {
+    setError("");
+    setSending(true);
+    try { await answerApproval(approval.id, decision); }
     catch (error) { setError((error as Error).message); }
+    finally { setSending(false); }
   };
   return (
     <section className="approval-card" aria-label={questions.length ? "Agent questions" : "Agent approval"}>
@@ -191,24 +212,27 @@ function RuntimeApproval({ approval, connected }: { approval: Approval; connecte
       {approval.params.command && <pre>{approval.params.command}</pre>}
       {approval.params.grantRoot && <p>Folder: {approval.params.grantRoot}</p>}
       {questions.length > 0 ? (
-        <form onSubmit={event => {
+        <form onSubmit={async event => {
           event.preventDefault();
-          try { answerQuestions(approval.id, answers); }
+          setError("");
+          setSending(true);
+          try { await answerQuestions(approval.id, answers); }
           catch (error) { setError((error as Error).message); }
+          finally { setSending(false); }
         }}>
           {questions.map((question: { id: string; question: string; isSecret?: boolean; options?: { label: string; description: string }[] }) => (
             <label key={question.id}>
               <p>{question.question}</p>
               {question.options?.map(option => (
-                <button type="button" key={option.label} disabled={!connected} onClick={() => setAnswers(previous => ({ ...previous, [question.id]: option.label }))} title={option.description}>{option.label}</button>
+                <button type="button" key={option.label} disabled={!connected || sending} onClick={() => setAnswers(previous => ({ ...previous, [question.id]: option.label }))} title={option.description}>{option.label}</button>
               ))}
               <input aria-label={question.question} type={question.isSecret ? "password" : "text"} required maxLength={10000} disabled={!connected} value={answers[question.id] ?? ""} onChange={event => setAnswers(previous => ({ ...previous, [question.id]: event.target.value }))} />
             </label>
           ))}
-          <button type="submit" disabled={!connected}>Send answers</button>
+          <button type="submit" disabled={!connected || sending}>{sending ? "Sending…" : "Send answers"}</button>
         </form>
       ) : canApprove ? (
-        <><button type="button" disabled={!connected} onClick={() => respond("decline")}>Decline</button><button type="button" disabled={!connected} onClick={() => respond("accept")}>Allow</button></>
+        <><button type="button" disabled={!connected || sending} onClick={() => void respond("decline")}>Decline</button><button type="button" disabled={!connected || sending} onClick={() => void respond("accept")}>{sending ? "Sending…" : "Allow"}</button></>
       ) : <p>This request type is not supported yet. Stop this turn to continue.</p>}
       {error && <p role="alert">{error}</p>}
     </section>

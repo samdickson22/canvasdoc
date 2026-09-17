@@ -1,4 +1,5 @@
 import { materialDownload } from "./material-download";
+import { nativeReceiver } from "../companion/native-framing.ts";
 import { mutate, parseSavedData, type Mutation } from "../src/storage/data.ts";
 const queues = new Map<string, Promise<unknown>>();
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
@@ -62,7 +63,16 @@ chrome.runtime.onConnect.addListener((port) => {
     return;
   }
   const native = chrome.runtime.connectNative("com.canvasdoc.connector");
-  native.onMessage.addListener((message) => port.postMessage(message));
+  const receive = nativeReceiver();
+  native.onMessage.addListener((message) => {
+    try {
+      const response = receive(message);
+      if (response) port.postMessage(response.value);
+    } catch (error) {
+      port.postMessage({ type: "error", message: `Native response could not be read: ${(error as Error).message}` });
+      native.disconnect();
+    }
+  });
   native.onDisconnect.addListener(() => {
     const error = chrome.runtime.lastError;
     const message = error?.message || "Local connector disconnected.";
