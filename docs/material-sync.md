@@ -34,15 +34,15 @@ Names are readable in Finder and agent directory listings. IDs remain suffixes t
 
 ## Transport and UI
 
-`canvasdoc-cli@0.1.4` advertises material support. The browser transfers files in 384 KiB chunks, below native-message limits, with a 100 MiB per-file ceiling. Up to four materials download and transfer concurrently, matching the extension and companion limits. Progress counts completed materials; individual failures do not block the remaining queue. Retries skip receipts whose revisions and paths still match. Local file and receipt commits remain serialized to avoid lost manifest updates. Work occurs outside the agent-turn queue. Older companions still support chat and show an update notice for material downloads.
+The companion advertises material support. The browser transfers files in 384 KiB chunks, below native-message limits, with a 100 MiB per-file ceiling. Up to four materials download and transfer concurrently, matching the extension and companion limits. Progress counts completed materials; individual failures do not block the remaining queue. Retries skip receipts whose revisions and paths still match. Local file and receipt commits remain serialized to avoid lost manifest updates. Work occurs outside the agent-turn queue. Older companions still support chat and show an update notice for material downloads.
 
 The extension worker downloads Canvas-authorized files when browser CORS would block a redirect. It resolves file URLs from Canvas metadata rather than accepting arbitrary remote URLs. The development loader uses ordinary browser fetch; cross-origin downloads without CORS may fail there even when an installed extension can fetch them. Other CDN/custom-domain permissions may need extending for a school's deployment.
 
-Home, connection settings, and Workspace Sources show sync status, errors, and a retry action. Browser navigation and cached data never wait on the companion. Offline collection records pending work; reconnection compares the catalog with disk receipts. Material previews retain the viewer's separate 5 MiB limit.
+Home, connection settings, and Workspace Sources show sync status, errors, and a retry action. Browser navigation and cached data never wait on the companion. Offline collection records pending work; reconnection compares the catalog with disk receipts. Material previews retain the viewer's separate 25 MiB file limit.
 
 ## Validation
 
-Run `npm run check` for types, build, and unit tests, including material transfer recovery, source changes, local edit conflicts, account separation, and path protections.
+For changes to this flow, select relevant checks from `tests/material-sync.test.ts`, `tests/materials.test.ts`, and `tests/assignment-context.test.ts`. These cover transfer recovery, source changes, local edit conflicts, account separation, and assignment context. A full-suite run is not required.
 
 `node dev/materials-integration.mjs` signs into the synthetic development Canvas with a normal student session, collects courses, verifies assignment-file links, downloads and verifies bytes, and checks that a second unchanged pass produces no changed revisions. `--live` exercises the running development companion's WebSocket protocol and writes synthetic materials into its configured root. This script never reads production Canvas credentials.
 

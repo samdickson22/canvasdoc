@@ -2,7 +2,7 @@
 
 ## Build and update
 
-Run `npm run check`, `node scripts/package-cli.mjs`, `node scripts/package-extension.mjs`, and `node scripts/package-webstore.mjs` from the repository root.
+Run `./build.sh`, `node scripts/package-cli.mjs`, `node scripts/package-extension.mjs`, and `node scripts/package-webstore.mjs` from the repository root. Verify the install and runtime behavior affected by the release; a full regression suite is not a prerequisite.
 
 The unpacked testing bundle includes the matching CLI archive. The Web Store ZIP contains only extension runtime files and icons; it excludes development origins, workspace data, source maps, credentials, and the local unpacked-extension key. Neither command publishes anything.
 
@@ -16,7 +16,7 @@ For an unpacked update: stop the connector, pull, run `./build.sh`, restart with
 - Suggested description: “A local coursework agent inside Canvas, with assignment conversations, course materials, and a persistent workspace on your computer.” State clearly that a local companion and Codex account are required and current support is Cal Poly only.
 - Complete Chrome's data-use disclosures to match `privacy.md`, including course content, chat content, and local runtime/model-provider processing.
 - Provide reviewer instructions and synthetic test access; never provide a student's real credentials.
-- Verify the native bridge with the store-issued ID before rollout. Check a clean install, upgrade, reconnect, and uninstall on a separate Chrome profile.
+- Verify the native bridge with the store-issued ID before rollout. Check a clean install, reconnect, and uninstall on a separate Chrome profile. Prerelease upgrades have no backward compatibility guarantee.
 
 ## Permissions and purpose
 

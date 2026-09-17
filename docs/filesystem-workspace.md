@@ -1,75 +1,29 @@
-# Filesystem and expanded workspace direction
-
-September 14, 2026. Product direction and proposed implementation; the Workspace UI remains deferred.
+# Filesystem and Workspace
 
 ## Ownership
 
-- Canvas: official assignments, dates, rubrics, grades, and submission records.
-- Browser extension: complete page-thread conversations, personal tasks, drafts, UI preferences, and file associations. Reuse assistant-ui persistence over extension-owned storage. No SQLite application database.
-- User's Canvasdoc folder: real source downloads, working files, and outputs shared by Claude and the file viewer.
-- Claude Code: main execution session, context, tools, and its own persisted transcripts. These may live in Claude's native configuration directory; starting in Canvasdoc does not automatically move them into the project folder.
+Canvas owns official course data and submission state. Browser extension storage owns conversations, drafts, personal tasks, preferences, and file associations. The chosen Canvasdoc folder holds actual source downloads, working files, and outputs shared by Codex, the viewer, and external editors.
 
-One main Claude agent always starts at the chosen Canvasdoc root. Assignment subdirectories organize work; they do not own separate main sessions.
+One main Codex agent runs from that root through Harness SDK. Assignment directories organize files; they do not create independent main sessions. Harness owns execution and recovery, while Canvasdoc routes messages and tracks browser delivery. See [transport ownership](../companion/vendor/harness-codex/README.md).
 
-## Folder setup
+## Root identity and file access
 
-Ask the user to create or choose the folder during local connector setup. Record its resolved absolute path and a stable root ID in a small configuration file. The launcher always sets that working directory, even if invoked from another directory. The native setup flow knows the real path; a browser directory handle should not be treated as an absolute path for a CLI process.
+Setup records the selected folder's resolved path and stable identity. The launcher uses that working directory regardless of where it was invoked. A missing or moved folder must be relocated explicitly instead of silently replaced. Browser references use root-relative paths; a browser directory handle is not a host filesystem path.
 
-If the folder moves, let the user locate it and verify its root ID. Never create an empty replacement silently. Use root-relative paths for browser file references so relocating the root does not break every link.
+The companion exposes files within the chosen root without requiring an inference turn. Path checks must account for symlink escapes and protect private connector state. Source refreshes must not overwrite user edits or generated work. See [material layout and sync](material-sync.md) for source identity and transfer rules.
 
-Suggested lazy-created organization:
+The browser reads the same files that Codex and external editors use. A download creates a separate copy. Do not introduce a second bidirectional filesystem-sync system or treat browser-private storage as the working filesystem.
 
-```text
-Canvasdoc/
-  .canvasdoc/
-    config.json
-  courses/
-    cs101-42/
-      course-materials/
-      assignments/
-        calculator-314/
-          sources/
-          work/
-          outputs/
-  personal/
-```
-
-Names are for readability; Canvas account/course/assignment IDs provide identity. A title change must not create another folder. Bind to one Canvas account initially; namespace additional accounts if supported. Create only folders needed by actual work. The file viewer initially filters to files associated with the current thread, with an optional all-files tree.
-
-## Thin filesystem bridge
-
-The existing machine connector should expose authenticated, root-scoped list, stat, read/range-read, write, import, rename, and change-subscription operations. It can also reveal/open a file in the native application on its host. These operations do not require an inference request. Keep them within the selected root, account for symlink escapes, and protect connector metadata from ordinary file-viewer edits.
-
-Watch the real files on the host. Claude, the Canvasdoc viewer, and external editors all operate on the same bytes. Notify the browser of changes and refresh affected previews. Re-scan after reconnect because filesystem watchers can miss events; they are notifications, not a durable history. Ignore temporary/build directories by default and request large files on demand.
-
-If editing is added, use file revisions and conditional saves. When Claude or an external editor changes a file with unsaved browser edits, present a conflict instead of overwriting. Atomic saves and short write coordination belong in the file bridge. Do not build a second bidirectional filesystem-sync product.
-
-The same bridge works when the selected Claude host is remote: the browser retrieves bytes from that host. A download creates an explicit local copy. A browser directory picker cannot directly grant access to a remote host's disk.
-
-## Sources and outputs
-
-Canvas source items retain their official IDs/URLs and fetch metadata. Download materials on demand when Claude needs local files. Keep source copies separate from editable work; refreshing a Canvas source must not overwrite user-created outputs. Expose sources and outputs as logical file lists in the UI without requiring users to manage the underlying folder layout.
-
-Dragging a file into a thread imports it into that assignment's files and records the association. Generated artifacts show up in the thread and Outputs list, opening the same on-disk file. File selections or code ranges can be attached to a message as a path, revision, and range.
-
-Start with text/code/Markdown, images, and PDF previews. Office files can be downloaded/opened in their native application; richer previews can be generated locally later. Sandbox HTML previews so generated content cannot access Canvas or connector credentials. Do not promise a full editable Office suite as part of a file viewer.
+The inspector supports text/Markdown, images, PDF, and sandboxed HTML previews; other formats can be downloaded. HTML previews must not gain access to Canvas, connector credentials, or the parent page. Preview/download is limited to 25 MiB per file, and text rendering is capped at 256 KiB while downloads retain the full bytes. Larger files remain available directly in the workspace folder.
 
 ## Two layouts, one conversation
 
-Assignment view preserves the actual Canvas page in the center and its conversation in the full sidebar.
+Assignment view preserves the real Canvas page with its conversation in the sidebar. Workspace moves the same conversation into the main area, full-width initially, with a collapsed Outputs/Sources inspector. Opening the inspector makes space for files; returning to Assignment docks the conversation back beside Canvas.
 
-Workspace view promotes that same conversation into the main work area. Initially show a spacious chat with a compact Sources/Outputs panel. Opening a file produces a resizable chat-and-viewer split, with file tabs, preview controls, and close/expand actions. Do not leave a duplicate conversation sidebar open. Closing the file returns space to the chat; returning to Assignment docks the same conversation back into the sidebar.
+Preserve conversation identity, drafts, history, pending approvals, and running work across this transition. It must not create another conversation, restart the agent session, or resend a request. Keep a direct way back to Assignment.
 
-Preserve thread ID, composer draft, running work, pending approvals, selected file, and appropriate scroll state. The layout change must not start a new session or resend context. Canvas global/course navigation and the Assignment/Workspace switch remain the route back to official content.
+## Recovery backups
 
-## Browser filesystem alternatives
+Browser history exports to `.canvasdoc/` as a recovery backup. Browser state remains primary; exports are not a second application database or competing writer. They run after browser commits, with debounce/coalescing, atomic writes, and reconnect retries.
 
-The File System Access API can grant browser access to a user-selected directory, with handles stored in IndexedDB and permissions checked on reuse. It is useful as an optional browser-only file-viewer mode, but adds permission lifecycle and browser-support constraints and cannot launch Claude or solve remote-disk access. Since the connector already exists, using it as the primary filesystem path is simpler.
-
-OPFS is browser-private storage, not the ordinary folder Claude uses. It may cache thumbnails, previews, and offline bytes, but should not become the authoritative working filesystem.
-
-Browser-owned history automatically exports recoverable JSON/JSONL snapshots into `.canvasdoc/` so extension removal does not destroy the only copy. This is a backup/export, not a second database or competing writer. The connector also needs a small durable spool of undelivered events if it promises to deliver agent output after the browser disconnects; acknowledge and trim it after browser persistence.
-
-References: [Work interface](https://learn.chatgpt.com/docs/get-started-with-work), [File System Access permissions](https://developer.chrome.com/blog/persistent-permissions-for-the-file-system-access-api), [OPFS](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API/Origin_private_file_system). The supplied Codex/Work screenshots are the primary layout references.
-
-Browser state remains the primary application store. Exports run asynchronously after browser commits, with debounce/coalescing, atomic writes, and reconnect retries. The UI never waits on an export or reads disk snapshots during ordinary thread navigation. Restoration is explicit and checks revisions.
+Ordinary navigation and drafting must not wait for disk or the companion. Restoring exported history is explicit and must not silently replace newer browser data. The companion's delivery journal tracks routing and receipts for reconnect recovery; it must not become another execution queue.

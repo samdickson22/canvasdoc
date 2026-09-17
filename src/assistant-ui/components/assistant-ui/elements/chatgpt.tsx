@@ -50,7 +50,8 @@ import { WorkspaceLink } from "../../../../workspace-link";
 
 type WorkOptions = {
   uploadStates?: Readonly<Record<string, AttachmentUploadState>>;
-  welcome?: ReactNode;
+  composerPlaceholder?: string;
+  composerFooter?: ReactNode;
   workMode?: boolean;
   connected?: boolean;
   onConnect?: () => void;
@@ -80,6 +81,7 @@ export const ChatGPT: FC<WorkOptions> = (options) => {
             <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mx-auto mt-auto flex w-full max-w-3xl flex-col gap-2 overflow-visible rounded-t-3xl bg-white pb-2 dark:bg-black">
               <ThreadScrollToBottom />
               <Composer placeholder="Ask anything" />
+              {options.composerFooter}
               <p className="text-center text-xs text-[#5d5d5d] dark:text-[#afafaf]">
                 Canvasdoc can make mistakes. Check important info.
               </p>
@@ -92,7 +94,7 @@ export const ChatGPT: FC<WorkOptions> = (options) => {
 };
 
 const EmptyState: FC = () => {
-  const { workMode, welcome } = useContext(WorkContext);
+  const { workMode, composerFooter } = useContext(WorkContext);
   return (
     <div className="aui-chatgpt-empty flex grow flex-col items-center justify-center px-4 pb-[16vh]">
       <div className="mx-auto flex w-full max-w-3xl flex-col items-stretch gap-6">
@@ -100,8 +102,8 @@ const EmptyState: FC = () => {
           {workMode ? "What should we work on?" : "Where should we begin?"}
         </h1>
         <div className="flex flex-col gap-3">
-          {welcome}
           <Composer placeholder="Ask anything" />
+          {composerFooter}
         </div>
       </div>
     </div>
@@ -172,7 +174,7 @@ const ComposerDropzone: FC<PropsWithChildren> = ({ children }) => {
 };
 
 const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
-  const { workMode } = useContext(WorkContext);
+  const { workMode, composerPlaceholder } = useContext(WorkContext);
   if (workMode)
     return (
       <ComposerDropzone>
@@ -184,7 +186,7 @@ const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
             />
           </div>
           <ComposerPrimitive.Input
-            placeholder="Describe what you want to work on…"
+            placeholder={composerPlaceholder ?? "Describe what you want to work on…"}
             aria-label="Work with Canvasdoc"
             rows={2}
             className="work-prompt"

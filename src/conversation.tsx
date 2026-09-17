@@ -1,4 +1,4 @@
-import { catchUpPrompt, homeSuggestions, HomeSuggestions } from "./home-suggestions";
+import { catchUpPrompt } from "./home-suggestions";
 import { catchUp } from "./catch-up";
 import { transitionView } from "./transitions";
 import { FileLinkThread } from "./workspace-link";
@@ -32,7 +32,6 @@ export function Conversation({
 }) {
   const data = useData();
   const { threads, outbox } = data;
-  const suggestions = useMemo(() => home ? homeSuggestions(data) : [], [home, data]);
   const [preparing, setPreparing] = useState(false);
   const preparation = useRef<AbortController | null>(null);
   const queued = Object.values(outbox ?? {}).some(command => command.sourceThreadId === context.threadId && (!home || isVisibleHomeRequest(command.requestId)));
@@ -68,7 +67,6 @@ export function Conversation({
   const runtime = useExternalStoreRuntime({
     adapters: { attachments: attachmentAdapter },
     messages,
-    suggestions,
     isSendDisabled: connection.status !== "connected",
     isRunning: preparing || queued || !!active,
     onCancel: async () => {
@@ -171,7 +169,6 @@ export function Conversation({
         className={`conversation ${home ? "conversation-home" : ""} ${messages.length ? "conversation-active" : ""}`}
       >
         <PortalContainerContext.Provider value={portalContainer}>
-          {home && !!saved?.messages.length && <button type="button" className="home-history-toggle" aria-pressed={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? "Hide previous conversation" : "Show previous conversation"}</button>}
           {(sendError || (failedRun?.error && !saved?.messages.some(m => m.id === `assistant:${failedRun.command.requestId}` && m.run?.error))) && <p className="error" role="alert">{sendError || failedRun?.error}</p>}
           {connection.approvals.filter(approval => approval.requestId && approval.requestId === active?.command.requestId).map(approval => (
             <RuntimeApproval key={approval.id} approval={approval} connected={connection.status === "connected"} />
@@ -179,7 +176,8 @@ export function Conversation({
           {(connection.canReconnectAgent || Object.values(connection.runs).some((run: any) => run.command.sourceThreadId === context.threadId && ["uncertain", "recovering"].includes(run.status))) &&
             <div className="approval-card"><p>The agent's last result needs to be checked before continuing.</p><button type="button" onClick={() => { try { reconnectAgent(); } catch (error) { setSendError((error as Error).message); } }}>Reconnect agent</button></div>}
           <ChatGPT
-            welcome={home ? <HomeSuggestions items={suggestions} /> : undefined}
+            composerFooter={home && !!saved?.messages.length && <button type="button" className="home-history-toggle" aria-pressed={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? "Hide previous conversation" : "Show previous conversation"}</button>}
+            composerPlaceholder={home ? "Catch me up" : undefined}
             workMode={home || workMode}
             uploadStates={uploadStates}
             connected={connection.status === "connected"}
