@@ -1,4 +1,3 @@
-import { CatchUp } from "./catch-up-view";
 import { InstructionSettings } from "./instruction-settings";
 import { transitionView } from "./transitions";
 import { localFilePath } from "./workspace-files";
@@ -6,7 +5,6 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ArrowLeft,
-  ArrowRight,
   BookOpen,
   Check,
   ChevronDown,
@@ -297,13 +295,10 @@ export function App({
               </header>
               <div className="dashboard-center">
                 <Conversation context={context} home onConnect={onConnect} />
-                <CatchUp />
-                <RecentWork />
               </div>
               <footer className="dashboard-footer">
                 <BookOpen size={14} /> Canvas is the source for your courses and
                 assignments.
-                <MaterialStatus />
               </footer>
             </main>
           ) : (
@@ -390,50 +385,6 @@ export function App({
     </>
   );
 }
-
-function RecentWork() {
-  const { threads, tasks, canvasCache } = useData();
-  const details = (thread: { id: string; href: string }) => {
-    const assignmentIds = thread.id.match(/^assignment:(\d+):(\d+)$/);
-    const task = tasks.find(item => thread.id === `personal:${item.id}`);
-    const courseId = assignmentIds ? Number(assignmentIds[1]) : task?.courseId ?? Number(thread.href.match(/\/courses\/(\d+)/)?.[1]);
-    const course = canvasCache?.courses.find(item => item.id === courseId);
-    const assignment = assignmentIds ? canvasCache?.todos.find(item => item.assignment?.id === Number(assignmentIds[2]) && item.assignment?.course_id === courseId)?.assignment : undefined;
-    const courseLabel = course ? shortName(course.name) : task ? "Personal task" : courseId ? "Course" : "Canvas";
-    const due = assignment?.due_at ?? task?.dueAt;
-    return [courseLabel, due ? `Due ${dateLabel(due)}` : assignment || task ? "No due date" : null].filter(Boolean).join(" · ");
-  };
-  const recent = Object.values(threads)
-    .filter(
-      (thread) =>
-        thread.id !== "home" && (thread.messages.length || thread.draft.trim()),
-    )
-    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-    .slice(0, 4);
-  if (!recent.length)
-    return (
-      <div className="recent-empty">
-        <span>Your work will pick up here.</span>
-        <p>Open an assignment from your to-dos to start its conversation.</p>
-      </div>
-    );
-  return (
-    <section className="recent">
-      <h2>Recent work</h2>
-      {recent.map((thread) => (
-        <a key={thread.id} href={thread.href}>
-          <MessageSquare size={17} />
-          <span>
-            {thread.title}
-            <small>{details(thread)}</small>
-          </span>
-          <ArrowRight size={16} />
-        </a>
-      ))}
-    </section>
-  );
-}
-
 
 function PersonalPage({ task }: { task?: PersonalTask }) {
   return (
