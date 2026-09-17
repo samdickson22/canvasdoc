@@ -4,6 +4,7 @@ import { FileLinkThread } from "./workspace-link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AssistantRuntimeProvider,
+  WebSpeechSynthesisAdapter,
   useExternalStoreRuntime,
   type ThreadMessageLike,
   type AppendMessage,
@@ -44,6 +45,10 @@ export function Conversation({
   const [sendError, setSendError] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [uploadStates, setUploadStates] = useState<Record<string, AttachmentUploadState>>({});
+  const speechAdapter = useMemo(() =>
+    typeof window.speechSynthesis !== "undefined" && typeof SpeechSynthesisUtterance !== "undefined"
+      ? new WebSpeechSynthesisAdapter()
+      : undefined, []);
   const attachmentAdapter = useMemo(() => createAttachmentAdapter({
     upload: uploadFile,
     onError: setSendError,
@@ -147,7 +152,7 @@ export function Conversation({
       move: () => { throw new Error("Queued messages cannot be reordered."); },
       edit: () => { throw new Error("Cancel the queued message and send an updated one."); },
     },
-    adapters: { attachments: attachmentAdapter },
+    adapters: { attachments: attachmentAdapter, speech: speechAdapter },
     messages,
     isSendDisabled: connection.status !== "connected" || preparing,
     isRunning: preparing || queued || !!active,
@@ -162,7 +167,24 @@ export function Conversation({
     },
     convertMessage: (message) => message,
     onNew,
+    onReload: async (parentId, { runConfig }) => {
+      const original = store.get().threads[context.threadId]?.messages.find(message => message.id === parentId && message.role === "user");
+      if (!original) {
+        setSendError("The original request could not be found.");
+        return;
+      }
+      await onNew({
+        role: "user", parentId, sourceId: null, runConfig,
+        createdAt: new Date(),
+        content: [{ type: "text", text: `Give me a new response to this earlier request:\n\n${original.text}` }],
+        attachments: original.attachments ?? [],
+        metadata: { custom: { quote: original.quote } },
+      });
+    },
   });
+  useEffect(() => () => {
+    if (runtime.thread.getState().speech) runtime.thread.stopSpeaking();
+  }, [runtime, context.threadId]);
   useEffect(() => {
     return runtime.thread.composer.unstable_on("attachmentAddError", (event) =>
       setSendError(event.message),

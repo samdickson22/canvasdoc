@@ -1,12 +1,9 @@
 "use client";
 
-import { cn } from "../../../lib/utils";
 import {
   ActionBarPrimitive,
-  ActionBarMorePrimitive,
   AuiIf,
   AttachmentPrimitive,
-  BranchPickerPrimitive,
   ComposerPrimitive,
   MessagePrimitive,
   ThreadPrimitive,
@@ -15,25 +12,18 @@ import {
 
 } from "@assistant-ui/react";
 import { type FC, type PropsWithChildren, type ReactNode, useContext, createContext, useEffect, useRef, useState } from "react";
-import { PortalContainerContext } from "../../../lib/portal-container";
 import { TooltipIconButton } from "./tooltip-icon-button";
 import { useAttachmentSrc } from "../../../hooks/use-attachment-src";
 import {
   ArrowUpIcon,
   CheckIcon,
   ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   CopyIcon,
-  Download,
   Mic,
-  MoreHorizontal,
-  PencilIcon,
   PlusIcon,
   RefreshCwIcon,
-  ThumbsDown,
-  ThumbsUp,
   Volume2,
+  SquareIcon,
   XIcon,
 } from "lucide-react";
 import { MarkdownText } from "./markdown-text";
@@ -73,7 +63,6 @@ export const ChatGPT: FC<WorkOptions> = (options) => {
           <ThreadPrimitive.Viewport className="min-h-0 flex grow flex-col gap-8 overflow-y-auto overscroll-contain pt-8">
             <ThreadPrimitive.Messages>
               {({ message }) => {
-                if (message.composer.isEditing) return <EditComposer />;
                 if (message.role === "user") return <UserMessage />;
                 return <AssistantMessage />;
               }}
@@ -359,43 +348,10 @@ const UserMessage: FC = () => {
               </AuiIf>
             </TooltipIconButton>
           </ActionBarPrimitive.Copy>
-          <ActionBarPrimitive.Edit asChild>
-            <TooltipIconButton
-              tooltip="Edit"
-              side="top"
-              className={assistantActionClassName}
-            >
-              <PencilIcon className="size-5" />
-            </TooltipIconButton>
-          </ActionBarPrimitive.Edit>
         </ActionBarPrimitive.Root>
 
-        <BranchPicker />
       </div>
     </MessagePrimitive.Root>
-  );
-};
-
-const EditComposer: FC = () => {
-  return (
-    <ComposerPrimitive.Root className="mx-auto flex w-full max-w-3xl flex-col justify-end gap-1 rounded-3xl bg-[#e9e9e9]/50 dark:bg-[#323232]">
-      <ComposerPrimitive.Input className="text-foreground flex h-8 w-full resize-none bg-transparent p-5 pb-0 outline-none dark:text-white" />
-
-      <div className="m-3 mt-2 flex items-center justify-center gap-2 self-end">
-        <ComposerPrimitive.Cancel
-          aria-label="Stop response"
-          className="bg-background text-foreground hover:bg-muted rounded-full px-3 py-2 text-sm font-semibold dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800"
-        >
-          Cancel
-        </ComposerPrimitive.Cancel>
-        <ComposerPrimitive.Send
-          aria-label="Send message"
-          className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-full px-3 py-2 text-sm font-semibold dark:bg-white dark:text-black dark:hover:bg-white/90"
-        >
-          Send
-        </ComposerPrimitive.Send>
-      </div>
-    </ComposerPrimitive.Root>
   );
 };
 
@@ -445,24 +401,7 @@ const AssistantMessage: FC = () => {
               </AuiIf>
             </TooltipIconButton>
           </ActionBarPrimitive.Copy>
-          <ActionBarPrimitive.FeedbackPositive asChild>
-            <TooltipIconButton
-              tooltip="Good response"
-              side="top"
-              className={assistantActionClassName}
-            >
-              <ThumbsUp className="size-5" />
-            </TooltipIconButton>
-          </ActionBarPrimitive.FeedbackPositive>
-          <ActionBarPrimitive.FeedbackNegative asChild>
-            <TooltipIconButton
-              tooltip="Bad response"
-              side="top"
-              className={assistantActionClassName}
-            >
-              <ThumbsDown className="size-5" />
-            </TooltipIconButton>
-          </ActionBarPrimitive.FeedbackNegative>
+          <AuiIf condition={(s) => s.message.speech == null}>
           <ActionBarPrimitive.Speak asChild>
             <TooltipIconButton
               tooltip="Read aloud"
@@ -472,6 +411,14 @@ const AssistantMessage: FC = () => {
               <Volume2 className="size-5" />
             </TooltipIconButton>
           </ActionBarPrimitive.Speak>
+          </AuiIf>
+          <AuiIf condition={(s) => s.message.speech != null}>
+            <ActionBarPrimitive.StopSpeaking asChild>
+              <TooltipIconButton tooltip="Stop reading" side="top" className={assistantActionClassName}>
+                <SquareIcon className="size-5" />
+              </TooltipIconButton>
+            </ActionBarPrimitive.StopSpeaking>
+          </AuiIf>
 
           <ActionBarPrimitive.Reload asChild>
             <TooltipIconButton
@@ -482,62 +429,9 @@ const AssistantMessage: FC = () => {
               <RefreshCwIcon className="size-5" />
             </TooltipIconButton>
           </ActionBarPrimitive.Reload>
-          <ActionBarMorePrimitive.Root>
-            <ActionBarMorePrimitive.Trigger asChild>
-              <button
-                type="button"
-                aria-label="More"
-                className={cn(
-                  assistantActionClassName,
-                  "data-[state=open]:bg-black/[0.07] dark:data-[state=open]:bg-white/15",
-                )}
-              >
-                <MoreHorizontal className="size-5" />
-              </button>
-            </ActionBarMorePrimitive.Trigger>
-            <ActionBarMorePrimitive.Content
-              portalProps={{ container: useContext(PortalContainerContext) }}
-              side="bottom"
-              align="end"
-              sideOffset={6}
-              className="bg-popover text-popover-foreground data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=open]:animate-in data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=closed]:animate-out data-[side=bottom]:slide-in-from-top-2 z-50 min-w-40 overflow-hidden rounded-xl border p-1.5"
-            >
-              <ActionBarPrimitive.ExportMarkdown asChild>
-                <ActionBarMorePrimitive.Item className="text-muted-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2.5 rounded-lg px-3 py-2 text-sm outline-none select-none">
-                  <Download className="size-5" />
-                  Export as Markdown
-                </ActionBarMorePrimitive.Item>
-              </ActionBarPrimitive.ExportMarkdown>
-            </ActionBarMorePrimitive.Content>
-          </ActionBarMorePrimitive.Root>
         </ActionBarPrimitive.Root>
-        <BranchPicker className="ml-1" />
       </div>
     </MessagePrimitive.Root>
-  );
-};
-
-const BranchPicker: FC<{ className?: string }> = ({ className }) => {
-  return (
-    <BranchPickerPrimitive.Root
-      hideWhenSingleBranch
-      className={cn(
-        "text-muted-foreground inline-flex items-center text-sm font-semibold dark:text-[#b4b4b4]",
-        className,
-      )}
-    >
-      <BranchPickerPrimitive.Previous asChild>
-        <TooltipIconButton tooltip="Previous" className="text-[#b4b4b4]">
-          <ChevronLeftIcon className="size-5" />
-        </TooltipIconButton>
-      </BranchPickerPrimitive.Previous>
-      <BranchPickerPrimitive.Number />/<BranchPickerPrimitive.Count />
-      <BranchPickerPrimitive.Next asChild>
-        <TooltipIconButton tooltip="Next" className="text-[#b4b4b4]">
-          <ChevronRightIcon className="size-5" />
-        </TooltipIconButton>
-      </BranchPickerPrimitive.Next>
-    </BranchPickerPrimitive.Root>
   );
 };
 
