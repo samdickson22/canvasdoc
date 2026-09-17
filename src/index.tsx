@@ -91,7 +91,8 @@ async function mount() {
   }
   const navigation = region("canvasdoc-navigation", document.body);
   const conversation = context.kind !== "home" ? region("canvasdoc-conversation", document.body) : null;
-  if (conversation) conversation.host.style.cssText = "display:flex;flex:1;min-height:0;height:100%;width:100%";
+  // Keep the persistent portal out of the page until a conversation view opens.
+  if (conversation) conversation.host.style.cssText = "display:none;flex:1;min-height:0;height:100%;width:100%";
   if (conversation) conversation.container.style.cssText = "display:flex;flex-direction:column;flex:1;min-height:0;height:100%;width:100%";
   const sidebar = region("canvasdoc-sidebar", document.body);
   const isHome = context.kind === "home" || context.kind === "personal";
