@@ -6,6 +6,8 @@ Run `./build.sh`, `node scripts/package-cli.mjs`, `node scripts/package-extensio
 
 The unpacked testing bundle includes the matching CLI archive. The Web Store ZIP contains only extension runtime files and icons; it excludes development origins, workspace data, source maps, credentials, and the local unpacked-extension key. Neither command publishes anything.
 
+The npm CLI ships minified JavaScript. Harness is bundled into the companion entry points; the package must not contain its source tree, source maps, or a Harness dependency that downloads source at install time. `package-cli.mjs` checks the exact archive file list and rejects source metadata in its JavaScript outputs. Agent guidance, skills, and required license notices remain readable. Minification is packaging, not source secrecy: distributed JavaScript can still be inspected. Harness's MIT copyright and license notice is retained as `HARNESS-LICENSE`; private repository visibility does not change that license.
+
 For an unpacked update: stop the connector, pull, run `./build.sh`, restart with `./start.sh`, reload the extension in `chrome://extensions`, and refresh Canvas. Keep the checkout path unchanged. UI-only updates do not require restarting the connector; file protocol/runtime changes do.
 
 ## Store configuration still required
