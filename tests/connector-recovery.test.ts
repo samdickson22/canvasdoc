@@ -15,8 +15,8 @@ test('connector reconnect, duplicate sends, delivery receipts and restart preser
   const inbox:any[]=[];const waiters:{pred:(m:any)=>boolean;resolve:(m:any)=>void}[]=[];
   ws.on('message',b=>{const m=JSON.parse(String(b));const i=waiters.findIndex(w=>w.pred(m));if(i>=0)waiters.splice(i,1)[0].resolve(m);else inbox.push(m)});
   const wait=(pred:(m:any)=>boolean)=>{const i=inbox.findIndex(pred);return i>=0?Promise.resolve(inbox.splice(i,1)[0]):new Promise<any>(resolve=>waiters.push({pred,resolve}))};
-  await once(ws,'open');ws.send(JSON.stringify({type:'connect',token:(await readFile(path.join(root,'.canvasdoc/dev-connection-token'),'utf8')).trim()}));
-  const hello=await wait(m=>m.type==='connected');return {ws,wait,hello,send:(m:any)=>ws.send(JSON.stringify(m))};
+  await once(ws,'open');ws.send(JSON.stringify({type:'connect',account:'canvasdoc:v1:http://localhost:3210:101',token:(await readFile(path.join(root,'.canvasdoc/dev-connection-token'),'utf8')).trim()}));
+  const hello=await wait(m=>m.type==='connected');return {ws,wait,hello,send:(m:any)=>ws.send(JSON.stringify({account:'canvasdoc:v1:http://localhost:3210:101',...m}))};
  }
  const command={requestId:'recovery-request-001',sourceThreadId:'assignment:1:1',title:'Synthetic',href:'/courses/1/assignments/1',text:'hello'};
  try{

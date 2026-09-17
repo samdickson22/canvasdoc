@@ -1,3 +1,4 @@
+import { WorkspaceAccount, IdentityError } from "./account-identity.ts";
 import { isSyncedSource } from "../src/workspace-files.ts";
 import type { DisplayPart } from "./message-parts.ts";
 import { displayParts } from "./harness-parts.ts";
@@ -71,6 +72,9 @@ try {
 } catch (error) {
   if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
 }
+const identity = new WorkspaceAccount(stateDir, config.workspaceId);
+await identity.load();
+const unboundHasWork = Boolean(config.runtimeStartedTurn !== false || runs.length || Object.keys(receipts).length);
 const clients = new Set<WebSocket>();
 let runtimeAvailable = runtime.connected;
 let runtimeThreadId = config.runtimeThreadId;
@@ -172,6 +176,7 @@ wss.on("connection", (socket, request) => {
     return;
   }
   let authenticated = false;
+  let account: string;
   const timer = setTimeout(
     () => socket.close(1008, "Authentication required"),
     5000,
@@ -192,12 +197,14 @@ wss.on("connection", (socket, request) => {
             socket.close(1008, "Invalid connection");
             return;
           }
+          account = await identity.admit(message.account, message.workspaceId, unboundHasWork, origin!);
           authenticated = true;
           clearTimeout(timer);
           clients.add(socket);
           socket.send(
             JSON.stringify({
               type: "connected",
+              account,
               runtimeAvailable,
               capabilities: { materials: true },
               workspace: {
@@ -215,6 +222,8 @@ wss.on("connection", (socket, request) => {
             socket.send(JSON.stringify({ type: "approval", ...approval }));
           return;
         }
+        if (message.account !== account)
+          throw new IdentityError("ACCOUNT_MISMATCH", "This command belongs to a different Canvas account. Reconnect the correct account.");
         if (message.type === "materials") {
           void materials.handle(message).then(
             result => socket.readyState === WebSocket.OPEN && socket.send(JSON.stringify({type:"materials-result", id:message.id, result})),
@@ -245,6 +254,7 @@ wss.on("connection", (socket, request) => {
           const c = message.command as Command;
           if (
             !c ||
+            typeof c.requestId !== "string" ||
             !/^[a-zA-Z0-9-]{8,80}$/.test(c.requestId) ||
             typeof c.sourceThreadId !== "string" ||
             typeof c.text !== "string" ||
@@ -254,17 +264,22 @@ wss.on("connection", (socket, request) => {
             typeof c.href !== "string" ||
             !c.href.startsWith("/") ||
             c.href.startsWith("//") ||
-            (c.context &&
+            (c.model !== undefined && typeof c.model !== "string") ||
+            (c.effort !== undefined && typeof c.effort !== "string") ||
+            (c.context !== undefined &&
               (typeof c.context !== "string" || c.context.length > 100000))
           )
             throw new Error("Invalid message");
           const hash = createHash("sha256")
-            .update(JSON.stringify(c))
+            .update(JSON.stringify(c, (_key, value) =>
+              value && typeof value === "object" && !Array.isArray(value)
+                ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0))
+                : value))
             .digest("hex");
           const receipt = receipts[c.requestId];
           if (receipt) {
             if (receipt.hash !== hash)
-              throw new Error("Request ID reused with different content");
+              throw new IdentityError("REQUEST_ID_REUSED", "Request ID reused with different content");
             socket.send(
               JSON.stringify({
                 type: "receipt",
@@ -279,7 +294,7 @@ wss.on("connection", (socket, request) => {
           );
           if (existing) {
             if (existing.hash !== hash)
-              throw new Error("Request ID reused with different content");
+              throw new IdentityError("REQUEST_ID_REUSED", "Request ID reused with different content");
             socket.send(JSON.stringify({ type: "run", run: existing }));
             return;
           }
@@ -385,9 +400,10 @@ wss.on("connection", (socket, request) => {
         if (socket.readyState === WebSocket.OPEN)
           socket.send(
             JSON.stringify(incoming?.type === "send" && typeof incoming.command?.requestId === "string"
-              ? {type:"send-rejected",requestId:incoming.command.requestId,message:error.message}
-              : { type: "error", message: error.message }),
+              ? {type:"send-rejected",requestId:incoming.command.requestId,code:error.code || "COMMAND_FAILED",message:error.message}
+              : { type: "error", code:error.code || "COMMAND_FAILED",message: error.message }),
           );
+        if (!authenticated) socket.close(1008, "Account connection rejected");
       });
   });
   socket.on("close", () => {
