@@ -92,7 +92,7 @@ export function Conversation({
           .filter((p) => p.type === "text")
           .map((p) => p.text)
           .join("\n");
-        const materials = materialContext(context.courseId);
+        const materials = materialContext(context.courseId,context.assignmentId);
         controller.signal.throwIfAborted();
         await sendMessage(
           context,
