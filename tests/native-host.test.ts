@@ -10,7 +10,7 @@ test('Chrome bridge connects without access to the workspace directory',async()=
  await writeFile(path.join(root,'.canvasdoc/dev-connection-token'),'synthetic-token');
  const server=new WebSocketServer({host:'127.0.0.1',port:0});await new Promise<void>(r=>server.on('listening',r));
  const port=(server.address() as {port:number}).port;
- server.on('connection',(socket,request)=>{assert.equal(request.headers.origin,'https://canvas.calpoly.edu');socket.on('message',bytes=>{assert.equal(JSON.parse(bytes.toString()).token,'synthetic-token');socket.send(JSON.stringify({type:'connected'}))})});
+ server.on('connection',(socket,request)=>{assert.equal(request.headers.origin,'https://canvas.calpoly.edu');socket.on('message',bytes=>{assert.equal(JSON.parse(bytes.toString()).token,'synthetic-token');assert.equal(JSON.parse(bytes.toString()).account,'canvasdoc:v1:https://canvas.calpoly.edu:synthetic');socket.send(JSON.stringify({type:'connected'}))})});
  let child:ReturnType<typeof spawn>|undefined;
  try{
   await build({entryPoints:['companion/native-host.ts'],outfile:path.join(temp,'native-host.mjs'),bundle:true,platform:'node',format:'esm',banner:{js:'import {createRequire} from "node:module";const require=createRequire(import.meta.url);'}});
@@ -21,6 +21,7 @@ test('Chrome bridge connects without access to the workspace directory',async()=
   const manifest=JSON.parse(await readFile(path.join(chrome,'com.canvasdoc.connector.json'),'utf8'));
   await rename(path.join(temp,'Documents'),path.join(temp,'Documents-unavailable'));
   child=spawn(manifest.path,[],{stdio:['pipe','pipe','pipe']});
+  const hello=Buffer.from(JSON.stringify({type:'connect',account:'canvasdoc:v1:https://canvas.calpoly.edu:synthetic'}));const header=Buffer.alloc(4);header.writeUInt32LE(hello.length);child.stdin!.write(Buffer.concat([header,hello]));
   const packet=await new Promise<any>((resolve,reject)=>{
    const timer=setTimeout(()=>reject(new Error('Native handshake timed out')),3000);let buffer=Buffer.alloc(0);
    child!.on('error',reject);child!.stdout!.on('data',chunk=>{buffer=Buffer.concat([buffer,chunk]);if(buffer.length>=4&&buffer.length>=4+buffer.readUInt32LE(0)){clearTimeout(timer);resolve(JSON.parse(buffer.subarray(4,4+buffer.readUInt32LE(0)).toString()))}});
@@ -40,6 +41,7 @@ test('native host splits a 25 MB file into bounded Chrome frames without losing 
   await build({entryPoints:['companion/native-host.ts'],outfile:path.join(temp,'host.mjs'),bundle:true,platform:'node',format:'esm',banner:{js:'import {createRequire} from "node:module";const require=createRequire(import.meta.url);'}});
   await writeFile(path.join(temp,'connection.json'),JSON.stringify({origin:'http://localhost:3210',port,token:'synthetic'}));
   child=spawn(process.execPath,[path.join(temp,'host.mjs'),'--connection-config',path.join(temp,'connection.json')],{stdio:['pipe','pipe','pipe']});
+  const hello=Buffer.from(JSON.stringify({type:'connect',account:'canvasdoc:v1:http://localhost:3210:synthetic'}));const header=Buffer.alloc(4);header.writeUInt32LE(hello.length);child.stdin!.write(Buffer.concat([header,hello]));
   const chunks=await new Promise<string[]>((resolve,reject)=>{
    let buffer=Buffer.alloc(0);const chunks:string[]=[];
    child!.on('error',reject);
