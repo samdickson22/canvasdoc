@@ -135,3 +135,9 @@
 .chat-run-error { border-left: 2px solid #b53535; padding-left: 10px; margin-block: 12px; font-size: 13px; color: #b53535; }
 .chat-activity-group > button, .chat-work-history > button { max-width: 100%; min-width: 0; text-align: left; }
 .chat-activity-group [data-slot="tool-group-trigger-label"], .chat-work-history > button [data-slot="tool-group-trigger-label"] { overflow-wrap: anywhere; }
+
+/* Composer has its own accessible focus-within ring; avoid a second textarea outline. */
+.aui-root .chat-dropzone textarea:focus-visible { outline:none; box-shadow:none; }
+
+.home-agent-compact .aui-root .chat-dropzone > form { padding:6px 8px; }
+.home-agent-compact .aui-root .chat-dropzone textarea { min-height:36px; }

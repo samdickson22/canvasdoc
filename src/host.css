@@ -131,23 +131,29 @@ html.canvasdoc-dashboard body.canvasdoc-sidebar-open #canvasdoc-main { right: ca
 }
 
 html.canvasdoc-dashboard #dashboard_header_container { border-bottom:1px solid #e4e8e2; }
-/* Preserve Canvas's native card widths and wrapping. Compact the card contents. */
-html.canvasdoc-dashboard .ic-DashboardCard__header_hero { height:60px; }
-html.canvasdoc-dashboard .ic-DashboardCard__header-subtitle,
-html.canvasdoc-dashboard .ic-DashboardCard__header-term { display:none; }
-html.canvasdoc-dashboard .ic-DashboardCard { border-radius:12px; box-shadow:0 2px 8px #163d2410; border:1px solid #e4e8e2; transition:box-shadow .16s ease; }
-html.canvasdoc-dashboard .ic-DashboardCard:hover { box-shadow:0 5px 18px #163d2420; }
-html.canvasdoc-dashboard .ic-DashboardCard__header_content { padding:16px; }
-html.canvasdoc-dashboard .ic-DashboardCard__header-title { line-height:1.4; }
+/* Keep native card contents and proportions; reduce gutters in our narrower center pane. */
+html.canvasdoc-dashboard .ic-DashboardCard__box__container {
+  display:flex;
+  flex-wrap:wrap;
+  gap:18px;
+  margin:0;
+}
+html.canvasdoc-dashboard .ic-DashboardCard {
+  flex:0 1 240px;
+  max-width:100%;
+  margin:0;
+}
+/* Grade badge presentation from UseBetterCanvas/bettercanvas css/content.css (AGPL-3.0).
+   Scoped to Canvasdoc; grade data and accessible labels remain Canvasdoc-owned. */
 html.canvasdoc-dashboard .canvasdoc-course-grade {
-  display:block;
-  margin:0 16px 14px;
-  padding:7px 10px;
-  border-radius:8px;
-  background:#eff3ed;
-  color:#214f3d;
-  font-size:13px;
-  font-weight:600;
+  position:absolute;
+  top:15px;
+  left:15px;
+  padding:2px 9px;
+  border-radius:200px;
+  color:var(--ic-brand-font-color-dark-lightened-30);
+  background:#fff;
+  transition:.2s opacity;
   text-decoration:none;
 }
 html.canvasdoc-dashboard .canvasdoc-course-grade:hover { text-decoration:underline; }

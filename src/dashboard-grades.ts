@@ -17,13 +17,14 @@ export function showDashboardGrades(root: HTMLElement, courses: Course[]) {
       const link = card.querySelector<HTMLAnchorElement>("a.ic-DashboardCard__link");
       const id = link?.pathname.match(/^\/courses\/(\d+)(?:\/|$)/)?.[1];
       if (!id || !link) continue;
-      const label = `Current grade: ${courseGrade(courses.find(course => course.id === Number(id)))}`;
+      const label = courseGrade(courses.find(course => course.id === Number(id)));
       let grade = card.querySelector<HTMLAnchorElement>(".canvasdoc-course-grade");
       if (!grade) {
         grade = document.createElement("a");
         grade.className = "canvasdoc-course-grade";
         link.after(grade);
       }
+      grade.setAttribute("aria-label", `Current grade: ${label}. Open course grades`);
       grade.href = `/courses/${id}/grades`;
       if (grade.textContent !== label) grade.textContent = label;
     }

@@ -54,7 +54,7 @@ export const ChatGPT: FC<WorkOptions> = (options) => {
   return (
     <WorkContext.Provider value={options}>
       <ThreadPrimitive.Root
-        data-work-mode={options.workMode || undefined}
+        data-work-mode={(!options.compact && options.workMode) || undefined}
         className="aui-root min-h-0 flex h-full flex-col items-stretch bg-white px-4 text-[#0d0d0d] dark:bg-black dark:text-[#ececec]"
       >
         {options.compact ? <Composer placeholder="Ask Canvasdoc…" /> : <>
@@ -171,13 +171,7 @@ const ComposerDropzone: FC<PropsWithChildren> = ({ children }) => {
 
 const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
   const { workMode, composerPlaceholder, compact } = useContext(WorkContext);
-  if (compact) return (
-    <ComposerPrimitive.Root className="home-inline-composer">
-      <ComposerPrimitive.Input placeholder="Ask Canvasdoc…" aria-label="Ask Canvasdoc" rows={1} className="home-inline-input" />
-      <ComposerPrimaryAction />
-    </ComposerPrimitive.Root>
-  );
-  if (workMode)
+  if (workMode && !compact)
     return (
       <ComposerDropzone>
       <ComposerPrimitive.Root className="work-composer">
@@ -235,8 +229,9 @@ const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
         </ComposerPrimitive.AddAttachment>
 
         <ComposerPrimitive.Input
-          autoFocus
-          placeholder={placeholder}
+          autoFocus={!compact}
+          aria-label={compact ? "Ask Canvasdoc" : "Message Canvasdoc"}
+          placeholder={compact ? "Ask Canvasdoc…" : placeholder}
           rows={1}
           className="max-h-52 min-h-9 flex-1 resize-none bg-transparent py-1.5 pr-2 pl-1 text-base text-[#0d0d0d] outline-none placeholder:text-[#8e8e8e] dark:text-[#ececec] dark:placeholder:text-[#8e8e8e]"
         />
@@ -245,7 +240,7 @@ const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
           <ComposerPrimaryAction />
         </div>
       </div>
-      <div className="flex justify-end px-2 pt-1"><CodexModelSelector /></div>
+      {!compact && <div className="flex justify-end px-2 pt-1"><CodexModelSelector /></div>}
     </ComposerPrimitive.Root>
     </ComposerDropzone>
   );

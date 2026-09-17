@@ -705,9 +705,6 @@ select {
 }
 
 .home-agent-header[hidden] { display:none; }
-.home-agent-compact { height:auto; margin-bottom:0; border-radius:14px; }
-.home-agent-compact:focus-within { border-color:var(--green); }
-.home-agent-compact .aui-root { padding:0; }
-.home-inline-composer { display:flex; align-items:center; gap:12px; padding:12px 16px; }
-.home-inline-input { flex:1; min-width:0; max-height:140px; resize:none; border:0; outline:none; background:transparent; color:var(--ink); padding:4px; font:inherit; }
-.home-inline-input::placeholder { color:var(--muted); }
+.home-agent-compact { height:auto; margin-bottom:0; border:0; border-radius:0; background:transparent; overflow:visible; box-shadow:none; }
+.home-agent-compact .aui-root { padding:0; background:transparent; }
+.home-agent-compact .conversation { overflow:visible; }
