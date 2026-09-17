@@ -95,8 +95,10 @@ const EmptyState: FC = () => {
         <h1 className="text-center text-2xl leading-7 font-normal text-[#0d0d0d] dark:text-[#ececec]">
           {workMode ? "What should we work on?" : "Where should we begin?"}
         </h1>
-        <Composer placeholder="Ask anything" />
-        {welcome}
+        <div className="flex flex-col gap-3">
+          {welcome}
+          <Composer placeholder="Ask anything" />
+        </div>
       </div>
     </div>
   );
