@@ -1,3 +1,4 @@
+import { instructionSnapshot } from "../instructions";
 import { useSyncExternalStore } from "react";
 import { boundedChatContext } from "./chat-context";
 import { store } from "../store";
@@ -358,6 +359,7 @@ export async function sendMessage(
   const command = {
     requestId,
     sourceThreadId: context.threadId,
+    instructions: instructionSnapshot(store.get().instructions, context.courseId),
     title: context.title,
     href: context.href,
     text,

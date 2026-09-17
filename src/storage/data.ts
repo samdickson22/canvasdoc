@@ -1,6 +1,8 @@
+import { validateInstruction, validateCourseId, validateInstructions, type Instructions } from "../instructions.ts";
 import type { PersonalTask, ThreadRecord } from "../types.ts";
 import type { UserCommand } from "../runtime/protocol.ts";
 export type Data = {
+  instructions?: Instructions;
   workspaceNavigationCollapsed?: boolean;
   materialCatalog?: import("../material-types.ts").MaterialCatalog;
   canvasCache?: { courses: import('../types.ts').Course[]; todos: import('../types.ts').Todo[]; fetchedAt: string };
@@ -66,10 +68,12 @@ export function parseSavedData(value: string | null): Data {
     )
       throw new Error("Invalid saved conversation.");
   }
+  if (parsed.instructions !== undefined) validateInstructions(parsed.instructions);
   return parsed;
 }
 
 export type Mutation =
+  | { type: "instructions"; text: string; courseId?: number }
   | { type: "workspace-navigation"; collapsed: boolean }
   | { type: "material-catalog"; catalog: NonNullable<Data["materialCatalog"]> }
   | { type: "canvas-cache"; cache: NonNullable<Data['canvasCache']> }
@@ -81,7 +85,16 @@ export type Mutation =
   | { type: "ack"; requestId: string };
 export function mutate(current: Data, op: Mutation): Data {
   const next = { ...current, revision: (current.revision ?? 0) + 1 };
-  if (op.type === "workspace-navigation") {
+  if (op.type === "instructions") {
+    validateInstruction(op.text);
+    if (op.courseId !== undefined) validateCourseId(op.courseId);
+    const instructions = { personal: current.instructions?.personal ?? "", courses: { ...current.instructions?.courses } };
+    const text = op.text.trim();
+    if (op.courseId === undefined) instructions.personal = text;
+    else if (text) instructions.courses[String(op.courseId)] = text;
+    else delete instructions.courses[String(op.courseId)];
+    next.instructions = instructions;
+  } else if (op.type === "workspace-navigation") {
     if (typeof op.collapsed !== "boolean") throw new Error("Invalid navigation preference.");
     next.workspaceNavigationCollapsed = op.collapsed;
   } else if (op.type === "material-catalog") next.materialCatalog = op.catalog;

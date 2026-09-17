@@ -68,6 +68,7 @@ async function mount() {
     location.pathname,
     location.search,
     content.querySelector("h1")?.textContent?.trim() || document.title,
+    store.get().tasks,
   );
   const stopMaterials = startMaterialSync(context.kind === "assignment" ? context.courseId : undefined);
   const sheet = document.createElement("style");
