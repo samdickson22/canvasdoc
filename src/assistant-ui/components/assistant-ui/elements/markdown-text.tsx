@@ -25,6 +25,7 @@ const MarkdownTextImpl = () => {
       preprocess={preprocessMarkdown}
       className="aui-md"
       components={defaultComponents}
+      smooth={false}
       defer
     />
     </>
