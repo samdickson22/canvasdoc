@@ -1,4 +1,5 @@
 export type UserCommand = {
+  instructions?: import("../instructions.ts").InstructionSnapshot;
   model?: string;
   effort?: string;
   attachments?: import("@assistant-ui/react").CompleteAttachment[];

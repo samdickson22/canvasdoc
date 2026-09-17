@@ -5,16 +5,20 @@ export function pageContext(
   pathname: string,
   search: string,
   title: string,
+  tasks: PersonalTask[] = [],
 ): PageContext {
   const taskId = new URLSearchParams(search).get("canvasdoc-task");
-  if (pathname === "/" && taskId)
+  if (pathname === "/" && taskId) {
+    const task = tasks.find(item => item.id === taskId);
     return {
       kind: "personal",
       threadId: `personal:${taskId}`,
       taskId,
-      title: "Personal task",
+      title: task?.title ?? "Personal task",
+      courseId: task?.courseId ?? undefined,
       href: `/?canvasdoc-task=${encodeURIComponent(taskId)}`,
     };
+  }
   const assignment = pathname.match(
     /^\/courses\/(\d+)\/assignments\/(\d+)\/?$/,
   );
