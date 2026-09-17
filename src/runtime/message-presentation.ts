@@ -54,6 +54,7 @@ export function presentMessage(message: SavedMessage): ThreadMessageLike {
     content,
     createdAt: new Date(message.createdAt),
     attachments: message.attachments,
+    ...(message.role === "user" && message.quote ? { metadata: { custom: { quote: message.quote } } } : {}),
     ...(message.role === "assistant"
       ? {
           metadata: { custom: { run: message.run } },
@@ -72,14 +73,16 @@ export function presentMessage(message: SavedMessage): ThreadMessageLike {
                     reason: "cancelled" as const,
                   },
                 }
-              : status === "completed"
+                : status === "completed"
                 ? {
                     status: {
                       type: "complete" as const,
                       reason: "stop" as const,
                     },
                   }
-                : {}),
+                : status === "working"
+                  ? { status: { type: "running" as const } }
+                  : {}),
         }
       : {}),
   };
@@ -144,7 +147,7 @@ export function summarizeActivity(
     )[toolCategory(tool)];
     return `${label}${active.length > 1 ? ` · ${active.length} active` : ""}`;
   }
-  if (!tools.length) {
+  if (running || !tools.length) {
     const reasoning = parts.filter(
       (p): p is Extract<DisplayPart, { type: "reasoning" }> =>
         p.type === "reasoning",
@@ -154,7 +157,11 @@ export function summarizeActivity(
       .split("\n")
       .find((s) => s.trim())
       ?.replace(/^[#*\s]+|[*\s]+$/g, "");
-    return heading ? compact(heading) : running ? "Thinking" : "Thought";
+    const latestTool = parts.reduce((last, p, i) => p.type === "tool-call" ? i : last, -1);
+    const latestReasoning = parts.reduce((last, p, i) => p.type === "reasoning" && p.text.trim() ? i : last, -1);
+    return heading && (!running || latestReasoning > latestTool)
+      ? compact(heading)
+      : running ? "Thinking" : "Thought";
   }
   const counts = new Map<string, number>();
   for (const tool of tools) {

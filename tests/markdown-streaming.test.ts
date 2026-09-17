@@ -6,7 +6,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseHTML } from "linkedom";
 
-test("the real assistant Markdown renderer replaces plain code with syntax tokens after completion", async () => {
+test("the real Markdown renderer highlights settled code and drains streamed text promptly", async () => {
   const { window } = parseHTML(
     '<!doctype html><html><head></head><body><div id="root"></div></body></html>',
   );
@@ -20,8 +20,9 @@ test("the real assistant Markdown renderer replaces plain code with syntax token
     cancelAnimationFrame: clearTimeout,
   });
   Object.defineProperty(window.document, "compatMode", { value: "CSS1Compat" });
+  let reducedMotion = false;
   window.matchMedia = () =>
-    ({ matches: true, addEventListener() {}, removeEventListener() {} }) as any;
+    ({ matches: reducedMotion, addEventListener() {}, removeEventListener() {} }) as any;
   const directory = await mkdtemp(
     path.resolve("node_modules/.markdown-stream-test-"),
   );
@@ -35,8 +36,8 @@ test("the real assistant Markdown renderer replaces plain code with syntax token
         contents: `
       import {AssistantRuntimeProvider, useExternalStoreRuntime, ThreadPrimitive, MessagePrimitive} from '@assistant-ui/react';
       import {MarkdownText} from './src/assistant-ui/components/assistant-ui/elements/markdown-text';
-      export function Fixture({running}) {
-        const runtime=useExternalStoreRuntime({messages:[{id:'a',role:'assistant',metadata:{},createdAt:new Date(),content:[{type:'text',text:'\x60\x60\x60python\\nprint("hello")\\n\x60\x60\x60'}],status:running?{type:'running'}:{type:'complete',reason:'stop'}}],isRunning:running,onNew:async()=>{}});
+      export function Fixture({running, text}) {
+        const runtime=useExternalStoreRuntime({messages:[{id:'a',role:'assistant',metadata:{},createdAt:new Date(),content:[{type:'text',text:text ?? '\x60\x60\x60python\\nprint("hello")\\n\x60\x60\x60'}],status:running?{type:'running'}:{type:'complete',reason:'stop'}}],isRunning:running,onNew:async()=>{}});
         return <AssistantRuntimeProvider runtime={runtime}><ThreadPrimitive.Messages>{()=> <MessagePrimitive.Root><MessagePrimitive.Parts>{({part})=>part.type==='text'?<MarkdownText/>:null}</MessagePrimitive.Parts></MessagePrimitive.Root>}</ThreadPrimitive.Messages></AssistantRuntimeProvider>;
       }`,
       },
@@ -105,6 +106,23 @@ test("the real assistant Markdown renderer replaces plain code with syntax token
       document.querySelector("pre code")?.textContent,
       'print("hello")\n',
     );
+    const burst = "Streaming text should catch up quickly. ".repeat(40).trim();
+    root.render(React.createElement(Fixture, { running: true, text: burst }));
+    const streamStarted = Date.now();
+    await new Promise(r => setTimeout(r, 50));
+    const firstLength = document.querySelector(".aui-md")?.textContent?.length ?? 0;
+    assert.ok(firstLength > 0 && firstLength < burst.length, `Expected a partial reveal, got ${firstLength}`);
+    while (document.querySelector(".aui-md")?.textContent !== burst && Date.now() - streamStarted < 1200)
+      await new Promise(r => setTimeout(r, 20));
+    assert.equal(document.querySelector(".aui-md")?.textContent, burst);
+    console.log(`Streamed ${burst.length} characters in ${Date.now() - streamStarted}ms`);
+    root.unmount();
+    reducedMotion = true;
+    root = createRoot(document.getElementById("root")!);
+    root.render(React.createElement(Fixture, { running: true, text: burst }));
+    await new Promise(r => setTimeout(r, 25));
+    assert.equal(document.querySelector(".aui-md")?.textContent, burst);
+
   } finally {
     root?.unmount();
     await rm(directory, { recursive: true, force: true });

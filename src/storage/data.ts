@@ -78,7 +78,7 @@ export function parseSavedData(value: string | null): Data {
 }
 
 export type ThreadMetadata = Pick<ThreadRecord, "id" | "title" | "href" | "updatedAt">;
-export type DraftUpdate = ThreadMetadata & Pick<ThreadRecord, "draft">;
+export type DraftUpdate = ThreadMetadata & Pick<ThreadRecord, "draft" | "draftQuote">;
 
 function mergeMessage(messages: Map<string, SavedMessage>, message: SavedMessage) {
   const prior = messages.get(message.id);
@@ -158,6 +158,7 @@ export function mutate(current: Data, op: Mutation): Data {
         title: c.title,
         href: c.href,
         draft: prior?.draft ?? "",
+        draftQuote: prior?.draftQuote,
         messages: messages.some((m) => m.id === c.requestId)
           ? messages
           : [

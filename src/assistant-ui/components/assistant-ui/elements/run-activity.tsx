@@ -17,6 +17,20 @@ import {
 import type { DisplayPart } from "../../../../../companion/message-parts";
 import type { SavedMessage } from "../../../../types";
 
+export function LiveActivity({ hasQueuedMessages = false }: { hasQueuedMessages?: boolean }) {
+  const parts = useAuiState(s => s.message.parts) as readonly DisplayPart[];
+  const run = useAuiState(s => s.message.metadata.custom.run);
+  if (!run && hasQueuedMessages) return null;
+  const last = parts.at(-1);
+  const label = !run ? "Waiting for agent" : last?.type === "text" && last.providerMetadata?.canvasdoc?.work === false
+    ? "Writing response"
+    : summarizeActivity(parts, true);
+  return <div role="status" className="chat-thinking flex items-center gap-2 text-sm text-neutral-500">
+    <span className="chat-thinking-dot shrink-0" aria-hidden="true" />
+    <span className="shimmer motion-reduce:animate-none">{label}</span>
+  </div>;
+}
+
 export function WorkHistory({
   children,
   indices,

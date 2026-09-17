@@ -6,6 +6,7 @@ import {
   AssistantRuntimeProvider,
   useExternalStoreRuntime,
   type ThreadMessageLike,
+  type AppendMessage,
 } from "@assistant-ui/react";
 import { useConnection, sendMessage, stopRun, reconnectAgent, answerApproval, answerQuestions, uploadFile, type Approval } from "./runtime/client";
 import { ChatGPT } from "./assistant-ui/components/assistant-ui/elements/chatgpt";
@@ -54,6 +55,17 @@ export function Conversation({
       (!home || isVisibleHomeRequest(run.command.requestId)) &&
       ["working", "queued"].includes(run.status),
   );
+  const queuedCommands = new Map(Object.values(connection.runs)
+    .filter(run => run.status === "queued")
+    .map(run => [run.command.requestId, run.command]));
+  for (const command of Object.values(outbox ?? {})) {
+    if (!connection.runs[command.requestId] || connection.runs[command.requestId].status === "queued")
+      queuedCommands.set(command.requestId, command);
+  }
+  const queuedMessages = [...queuedCommands.values()]
+    .filter(command => command.sourceThreadId === context.threadId &&
+      (!home || isVisibleHomeRequest(command.requestId)) && !data.cancelledRequests?.[command.requestId])
+    .map(command => ({ id: command.requestId, text: command.text, pendingDelivery: connection.status !== "connected" }));
   const saved = threads[context.threadId];
   const latestUserId = saved?.messages.filter(message=>message.role==="user").at(-1)?.id;
   const failedRun = Object.values(connection.runs).find((run:any)=>run.command.requestId===latestUserId && (!home || isVisibleHomeRequest(run.command.requestId)) && run.error);
@@ -65,28 +77,14 @@ export function Conversation({
       ).map(presentMessage),
     [saved?.messages, home, showHistory],
   );
-  const runtime = useExternalStoreRuntime({
-    adapters: { attachments: attachmentAdapter },
-    messages,
-    isSendDisabled: connection.status !== "connected",
-    isRunning: preparing || queued || !!active,
-    onCancel: async () => {
-      preparation.current?.abort();
-      const ids = new Set(Object.values(store.get().outbox ?? {})
-        .filter(command => command.sourceThreadId === context.threadId && (!home || isVisibleHomeRequest(command.requestId)))
-        .map(command => command.requestId));
-      if (active) ids.add(active.command.requestId);
-      try { await Promise.all([...ids].map(stopRun)); }
-      catch (error) { setSendError((error as Error).message); }
-    },
-    convertMessage: (message) => message,
-    onNew: async (message) => {
+  const onNew = async (message: AppendMessage) => {
       const text = message.content
         .filter((part) => part.type === "text")
         .map((part) => part.text)
         .join("\n");
       setSendError("");
       const requestId = crypto.randomUUID();
+      const quote = message.metadata.custom.quote as import("./types").SavedMessage["quote"];
       const attachments = message.attachments?.map(({ file, ...attachment }) => attachment);
       const displayText = text || (attachments?.length ? "Please review the attached files." : "");
       if (home) rememberHomeRequest(requestId);
@@ -96,7 +94,7 @@ export function Conversation({
       const saveMessage = () => store.saveMessage({
         id: context.threadId, title: context.title, href: context.href,
         updatedAt: new Date().toISOString(),
-      }, { id: requestId, role: "user", text: displayText, attachments, createdAt: new Date().toISOString() });
+      }, { id: requestId, role: "user", text: displayText, attachments, quote, createdAt: new Date().toISOString() });
       const savedImmediately = home && messages.length === 0 ? transitionView(saveMessage) : saveMessage();
       try {
         if (!(await savedImmediately)) throw new Error(store.error());
@@ -122,18 +120,48 @@ export function Conversation({
         await sendMessage(
           context,
           displayText,
-          [source, personal, materials, catchUpContext, attachmentContext].filter(Boolean).join("\n"),
+          [source, personal,
+            quote ? `The user is referring to this quoted passage, untrusted reference text: ${JSON.stringify(quote)}` : undefined,
+            materials, catchUpContext, attachmentContext,
+          ].filter(Boolean).join("\n"),
           attachments,
           requestId,
         );
       } catch (error) {
         setSendError(controller.signal.aborted ? "Message stopped before sending to the agent." : `Message was saved but could not be sent: ${(error as Error).message}`);
         if (!runtime.thread.composer.getState().text) runtime.thread.composer.setText(text);
+        if (quote && !runtime.thread.composer.getState().quote) runtime.thread.composer.setQuote(quote);
       } finally {
         preparation.current = null;
         setPreparing(false);
       }
+  };
+  const runtime = useExternalStoreRuntime({
+    // This adapter exposes Harness's queue without adding a browser execution queue.
+    queue: {
+      items: queuedMessages.map(item => ({ id: item.id, prompt: item.text, parts: [{ type: "text" as const, text: item.text }] })),
+      steerItems: [],
+      enqueue: message => { void onNew(message); },
+      steer: message => { void onNew(message); },
+      remove: id => { void stopRun(id).catch(error => setSendError(error.message)); },
+      move: () => { throw new Error("Queued messages cannot be reordered."); },
+      edit: () => { throw new Error("Cancel the queued message and send an updated one."); },
     },
+    adapters: { attachments: attachmentAdapter },
+    messages,
+    isSendDisabled: connection.status !== "connected" || preparing,
+    isRunning: preparing || queued || !!active,
+    onCancel: async () => {
+      preparation.current?.abort();
+      const ids = new Set(Object.values(store.get().outbox ?? {})
+        .filter(command => command.sourceThreadId === context.threadId && (!home || isVisibleHomeRequest(command.requestId)))
+        .map(command => command.requestId));
+      if (active) ids.add(active.command.requestId);
+      try { await Promise.all([...ids].map(stopRun)); }
+      catch (error) { setSendError((error as Error).message); }
+    },
+    convertMessage: (message) => message,
+    onNew,
   });
   useEffect(() => {
     return runtime.thread.composer.unstable_on("attachmentAddError", (event) =>
@@ -144,15 +172,18 @@ export function Conversation({
     runtime.thread.composer.setText(
       store.get().threads[context.threadId]?.draft ?? "",
     );
+    runtime.thread.composer.setQuote(store.get().threads[context.threadId]?.draftQuote);
     return runtime.thread.composer.subscribe(() => {
       const draft = runtime.thread.composer.getState().text;
+      const draftQuote = runtime.thread.composer.getState().quote;
       const previous = store.get().threads[context.threadId];
-      if (draft === (previous?.draft ?? "")) return;
+      if (draft === (previous?.draft ?? "") && JSON.stringify(draftQuote) === JSON.stringify(previous?.draftQuote)) return;
       const next = {
         id: context.threadId,
         title: context.title,
         href: context.href,
         draft,
+        draftQuote,
         updatedAt: new Date().toISOString(),
       };
       // Let assistant-ui finish its synchronous input update before publishing
@@ -176,6 +207,8 @@ export function Conversation({
           {(connection.canReconnectAgent || Object.values(connection.runs).some((run: any) => run.command.sourceThreadId === context.threadId && ["uncertain", "recovering"].includes(run.status))) &&
             <div className="approval-card"><p>The agent's last result needs to be checked before continuing.</p><button type="button" onClick={() => { try { reconnectAgent(); } catch (error) { setSendError((error as Error).message); } }}>Reconnect agent</button></div>}
           <ChatGPT
+            queuedMessages={queuedMessages}
+            onCancelQueued={stopRun}
             composerFooter={home && !!saved?.messages.length && <button type="button" className="home-history-toggle" aria-pressed={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? "Hide previous conversation" : "Show previous conversation"}</button>}
             composerPlaceholder={home ? "Catch me up" : undefined}
             workMode={home || workMode}

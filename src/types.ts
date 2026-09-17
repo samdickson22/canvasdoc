@@ -36,6 +36,7 @@ export type PersonalTask = {
   createdAt: string;
 };
 export type SavedMessage = {
+  quote?: { text: string; messageId: string };
   revision?: number;
   run?: { status: string; startedAt?: string; completedAt?: string; error?: string };
   files?: string[];
@@ -48,6 +49,7 @@ export type SavedMessage = {
   createdAt: string;
 };
 export type ThreadRecord = {
+  draftQuote?: SavedMessage["quote"];
   id: string;
   title: string;
   href: string;

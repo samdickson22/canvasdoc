@@ -141,6 +141,28 @@ test("activity summaries describe actual work and preserve failures", () => {
   );
 });
 
+test("live activity returns to thinking after tools and uses the next provider summary", () => {
+  const parts: DisplayPart[] = [
+    { type: "tool-call", toolCallId: "read", toolName: "Run command", args: {}, argsText: "{}", result: "Done" },
+    { type: "text", text: "The notes are ready.", phase: "commentary" },
+  ];
+  assert.equal(summarizeActivity(parts, true), "Thinking");
+  parts.push({ type: "reasoning", text: "**Verifying with command source**\n\nChecking the output." });
+  assert.equal(summarizeActivity(parts, true), "Verifying with command source");
+  parts.push({ type: "tool-call", toolCallId: "check", toolName: "Run command", args: {}, argsText: "{}" });
+  assert.equal(summarizeActivity(parts, true), "Running command");
+});
+
+test("a working response retains its running state when another user message is queued", () => {
+  assert.equal(presentMessage({ ...base, text: "Checking.", run: { status: "working" } }).status?.type, "running");
+});
+
+test("saved user quotes are restored to assistant-ui message metadata", () => {
+  const quote = { text: "Selected passage", messageId: "source" };
+  const message = presentMessage({ ...base, role: "user", text: "Explain this", quote });
+  assert.deepEqual(message.metadata?.custom?.quote, quote);
+});
+
 test("an interrupted commentary is retained in stopped work rather than promoted to a final answer", () => {
   const message: SavedMessage = {
     ...base,

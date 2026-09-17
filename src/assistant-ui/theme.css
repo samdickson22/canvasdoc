@@ -1,9 +1,20 @@
 @import "tailwindcss" source(none);
+@import "tw-animate-css";
+@import "tw-shimmer";
 /* Match the surrounding Canvasdoc theme; OS dark mode alone must not recolor chat. */
 @custom-variant dark (&:where(.dark, .dark *));
 @source "./components";
 @source "../conversation.tsx";
 @theme {
+  /* Base UI exposes a different measured height than the animation defaults. */
+  @keyframes collapsible-down {
+    from { height: 0; }
+    to { height: var(--collapsible-panel-height); }
+  }
+  @keyframes collapsible-up {
+    from { height: var(--collapsible-panel-height); }
+    to { height: 0; }
+  }
   --color-background: #fff;
   --color-foreground: #26322b;
   --color-card: #fff;
@@ -28,6 +39,8 @@
   .aui-root { min-height: 0; font-size: 14px; }
   .aui-root textarea { border: 0; box-shadow: none; font-family: inherit; }
 }
+/* @property initial values do not cross into Canvas's shadow root. */
+.conversation { --shimmer-angle: 15deg; --shimmer-track-height: 200px; }
 /* The dashboard positions the welcome group; avoid the demo's extra bottom offset. */
 .conversation-home .aui-chatgpt-empty { padding-bottom: 0; }
 /* Work surfaces keep assistant-ui behavior and give files/context a visible home. */
@@ -96,6 +109,15 @@
 }
 @media (hover: none) { .chat-user-actions { opacity: 1; pointer-events: auto; } }
 @media (prefers-reduced-motion: reduce) { .chat-user-actions { transition: none; } }
+
+/* Portaled menus live inside the conversation too. */
+@media (prefers-reduced-motion: reduce) {
+  .conversation *, .conversation *::before, .conversation *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+  .conversation .shimmer { background: none; -webkit-text-fill-color: currentColor; }
+}
 
 .chat-work-history { margin-block: 4px 14px; }
 .chat-run-heading, .chat-run-note { color: #788176; font-size: 12px; line-height: 1.5; margin-block: 6px 12px; }

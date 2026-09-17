@@ -40,12 +40,15 @@ import { MarkdownText } from "./markdown-text";
 import { hasFileDrop, readDroppedFiles } from "../../../../runtime/dropped-files";
 import { CodexModelSelector } from "../../../../model-selector";
 
-import { WorkHistory, ActivityGroup, ActivityTool, RunData, RunOutcome } from "./run-activity";
+import { WorkHistory, ActivityGroup, ActivityTool, RunData, RunOutcome, LiveActivity } from "./run-activity";
 import { Reasoning } from "./reasoning.aui";
 import { attachmentWorkspaceHref, type AttachmentUploadState } from "../../../../runtime/attachments";
 import { WorkspaceLink } from "../../../../workspace-link";
+import { SelectionQuote, ComposerQuote, AttachmentPreview, QueuedMessages, type QueuedMessage } from "./chat-extras";
 
 type WorkOptions = {
+  queuedMessages?: readonly QueuedMessage[];
+  onCancelQueued?: (id: string) => Promise<void>;
   uploadStates?: Readonly<Record<string, AttachmentUploadState>>;
   composerPlaceholder?: string;
   composerFooter?: ReactNode;
@@ -61,6 +64,7 @@ export const ChatGPT: FC<WorkOptions> = (options) => {
         data-work-mode={options.workMode || undefined}
         className="aui-root min-h-0 flex h-full flex-col items-stretch bg-white px-4 text-[#0d0d0d] dark:bg-black dark:text-[#ececec]"
       >
+        <SelectionQuote />
         <AuiIf condition={(s) => s.thread.isEmpty}>
           <EmptyState />
         </AuiIf>
@@ -77,6 +81,7 @@ export const ChatGPT: FC<WorkOptions> = (options) => {
 
             <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mx-auto mt-auto flex w-full max-w-3xl flex-col gap-2 overflow-visible rounded-t-3xl bg-white pb-2 dark:bg-black">
               <ThreadScrollToBottom />
+              {options.queuedMessages && options.onCancelQueued && <QueuedMessages items={options.queuedMessages} onCancel={options.onCancelQueued} />}
               <Composer placeholder="Ask anything" />
               {options.composerFooter}
               <p className="text-center text-xs text-[#5d5d5d] dark:text-[#afafaf]">
@@ -176,7 +181,7 @@ const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
     return (
       <ComposerDropzone>
       <ComposerPrimitive.Root className="work-composer">
-
+          <ComposerQuote />
           <div className="work-attachments">
             <ComposerPrimitive.Attachments
               components={{ Attachment: ChatGPTAttachmentUI }}
@@ -207,6 +212,7 @@ const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
   return (
     <ComposerDropzone>
     <ComposerPrimitive.Root className="group/composer flex w-full flex-col rounded-[28px] border border-[#e5e5e5] bg-white px-2 py-2 focus-within:border-[#d0d0d0] dark:border-transparent dark:bg-[#212121] dark:focus-within:border-transparent">
+      <ComposerQuote />
       <AuiIf condition={(s) => s.composer.attachments.length > 0}>
         <div className="flex flex-row flex-wrap gap-2 px-1 pt-1 pb-2">
           <ComposerPrimitive.Attachments
@@ -270,7 +276,6 @@ const ComposerPrimaryAction: FC = () => {
 
       <AuiIf
         condition={(s) =>
-          !s.thread.isRunning &&
           s.composer.dictation == null &&
           !s.composer.isEmpty
         }
@@ -323,6 +328,7 @@ const ThreadScrollToBottom: FC = () => {
 const UserMessage: FC = () => {
   return (
     <MessagePrimitive.Root className="chat-user-message relative mx-auto flex w-full max-w-3xl flex-col items-end gap-1">
+      <MessagePrimitive.Quote>{({ text }) => <blockquote className="max-w-[80%] border-l-2 border-border pl-3 text-sm text-muted-foreground whitespace-pre-wrap">{text}</blockquote>}</MessagePrimitive.Quote>
       <div className="flex flex-row flex-wrap justify-end gap-2">
         <MessagePrimitive.Attachments
           components={{ Attachment: ChatGPTAttachmentUI }}
@@ -397,10 +403,11 @@ const assistantActionClassName =
   "flex size-8 items-center justify-center rounded-lg text-[#5d5d5d] transition-colors hover:bg-black/[0.07] hover:text-[#5d5d5d] dark:text-[#cdcdcd] dark:hover:bg-white/15 dark:hover:text-[#cdcdcd]";
 
 const AssistantMessage: FC = () => {
+  const { queuedMessages } = useContext(WorkContext);
   return (
     <MessagePrimitive.Root className="relative mx-auto flex w-full max-w-3xl flex-col">
       <div className="text-[#0d0d0d] dark:text-[#ececec]">
-        <MessagePrimitive.GroupedParts indicator="empty" groupBy={(part) => {
+        <MessagePrimitive.GroupedParts indicator="always" groupBy={(part) => {
           const work = "providerMetadata" in part && part.providerMetadata?.canvasdoc?.work;
           const groups: `group-${string}`[] = work ? ["group-work"] : [];
           if (part.type === "reasoning" || part.type === "tool-call") groups.push("group-activity");
@@ -414,9 +421,7 @@ const AssistantMessage: FC = () => {
               case "reasoning": return part.text ? <div className="chat-reasoning-summary"><Reasoning {...part} /></div> : null;
               case "tool-call": return part.toolUI ?? <ActivityTool {...part} />;
               case "data": return <RunData part={part} />;
-              case "indicator": return <div role="status" className="chat-thinking flex items-center gap-2 text-sm text-neutral-500">
-                <span className="chat-thinking-dot" aria-hidden="true" /> Thinking…
-              </div>;
+              case "indicator": return <LiveActivity hasQueuedMessages={!!queuedMessages?.length} />;
               default: return null;
             }
           }}
@@ -551,11 +556,11 @@ const ChatGPTAttachmentUI: FC = () => {
       <div className="bg-secondary flex items-center gap-2 overflow-hidden rounded-2xl border dark:bg-white/5">
         <AuiIf condition={(s) => s.attachment.type === "image"}>
           {src ? (
-            <img
+            <AttachmentPreview src={src} name={attachment.name}><img
               className="size-32 rounded-md object-cover"
-              alt="Attachment"
+              alt={attachment.name}
               src={src}
-            />
+            /></AttachmentPreview>
           ) : (
             <div className="flex h-full w-12 items-center justify-center rounded-md">
               <AttachmentPrimitive.unstable_Thumb className="text-xs" />
