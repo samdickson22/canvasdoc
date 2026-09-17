@@ -68,6 +68,7 @@ test(
       ws.send(
         JSON.stringify({
           type: "connect",
+          account: "canvasdoc:v1:http://localhost:3210:101",
           token: (
             await readFile(
               path.join(root, ".canvasdoc/dev-connection-token"),
@@ -89,14 +90,14 @@ test(
           course: { id: 1, text: "COURSE_ONE_MARKER" },
         },
       };
-      ws.send(JSON.stringify({ type: "send", command }));
+      ws.send(JSON.stringify({ type: "send", account: "canvasdoc:v1:http://localhost:3210:101", command }));
       await wait(
         (message) =>
           message.type === "run" &&
           message.run.command.requestId === command.requestId &&
           message.run.status === "completed",
       );
-      ws.send(JSON.stringify({ type: "send", command }));
+      ws.send(JSON.stringify({ type: "send", account: "canvasdoc:v1:http://localhost:3210:101", command }));
       await wait(
         (message) =>
           message.type === "run" &&
@@ -104,7 +105,7 @@ test(
       );
       ws.send(
         JSON.stringify({
-          type: "send",
+          type: "send", account: "canvasdoc:v1:http://localhost:3210:101",
           command: {
             ...command,
             requestId: "instructions-two",
@@ -122,7 +123,7 @@ test(
       );
       ws.send(
         JSON.stringify({
-          type: "send",
+          type: "send", account: "canvasdoc:v1:http://localhost:3210:101",
           command: {
             ...command,
             requestId: "instructions-bad",

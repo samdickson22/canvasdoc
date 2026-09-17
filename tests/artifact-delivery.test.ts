@@ -108,6 +108,7 @@ test(
         ws.send(
           JSON.stringify({
             type: "connect",
+            account: "canvasdoc:v1:http://localhost:3210:101",
             token: (
               await readFile(
                 path.join(root, ".canvasdoc/dev-connection-token"),
@@ -121,7 +122,7 @@ test(
           ws,
           wait,
           hello,
-          send: (m: any) => ws.send(JSON.stringify(m)),
+          send: (m: any) => ws.send(JSON.stringify({account: "canvasdoc:v1:http://localhost:3210:101", ...m})),
         };
       }
       const c = await connect();

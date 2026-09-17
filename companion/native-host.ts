@@ -26,15 +26,17 @@ function send(value: unknown) {
 }
 const socket = new WebSocket(`ws://127.0.0.1:${port}`, { origin });
 let connected = false;
-const queued: unknown[] = [];
-socket.on("open", () =>
-  socket.send(JSON.stringify({ type: "connect", token })),
-);
+let handshake: Record<string, unknown> | undefined;
+function connect() {
+  if (handshake && socket.readyState === WebSocket.OPEN)
+    socket.send(JSON.stringify({ ...handshake, token }));
+}
+socket.on("open", connect);
 socket.on("message", (data) => {
   const value = JSON.parse(data.toString());
   if (value.type === "connected") {
     connected = true;
-    for (const item of queued.splice(0)) socket.send(JSON.stringify(item));
+
   }
   send(value);
 });
@@ -61,8 +63,11 @@ process.stdin.on("data", (chunk: Buffer) => {
     if (buffer.length < length + 4) return;
     const value = JSON.parse(buffer.subarray(4, 4 + length).toString());
     buffer = buffer.subarray(4 + length);
-    if (connected) socket.send(JSON.stringify(value));
-    else queued.push(value);
+    if (!handshake && value.type === "connect") {
+      handshake = value;
+      connect();
+    } else if (connected && value.type !== "connect") socket.send(JSON.stringify(value));
+    else send({ type: "error", code: "handshake_required", message: "Connect the Canvas account before sending commands." });
   }
 });
 process.stdin.on("end", () => socket.close());

@@ -69,6 +69,15 @@ chrome.runtime.onConnect.addListener((port) => {
     console.error("Canvasdoc native connection:", message);
     try { port.postMessage({ type: "native-disconnected", message }); } catch { /* The Canvas tab already closed. */ }
   });
-  port.onMessage.addListener((message) => native.postMessage(message));
+  port.onMessage.addListener((message) => {
+    const prefix = `canvasdoc:v1:${new URL(sender.url!).origin}:`;
+    if (typeof message.account !== "string" || !message.account.startsWith(prefix) || !message.account.slice(prefix.length) || message.account.slice(prefix.length).includes(":")) {
+      port.postMessage({ type: "error", code: "account_mismatch", message: "Canvas account does not match this tab." });
+      port.disconnect();
+      native.disconnect();
+      return;
+    }
+    native.postMessage(message);
+  });
   port.onDisconnect.addListener(() => native.disconnect());
 });

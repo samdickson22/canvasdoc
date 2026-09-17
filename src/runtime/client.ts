@@ -31,6 +31,11 @@ let nativePort: chrome.runtime.Port | undefined;
 let socket: WebSocket | undefined;
 let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 let backupTimer: ReturnType<typeof setTimeout> | undefined;
+let connectionAccount: string | undefined;
+const workspaceKey = (account: string) => `canvasdoc:workspace:${account}`;
+function handshake() {
+  return { type: "connect", account: connectionAccount, workspaceId: sessionStorage.getItem(workspaceKey(connectionAccount!)) || undefined };
+}
 let savedConnection: { url: string; token: string } | undefined;
 const listeners = new Set<() => void>();
 const uploads = new Map<string, { resolve: (path: string) => void; reject: (error: Error) => void }>();
@@ -74,7 +79,9 @@ function update(patch: Partial<State>) {
   state = { ...state, ...patch };
   listeners.forEach((fn) => fn());
 }
-function send(value: unknown) {
+function send(value: object) {
+  if (!connectionAccount || connectionAccount !== store.account()) throw new Error("Canvas account changed. Reconnect your computer.");
+  value = { ...value, account: connectionAccount };
   if (nativePort && state.status === "connected") {
     nativePort.postMessage(value);
     return;
@@ -84,6 +91,8 @@ function send(value: unknown) {
   socket.send(JSON.stringify(value));
 }
 async function applyRun(run: any) {
+  const account = connectionAccount;
+  if (!account || account !== store.account()) return;
   const c = run.command;
   if (
     !c ||
@@ -128,6 +137,7 @@ async function applyRun(run: any) {
       draft: previous?.draft ?? "",
       updatedAt: new Date().toISOString(),
     });
+  if (account !== connectionAccount || account !== store.account()) return;
   const persisted = store.committed().threads[c.sourceThreadId];
   if (
     ["completed", "interrupted", "cancelled", "error"].includes(run.status) &&
@@ -178,12 +188,13 @@ export function connect(url: string, token: string) {
     socket.onclose = null;
     socket.close();
   }
-  update({ status: "connecting", error: undefined, approvals: [] });
+  connectionAccount = store.account();
+  update({ status: "connecting", error: undefined, approvals: [], runs: {} });
   const current = new WebSocket(url);
   socket = current;
   current.onopen = () =>
-    current.send(JSON.stringify({ type: "connect", token }));
-  current.onmessage = receive;
+    current.send(JSON.stringify({ ...handshake(), token }));
+  current.onmessage = event => { if (socket === current) receive(event); };
   current.onerror = () => update({ error: "Could not reach your computer." });
   current.onclose = (event) => {
     if (socket !== current) return;
@@ -195,12 +206,17 @@ export function connect(url: string, token: string) {
       }, 2500);
     if (event.code === 1008)
       update({
-        error:
+        error: state.error ||
           "The connector rejected this connection. Check the token and Canvas origin.",
       });
   };
 }
 function receive(event: { data: string }) {
+  if (!connectionAccount || connectionAccount !== store.account()) {
+    disconnect();
+    update({ error: "Canvas account changed. Reconnect your computer.", runs: {} });
+    return;
+  }
   let m: any;
   try {
     m = JSON.parse(event.data);
@@ -241,6 +257,13 @@ function receive(event: { data: string }) {
     return;
   }
   if (m.type === "connected") {
+    const expected = sessionStorage.getItem(workspaceKey(connectionAccount));
+    if (m.account !== connectionAccount || typeof m.workspace?.workspaceId !== "string" || (expected && expected !== m.workspace.workspaceId)) {
+      disconnect();
+      update({ error: "Canvas account or workspace does not match this connection.", runs: {} });
+      return;
+    }
+    sessionStorage.setItem(workspaceKey(connectionAccount), m.workspace.workspaceId);
     update({
       status: m.runtimeAvailable === false ? "disconnected" : "connected",
       materials: !!m.capabilities?.materials,
@@ -321,12 +344,14 @@ export function connectNative() {
   const previous = nativePort;
   nativePort = undefined;
   previous?.disconnect();
-  update({ status: "connecting", error: undefined });
+  connectionAccount = store.account();
+  update({ status: "connecting", error: undefined, approvals: [], runs: {} });
   const current = chrome.runtime.connect({ name: "canvasdoc:runtime" });
   nativePort = current;
   current.onMessage.addListener((message) => {
     if (nativePort === current) receive({ data: JSON.stringify(message) });
   });
+  current.postMessage(handshake());
   current.onDisconnect.addListener(() => {
     const error = chrome.runtime.lastError;
     if (nativePort !== current) return;
@@ -336,6 +361,7 @@ export function connectNative() {
 }
 export const usesNativeConnection = isExtension;
 export function disconnect() {
+  connectionAccount = undefined;
   nativePort?.disconnect();
   nativePort = undefined;
   savedConnection = undefined;
@@ -345,7 +371,7 @@ export function disconnect() {
     socket.onclose = null;
     socket.close();
   }
-  update({ status: "disconnected", approvals: [] });
+  update({ status: "disconnected", approvals: [], runs: {} });
 }
 export async function sendMessage(
   context: PageContext,
@@ -354,6 +380,7 @@ export async function sendMessage(
   attachments?: import("@assistant-ui/react").CompleteAttachment[],
   requestId = crypto.randomUUID(),
 ) {
+  const account = store.account();
   update({error:undefined});
   if (!text.trim() || text.length > 50000) throw new Error("Messages must contain between 1 and 50,000 characters.");
   if (context.kind === "home") rememberHomeRequest(requestId);
@@ -370,6 +397,7 @@ export async function sendMessage(
     attachments,
   };
   if (!(await store.enqueue(command))) throw new Error(store.error());
+  if (account !== store.account()) throw new Error("Canvas account changed. Reconnect your computer.");
   if (state.status === "connected") send({ type: "send", command });
   return requestId;
 }
@@ -395,7 +423,8 @@ export function useConnection() {
 }
 
 export function reconnectAgent() {
-  const command = { type: "reconcile" };
+  if (!connectionAccount || connectionAccount !== store.account()) throw new Error("Canvas account changed. Reconnect your computer.");
+  const command = { type: "reconcile", account: connectionAccount };
   if (nativePort) nativePort.postMessage(command);
   else if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(command));
   else throw new Error("Reconnect your computer first.");

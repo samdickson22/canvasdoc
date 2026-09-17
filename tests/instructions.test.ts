@@ -193,6 +193,7 @@ test("real browser send snapshots selected instructions offline and retries unch
     await socket.onmessage({
       data: JSON.stringify({
         type: "connected",
+        account: store.account(),
         workspace: {
           workspaceId: "synthetic",
           root: "/synthetic",
