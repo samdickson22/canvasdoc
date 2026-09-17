@@ -49,6 +49,19 @@ test(
           }
         });
       });
+      for (const name of [
+        "canvasdoc-assignment-review",
+        "canvasdoc-study-preparation",
+        "canvasdoc-artifacts",
+      ]) {
+        assert.match(
+          await readFile(
+            path.join(root, ".agents/skills", name, "SKILL.md"),
+            "utf8",
+          ),
+          new RegExp(`name: ${name}`),
+        );
+      }
       async function connect() {
         const ws = new WebSocket(`ws://127.0.0.1:${port}`, {
           origin: "http://localhost:3210",

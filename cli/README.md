@@ -29,3 +29,9 @@ The chat model and reasoning-effort selector requires connector 0.1.3 or later. 
 Canvasdoc's browser extension reads course materials using your existing Canvas login. The companion receives source files through authenticated, verified transfers and writes them under `courses/<account>/course-<id>/`. It never needs a Canvas API token or browser cookies.
 
 The extension owns the material index and checks for updates while Canvas is open. Connect this companion to download new or changed materials. Course pages, syllabus content, assignment instructions, module indexes, announcements, and accessible files appear in the workspace Sources panel. Synced source files are separate from `work/` folders; locally edited sources are preserved and reported as conflicts. Files are limited to 100 MB each; preview limits are separate. External publisher content remains linked rather than automatically downloaded.
+
+## Coursework procedures
+
+The companion bundles assignment review, study preparation, and document/code artifact procedures. Codex discovers them in your Canvasdoc folder's `.agents/skills/` and loads applicable instructions on demand. Procedures use available sources and installed authoring tools; they do not add a required authoring tool stack.
+
+Existing skills and edited bundled files are preserved. Canvasdoc updates only files whose contents still match its ownership record in `.canvasdoc/bundled-skills.json`. To restore a bundled procedure after editing it, remove that procedure's `SKILL.md` and restart the companion. These procedures are maintained with the application; they do not learn or import skills automatically.

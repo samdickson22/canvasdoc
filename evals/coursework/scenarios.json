@@ -1,0 +1,32 @@
+[
+  {
+    "id": "required-materials",
+    "skill": "canvasdoc-assignment-review",
+    "files": {"assignment.md": "Write a comparison using reading-a.md and required reading-b.md. The latter has not been supplied. Do not substitute another reading.", "reading-a.md": "The synthetic experiment used two covered containers."},
+    "prompt": "Review assignment.md and available readings. Identify required materials and what work can proceed. Do not create the missing reading.",
+    "answerPatterns": ["reading-b\\.md", "missing|unavailable|not (?:been )?(?:provided|supplied)|absent"],
+    "absentFiles": ["reading-b.md"]
+  },
+  {
+    "id": "rubric-fidelity",
+    "skill": "canvasdoc-assignment-review",
+    "files": {"rubric.md": "Criteria: Comparison 65 points; Evidence 25 points; Format 10 points. Format requires a table.", "draft.md": "The two containers differed in size. No measurements or table are provided."},
+    "prompt": "Review draft.md against rubric.md. Cover every criterion with its original point weight and concrete draft evidence or gaps. Do not give an official grade.",
+    "answerPatterns": ["Comparison", "65", "Evidence", "25", "Format", "10", "table", "measurements|evidence|support"]
+  },
+  {
+    "id": "file-evidence",
+    "skill": "canvasdoc-artifacts",
+    "files": {"source.md": "Synthetic observation: container A held 12 beads; container B held 7 beads."},
+    "prompt": "Create a concise Markdown report at outputs/report.md from source.md. Include the two counts and their difference. Verify the saved file and link it. Use installed tools; Markdown needs no new dependencies.",
+    "answerPatterns": ["\\]\\(<?(?:\\./)?outputs/report\\.md>?\\)"],
+    "output": {"path": "outputs/report.md", "patterns": ["12", "7", "5"]}
+  },
+  {
+    "id": "source-uncertainty",
+    "skill": "canvasdoc-study-preparation",
+    "files": {"notes-a.md": "Synthetic notes: the sample was heated for 8 minutes. No official answer key is available.", "notes-b.md": "Synthetic notes: the sample was heated for 13 minutes. No official answer key is available."},
+    "prompt": "Prepare a short study explanation of the heating duration from these notes. Cite both notes and explain whether a definitive duration is supported.",
+    "answerPatterns": ["notes-a\\.md", "notes-b\\.md", "8", "13", "conflict|contradict|inconsisten|disagree|uncertain", "cannot|can't|not (?:possible|supported|established)|no definitive|unresolved"]
+  }
+]

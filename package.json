@@ -12,7 +12,8 @@
     "companion": "node companion/server.ts",
     "test:runtime": "node companion/smoke.ts",
     "native:install": "node companion/install-native.ts",
-    "check": "npm run typecheck && npm run build && npm test"
+    "check": "npm run typecheck && npm run build && npm test",
+    "eval:release": "node scripts/eval-coursework.ts"
   },
   "dependencies": {
     "@assistant-ui/react": "0.15.19",
