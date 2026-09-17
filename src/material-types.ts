@@ -12,7 +12,7 @@ export type Material = {
 };
 export type MaterialCatalog = {
   notices?: string[];
-  responses?: Record<string,{at:number;value:any[];error?:string;notice?:boolean}>;
+  responses?: Record<string,{at:number;successfulAt?:number;value:any[];error?:string;notice?:boolean}>;
   checkedAt: string;
   resources: Material[];
   errors: string[];
