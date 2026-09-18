@@ -205,14 +205,12 @@ test("an interrupted commentary is retained in stopped work rather than promoted
   );
 });
 
-test("file evidence stays visible and distinguishes availability from correctness", () => {
+test("file delivery metadata does not append text to the assistant response", () => {
   const message = presentMessage({ ...base, text: "[Report](report.pdf)", run: { status: "completed" }, artifacts: [
     { path: "report.pdf", status: "available", checkedAt: "2026-09-16T20:00:00Z", size: 123, mime: "application/pdf" },
     { path: "missing.md", status: "unavailable", checkedAt: "2026-09-16T20:00:00Z", reason: "File does not exist." },
   ] });
-  const evidence = (message.content as any[]).at(-1);
-  assert.equal(evidence.providerMetadata.canvasdoc.work, false);
-  assert.match(evidence.text, /Files available at delivery: 1/);
-  assert.doesNotMatch(evidence.text, /correct|submitted/i);
-  assert.match(evidence.text, /Unavailable: "missing.md". File does not exist/);
+  assert.equal((message.content as any[]).length, 1);
+  assert.equal((message.content as any[])[0].text, "[Report](report.pdf)");
+  assert.equal(finalAnswerText(message.content as any), "[Report](report.pdf)");
 });

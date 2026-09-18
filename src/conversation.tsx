@@ -231,6 +231,7 @@ export function Conversation({
           {(connection.canReconnectAgent || Object.values(connection.runs).some((run: any) => run.command.sourceThreadId === context.threadId && ["uncertain", "recovering"].includes(run.status))) &&
             <div className="approval-card"><p>The agent's last result needs to be checked before continuing.</p><button type="button" onClick={() => { try { reconnectAgent(); } catch (error) { setSendError((error as Error).message); } }}>Reconnect agent</button></div>}
           <ChatGPT
+            preparing={preparing}
             compact={compact}
             onReadAloud={speechAdapter ? text => { speechText.current = text; } : undefined}
             queuedMessages={queuedMessages}

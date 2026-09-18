@@ -7,7 +7,8 @@ let key = "";
 let data = empty();
 let committed = empty();
 let storageError = "";
-let pending: Mutation[] = [];
+type PendingWrite = { op: Mutation; started: boolean; result: Promise<boolean> };
+let pending: PendingWrite[] = [];
 let tail = Promise.resolve();
 let unsubscribe: undefined | (() => void);
 const listeners = new Set<() => void>();
@@ -15,7 +16,7 @@ function emit() {
   listeners.forEach((fn) => fn());
 }
 function project() {
-  data = pending.reduce(mutate, committed);
+  data = pending.reduce((current, entry) => mutate(current, entry.op), committed);
   emit();
 }
 export async function initializeStore(userId: string) {
@@ -38,19 +39,33 @@ export async function initializeStore(userId: string) {
   });
 }
 function update(op: Mutation): Promise<boolean> {
-  pending.push(op);
-  project();
+  const last = pending.at(-1);
+  // Streaming events are full snapshots. Replace an unsaved snapshot instead
+  // of making the next user message wait behind every intermediate version.
+  if (last && !last.started && last.op.type === "message" && op.type === "message" &&
+      op.message.role === "assistant" && op.message.run?.requestId &&
+      last.op.thread.id === op.thread.id && last.op.message.id === op.message.id &&
+      last.op.message.run?.requestId === op.message.run.requestId &&
+      op.message.revision !== undefined && last.op.message.revision !== undefined &&
+      op.message.revision > last.op.message.revision) {
+    last.op = op;
+    project();
+    return last.result;
+  }
+  const entry: PendingWrite = { op, started: false, result: Promise.resolve(true) };
+  pending.push(entry);
   let ok = true;
   const operation = tail.then(async () => {
+    entry.started = true;
     try {
-      committed = await browserStorage.commit(key, op);
-      pending = pending.filter((item) => item !== op);
+      committed = await browserStorage.commit(key, entry.op);
+      pending = pending.filter((item) => item !== entry);
       storageError = "";
       project();
       window.dispatchEvent(new Event("canvasdoc:committed"));
     } catch {
       ok = false;
-      pending = pending.filter((item) => item !== op);
+      pending = pending.filter((item) => item !== entry);
       project();
       storageError =
         "Changes could not be saved in this browser. Keep this page open and try again.";
@@ -58,7 +73,9 @@ function update(op: Mutation): Promise<boolean> {
     }
   });
   tail = operation.catch(() => {});
-  return operation.then(() => ok);
+  entry.result = operation.then(() => ok);
+  project();
+  return entry.result;
 }
 export const store = {
   saveCatchUp(state: NonNullable<Data["catchUp"]>) { return update({type:"catch-up",state}); },

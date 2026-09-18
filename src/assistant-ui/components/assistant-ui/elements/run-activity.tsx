@@ -17,14 +17,14 @@ import {
 import type { DisplayPart } from "../../../../../companion/message-parts";
 import type { SavedMessage } from "../../../../types";
 
-export function LiveActivity({ hasQueuedMessages = false }: { hasQueuedMessages?: boolean }) {
+export function LiveActivity({ hasQueuedMessages = false, preparing = false }: { hasQueuedMessages?: boolean; preparing?: boolean }) {
   const parts = useAuiState(s => s.message.parts) as readonly DisplayPart[];
   const run = useAuiState(s => s.message.metadata.custom.run);
   if (!run && hasQueuedMessages) return null;
   const last = parts.at(-1);
   // WorkHistory owns the status while a work group is present.
   if (parts.some(part => "providerMetadata" in part && part.providerMetadata?.canvasdoc?.work)) return null;
-  const label = !run ? "Waiting for agent" : last?.type === "text" && last.providerMetadata?.canvasdoc?.work === false
+  const label = !run ? preparing ? "Preparing message" : "Starting agent" : last?.type === "text" && last.providerMetadata?.canvasdoc?.work === false
     ? "Writing response"
     : summarizeActivity(parts, true);
   return <div role="status" className="chat-thinking flex items-center gap-2 text-sm text-neutral-500">

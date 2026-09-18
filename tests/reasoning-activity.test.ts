@@ -77,6 +77,16 @@ test("native summary sections update one status row without rendering reasoning 
     assert.match(document.body.textContent!, /Worked for/);
     assert.match(document.body.textContent!, /Synthetic answer/);
     assert.doesNotMatch(document.body.textContent!, /Exploring substitution|Rewriting integral/);
+    connection.send({ type: "send", command: {
+      requestId: "summary-followup", sourceThreadId: "home", title: "Synthetic", href: "/",
+      text: "SCENARIO:slow-start",
+    } });
+    const followup = await connection.wait(message => message.type === "run" &&
+      message.run.command.requestId === "summary-followup" && message.run.status === "working" && !message.run.turnId);
+    root.render(React.createElement(Fixture, { run: followup.run }));
+    await new Promise(resolve => setTimeout(resolve, 50));
+    assert.match(document.body.textContent!, /Thinking/);
+    assert.doesNotMatch(document.body.textContent!, /Waiting for agent|Preparing message|Starting agent/);
   } finally {
     root?.unmount();
     await fixture.close();
