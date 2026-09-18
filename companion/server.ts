@@ -25,7 +25,10 @@ const port = Number(process.env.CANVASDOC_CONNECTOR_PORT || 3218);
 const origin = process.env.CANVASDOC_DEV_ORIGIN;
 if (!origin)
   throw new Error("This dev bridge requires an explicit CANVASDOC_DEV_ORIGIN.");
-const config = await runtime.start();
+const config = await runtime.start().catch((error: unknown) => {
+  console.error(`Canvasdoc: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+});
 const stateDir = path.join(config.root, ".canvasdoc");
 const materials = new MaterialMirror(config.root);
 void materials.extractor.restore();

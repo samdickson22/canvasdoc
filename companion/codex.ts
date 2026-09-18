@@ -19,6 +19,7 @@ import type { Harness } from "harness-sdk";
 import { decodeMessage, encodeMessage } from "./vendor/harness-codex/json.ts";
 
 import { installBundledSkills } from "./skills.ts";
+import { prepareCodexHome } from "./codex-home.ts";
 
 export type RpcEvent = {
   method: string;
@@ -112,6 +113,7 @@ export class CodexRuntime {
       },
     });
     try {
+      const codexHome = await prepareCodexHome(root);
       const configPath = path.join(dir, "config.json");
       try {
         this.config = JSON.parse(await readFile(configPath, "utf8"));
@@ -157,10 +159,10 @@ export class CodexRuntime {
       const connect: CodexClient.Connect = async (sink) => {
         const child = (this.child = spawn(
           this.bin,
-          [...prefix, "app-server", "--stdio"],
+          [...prefix, ...codexHome.args, "app-server", "--stdio"],
           {
             cwd: root,
-            env: process.env,
+            env: codexHome.env,
             stdio: ["pipe", "pipe", "pipe"],
           },
         ));
@@ -351,7 +353,7 @@ export class CodexRuntime {
       const account = await this.rpc("account/read", {});
       if (account.requiresOpenaiAuth && !account.account)
         throw new Error(
-          "Sign in with codex login before connecting Canvasdoc.",
+          "Run npx canvasdoc-cli for this folder to sign in to its private Codex home.",
         );
       try {
         let cursor: string | null = null;
@@ -389,6 +391,16 @@ export class CodexRuntime {
       return this.config;
     } catch (error) {
       await this.close();
+      const writer =
+        error instanceof Error &&
+        /^thread (\S+) already has an active writer$/.exec(error.message);
+      if (writer)
+        throw new Error(
+          `Codex thread ${writer[1]} is already open in another app. ` +
+            "Fully quit ChatGPT or the Codex client holding this thread, then start Canvasdoc again. " +
+            "Closing its window may leave it running in the background.",
+          { cause: error },
+        );
       throw error;
     }
   }

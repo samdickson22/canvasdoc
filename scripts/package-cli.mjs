@@ -12,6 +12,7 @@ await copyFile('companion/vendor/harness-codex/LICENSE', `${out}/HARNESS-LICENSE
 for (const file of ['canvasdoc.mjs', 'setup.mjs', 'native-setup.mjs']) {
   await build({
     entryPoints: [`cli/${file}`],
+    bundle: true,
     outfile: `${out}/${file}`,
     platform: 'node',
     format: 'esm',

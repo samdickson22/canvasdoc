@@ -1,8 +1,8 @@
 # Canvasdoc
 
-Run `npx canvasdoc-cli` to choose a Canvasdoc folder and Canvas URL, reuse your Codex sign-in, and start the local connector. Keep the terminal open while working. Later runs remember the folder and resume the same main agent.
+Run `npx canvasdoc-cli` to choose a Canvasdoc folder and Canvas URL, sign in to Codex for that folder, and start the local connector. Keep the terminal open while working. Later runs remember the folder and resume the same main agent.
 
-Requires Node.js 22.13 or later. Uses an existing Codex CLI when available and includes Codex as a fallback. Sign-in runs only when Codex reports no active login. Existing `CODEX_HOME` settings are inherited.
+Requires Node.js 22.13 or later. Uses an existing Codex CLI when available and includes Codex as a fallback. Sign-in runs only when the folder's private Codex home has no active login.
 
 Canvasdoc is in early development. The Canvasdoc browser UI must already be installed on your Canvas site. This package does not install a browser extension or modify your school's Canvas deployment. Automatic browser pairing supports the development UI on macOS and Linux. On macOS, pass `--extension-id <id>` to register the installed extension with the native host.
 
@@ -13,6 +13,8 @@ npx canvasdoc-cli --help
 ```
 
 Settings live in `~/.config/canvasdoc/settings.json`. Files and automatic recovery exports live in the chosen folder. Browser storage remains primary for chats, drafts, and tasks. The connector does not upload your folder to a hosted sandbox.
+
+Each workspace uses `.canvasdoc/codex-home/` for Codex sessions, sign-in, and settings. The launcher and companion override inherited `CODEX_HOME` and `CODEX_SQLITE_HOME` for their Codex processes. Canvasdoc's threads stay out of the desktop app's default history, so ChatGPT can remain open. Materials, outputs, and `.agents/skills/` stay in the workspace. Skills and settings installed only in your personal Codex home are separate.
 
 A missing remembered folder causes an error rather than creating a replacement. Restore the folder to its original location to resume. For a moved folder, run `npx canvasdoc-cli --folder /new/location --relocate` to preserve its workspace identity and resume its existing agent.
 

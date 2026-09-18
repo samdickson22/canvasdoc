@@ -17,7 +17,7 @@ One persistent Codex agent works across these conversations and shares the selec
 ## Requirements and current limits
 
 - macOS, Google Chrome, and Node.js 22.13 or later. Native bridge installation is currently macOS-only.
-- A Codex sign-in. The launcher reuses an existing installation and sign-in, includes a fallback Codex binary, and starts the login flow when needed.
+- A Codex sign-in for your Canvasdoc folder. The launcher reuses an existing Codex installation, includes a fallback binary, and starts the login flow when needed.
 - A supported Canvas origin. The current extension is configured for Cal Poly's `https://canvas.calpoly.edu` and development origins; it is not yet a general installation for every Canvas school.
 
 Canvasdoc uses your signed-in Canvas browser session, so no Canvas API token is needed. The companion runs on your machine and uses your Codex provider access; Canvasdoc does not host inference. Local execution does not mean the model runs offline: prompts and supplied materials are sent through the configured provider.
@@ -45,6 +45,8 @@ On first run, choose a Canvasdoc workspace folder when prompted. The repository 
 Keep the terminal running, then open Canvas. The launcher installs Chrome's native bridge in Canvasdoc's Application Support directory. No sudo or manual extension-ID copying is needed.
 
 Both scripts install dependencies from the lockfile when needed. `start.sh` packages and runs the companion from the current checkout. Use `./start.sh --help` for options, including `--no-open`, `--folder`, `--origin`, and `--relocate`.
+
+Each workspace uses `.canvasdoc/codex-home/` for Codex sessions, sign-in, and settings. Canvasdoc's threads stay out of the desktop app's default history, so ChatGPT can remain open. First use requires signing in for that folder. Materials, outputs, and bundled or learned skills remain in the workspace; skills and settings installed only in your personal Codex home are separate.
 
 ## Update
 

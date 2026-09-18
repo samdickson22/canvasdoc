@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import path from 'node:path';
 import { canvasOrigin, readSettings, selectRoot, saveSettings } from './setup.mjs';
+import { prepareCodexHome } from '../companion/codex-home.ts';
 
 const args = process.argv.slice(2);
 const help = `Canvasdoc\n\nUsage: npx canvasdoc-cli [--folder PATH] [--origin URL] [--no-open] [--relocate]\n\nFirst run chooses a folder and Canvas URL. Later runs resume the same agent.\nKeep this terminal open while using Canvasdoc. Chat attachments support files up to 5 MB. Node.js 22.13 or later is required.\nThe Canvasdoc browser extension or development UI must already be installed.
@@ -52,30 +53,30 @@ async function main() {
     }
     origin = canvasOrigin(options.origin || saved?.origin || await ask('Canvas URL', process.env.CANVASDOC_DEV_ORIGIN));
   } finally { rl?.close(); }
-  // Inherit CODEX_HOME and the user's existing credentials; never copy auth files.
+  const codexHome = await prepareCodexHome(root);
   let bin = process.env.CANVASDOC_CODEX_BIN || 'codex';
   let prefix = [];
-  const probe = spawnSync(bin, ['--version'], { stdio: 'ignore' });
+  const probe = spawnSync(bin, ['--version'], { env: codexHome.env, stdio: 'ignore' });
   if (probe.error?.code === 'ENOENT' && !process.env.CANVASDOC_CODEX_BIN) {
     bin = process.execPath;
     prefix = [createRequire(import.meta.url).resolve('@openai/codex/bin/codex.js')];
   } else if (probe.error || probe.status !== 0) throw new Error('Unable to start Codex. Check CANVASDOC_CODEX_BIN or your Codex installation.');
   if (prefix.length) {
-    const bundled = spawnSync(bin, [...prefix, '--version'], { stdio: 'ignore' });
+    const bundled = spawnSync(bin, [...prefix, '--version'], { env: codexHome.env, stdio: 'ignore' });
     if (bundled.error || bundled.status !== 0) throw new Error('The bundled Codex could not start. Install Codex for your platform and rerun npx canvasdoc-cli.');
   }
-  const status = spawnSync(bin, [...prefix, 'login', 'status'], { cwd: root, stdio: 'ignore' });
+  const status = spawnSync(bin, [...prefix, ...codexHome.args, 'login', 'status'], { cwd: root, env: codexHome.env, stdio: 'ignore' });
   if (status.status !== 0) {
-    console.log('Codex needs sign-in. Opening its login flow.');
-    const login = spawnSync(bin, [...prefix, 'login'], { cwd: root, stdio: 'inherit' });
+    console.log('Sign in to Codex for this Canvasdoc folder. Opening its login flow.');
+    const login = spawnSync(bin, [...prefix, ...codexHome.args, 'login'], { cwd: root, env: codexHome.env, stdio: 'inherit' });
     if (login.status !== 0) throw new Error('Codex sign-in did not finish. Run npx canvasdoc-cli again when ready.');
-  } else console.log('Using your existing Codex sign-in.');
+  } else console.log('Using this Canvasdoc folder\'s Codex sign-in.');
     const port = Number(process.env.CANVASDOC_CONNECTOR_PORT || 3218);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid connector port.');
   const extensionId = options['extension-id'] || saved?.extensionId;
   const child = spawn(process.execPath, [fileURLToPath(new URL('./connector.mjs', import.meta.url)), root], {
     cwd: root,
-    env: { ...process.env, CANVASDOC_DEV_ORIGIN: origin, CANVASDOC_CODEX_BIN: bin, CANVASDOC_CODEX_PREFIX: JSON.stringify(prefix), CANVASDOC_RELOCATE: options.relocate ? '1' : '' },
+    env: { ...codexHome.env, CANVASDOC_DEV_ORIGIN: origin, CANVASDOC_CODEX_BIN: bin, CANVASDOC_CODEX_PREFIX: JSON.stringify(prefix), CANVASDOC_RELOCATE: options.relocate ? '1' : '' },
     stdio: ['ignore', 'pipe', 'inherit'],
   });
   child.on('error', error => { console.error(error.message); process.exitCode = 1; });
