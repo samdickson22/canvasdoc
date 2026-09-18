@@ -95,6 +95,13 @@ export function presentMessage(message: SavedMessage): ThreadMessageLike {
 
 const compact = (text: string) =>
   text.replace(/\s+/g, " ").trim().slice(0, 100);
+const reasoningHeading = (part: Extract<DisplayPart, { type: "reasoning" }>) => {
+  const section = part.providerMetadata?.canvasdoc?.reasoningSummary;
+  const text = typeof section === "string" ? section : part.text;
+  const headings = [...text.matchAll(/^(?:\*\*([^\n]+?)\*\*|#{1,6}\s+([^\n]+))\s*$/gm)];
+  const latest = headings.at(-1);
+  return compact(latest?.[1] ?? latest?.[2] ?? text.split("\n").find(line => line.trim())?.replace(/^[#*\s]+|[*\s]+$/g, "") ?? "");
+};
 const toolCategory = (part: Extract<DisplayPart, { type: "tool-call" }>) => {
   const actions = part.providerMetadata?.canvasdoc?.commandActions;
   if (Array.isArray(actions) && actions.length) {
@@ -138,10 +145,11 @@ export function summarizeActivity(
   );
   const active = tools.filter((p) => p.result === undefined && !p.isError);
   const latestActivity = parts.at(-1);
+  if (running && latestActivity?.type === "text" &&
+      (latestActivity.phase === "final_answer" || latestActivity.providerMetadata?.canvasdoc?.work === false))
+    return "Writing response";
   if (running && latestActivity?.type === "reasoning") {
-    const heading = latestActivity.text.split("\n").find(s => s.trim())
-      ?.replace(/^[#*\s]+|[*\s]+$/g, "");
-    return heading ? compact(heading) : "Thinking";
+    return reasoningHeading(latestActivity) || "Thinking";
   }
   if (running && latestActivity?.type === "tool-call") {
     const tool = active.at(-1) ?? latestActivity;
@@ -167,10 +175,7 @@ export function summarizeActivity(
         p.type === "reasoning",
     );
     const last = reasoning[reasoning.length - 1];
-    const heading = last?.text
-      .split("\n")
-      .find((s) => s.trim())
-      ?.replace(/^[#*\s]+|[*\s]+$/g, "");
+    const heading = last && reasoningHeading(last);
     const latestTool = parts.reduce((last, p, i) => p.type === "tool-call" ? i : last, -1);
     const latestReasoning = parts.reduce((last, p, i) => p.type === "reasoning" && p.text.trim() ? i : last, -1);
     return heading && (!running || latestReasoning > latestTool)

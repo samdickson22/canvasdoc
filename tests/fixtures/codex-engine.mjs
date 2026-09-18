@@ -180,6 +180,45 @@ export async function serve(mode, threadId) {
         emit({ id: m.id, result });
         continue;
       }
+      if (scenario === "reasoning-sections") {
+        const item = { type: "reasoning", id: "reasoning-" + id, summary: [], content: [] };
+        active.items.push(item);
+        const summary = (summaryIndex, text) => {
+          item.summary[summaryIndex] = (item.summary[summaryIndex] ?? "") + text;
+          emit({ method: "item/reasoning/summaryTextDelta", params: {
+            threadId, turnId: active.id, itemId: item.id, summaryIndex, delta: text,
+          } });
+        };
+        later(() => emit({ method: "item/started", params: { threadId, turnId: active.id, item } }), 50);
+        later(() => summary(0, "**Exploring substitution**"), 100);
+        later(() => {
+          emit({ method: "item/reasoning/summaryPartAdded", params: { threadId, turnId: active.id, itemId: item.id, summaryIndex: 1 } });
+          summary(1, "**Rewriting integral");
+        }, 250);
+        later(() => summary(1, " using identities**"), 400);
+        const command = { type: "commandExecution", id: "command-" + id, command: "node check.mjs",
+          commandActions: [], status: "inProgress", aggregatedOutput: "", exitCode: null };
+        later(() => {
+          active.items.push(command);
+          emit({ method: "item/started", params: { threadId, turnId: active.id, item: command } });
+        }, 450);
+        later(() => {
+          command.status = "completed";
+          command.exitCode = 0;
+          emit({ method: "item/completed", params: { threadId, turnId: active.id, item: command } });
+          const next = { type: "reasoning", id: "checking-" + id, summary: ["**Checking result**"], content: [] };
+          active.items.push(next);
+          emit({ method: "item/started", params: { threadId, turnId: active.id, item: next } });
+        }, 550);
+        later(() => {
+          emit({ method: "item/completed", params: { threadId, turnId: active.id, item } });
+          active.items.push({ type: "agentMessage", id: "final-" + id, phase: "final_answer", text: "" });
+          emit({ method: "item/started", params: { threadId, turnId: active.id, item: active.items.at(-1) } });
+          finish("completed", "Synthetic answer");
+        }, 650);
+        emit({ id: m.id, result });
+        continue;
+      }
       later(() => delta("Synthetic streaming started.\n"), 100);
       if (scenario === "crash") later(() => process.exit(1), 500);
       else if (scenario === "fail") later(() => finish("failed", ""), 500);

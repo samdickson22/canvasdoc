@@ -22,8 +22,8 @@ export function LiveActivity({ hasQueuedMessages = false }: { hasQueuedMessages?
   const run = useAuiState(s => s.message.metadata.custom.run);
   if (!run && hasQueuedMessages) return null;
   const last = parts.at(-1);
-  // The last activity group owns the live row once reasoning or tools arrive.
-  if (last?.type === "reasoning" || last?.type === "tool-call") return null;
+  // WorkHistory owns the status while a work group is present.
+  if (parts.some(part => "providerMetadata" in part && part.providerMetadata?.canvasdoc?.work)) return null;
   const label = !run ? "Waiting for agent" : last?.type === "text" && last.providerMetadata?.canvasdoc?.work === false
     ? "Writing response"
     : summarizeActivity(parts, true);
@@ -67,57 +67,21 @@ export function WorkHistory({
   const outcome =
     run?.status === "error" ? "Failed" : failed ? "Stopped" : "Worked";
   const label = `${outcome}${duration ? ` ${failed ? "after" : "for"} ${duration}` : ""}${tools.length ? ` · ${summarizeActivity(tools)}` : ""}`;
-  return (
+  return <>
+    {running && <div className="chat-run-heading">Working{duration ? ` for ${duration}` : "…"}</div>}
     <ToolGroupRoot
       variant="ghost"
       className="chat-work-history"
-      open={running || (expanded ?? failed)}
+      open={expanded ?? failed}
       onOpenChange={setExpanded}
     >
-      {running ? (
-        <div className="chat-run-heading" role="status">
-          Working{duration ? ` for ${duration}` : "…"}
-        </div>
-      ) : (
-        <ToolGroupTrigger count={tools.length} label={label} />
-      )}
+      <ToolGroupTrigger count={tools.length} active={running}
+        label={running ? summarizeActivity(message.parts as readonly DisplayPart[], true) : label} />
       <ToolGroupContent className="chat-work-content">
         {children}
       </ToolGroupContent>
     </ToolGroupRoot>
-  );
-}
-
-export function ActivityGroup({
-  children,
-  indices,
-  running,
-}: PropsWithChildren<{ indices: readonly number[]; running: boolean }>) {
-  const parts = useAuiState((s) => s.message.parts);
-  const messageRunning = useAuiState((s) => s.message.status?.type === "running");
-  const active = messageRunning && (running || indices.includes(parts.length - 1));
-  const selected = indices
-    .map((i) => parts[i])
-    .filter(Boolean) as DisplayPart[];
-  const hasFailure = selected.some((p) => p.type === "tool-call" && p.isError);
-  const [expanded, setExpanded] = useState<boolean | undefined>();
-  return (
-    <ToolGroupRoot
-      variant="ghost"
-      className="chat-activity-group"
-      open={expanded ?? hasFailure}
-      onOpenChange={setExpanded}
-    >
-      <ToolGroupTrigger
-        count={selected.length}
-        active={active}
-        label={summarizeActivity(selected, active)}
-      />
-      <ToolGroupContent className="chat-activity-content">
-        {children}
-      </ToolGroupContent>
-    </ToolGroupRoot>
-  );
+  </>;
 }
 
 export function ActivityTool(props: ToolCallMessagePartProps) {

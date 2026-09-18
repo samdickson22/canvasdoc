@@ -30,8 +30,7 @@ import { MarkdownText } from "./markdown-text";
 import { hasFileDrop, readDroppedFiles } from "../../../../runtime/dropped-files";
 import { CodexModelSelector } from "../../../../model-selector";
 
-import { WorkHistory, ActivityGroup, ActivityTool, RunData, RunOutcome, LiveActivity } from "./run-activity";
-import { Reasoning } from "./reasoning.aui";
+import { WorkHistory, ActivityTool, RunData, RunOutcome, LiveActivity } from "./run-activity";
 import { attachmentWorkspaceHref, type AttachmentUploadState } from "../../../../runtime/attachments";
 import { WorkspaceLink } from "../../../../workspace-link";
 import { SelectionQuote, ComposerQuote, AttachmentPreview, QueuedMessages, type QueuedMessage } from "./chat-extras";
@@ -373,15 +372,13 @@ const AssistantMessage: FC = () => {
         <MessagePrimitive.GroupedParts indicator="always" groupBy={(part) => {
           const work = "providerMetadata" in part && part.providerMetadata?.canvasdoc?.work;
           const groups: `group-${string}`[] = work ? ["group-work"] : [];
-          if (part.type === "reasoning" || part.type === "tool-call") groups.push("group-activity");
           return groups;
         }}>
           {({ part, children }) => {
             switch (part.type) {
               case "group-work": return <WorkHistory indices={part.indices}>{children}</WorkHistory>;
-              case "group-activity": return <ActivityGroup indices={part.indices} running={part.status.type === "running"}>{children}</ActivityGroup>;
               case "text": return <MarkdownText />;
-              case "reasoning": return part.text ? <div className="chat-reasoning-summary"><Reasoning {...part} /></div> : null;
+              case "reasoning": return null;
               case "tool-call": return part.toolUI ?? <ActivityTool {...part} />;
               case "data": return <RunData part={part} />;
               case "indicator": return <LiveActivity hasQueuedMessages={!!queuedMessages?.length} />;

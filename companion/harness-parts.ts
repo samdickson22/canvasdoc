@@ -9,12 +9,17 @@ export function displayParts(
     message.parts.flatMap((part): DisplayPart[] => {
       if (part.type === "text" || part.type === "reasoning") {
         const native = part.metadata?.provider?.codex as
-          { phase?: string } | undefined;
+          { phase?: string; summary?: string[] } | undefined;
         return [
           {
             type: part.type,
             text: part.text,
             itemId: message.id,
+            ...(part.type === "reasoning" && native?.summary
+              ? { providerMetadata: { canvasdoc: {
+                  reasoningSummary: native.summary.filter(section => section.trim()).at(-1) ?? "",
+                } } }
+              : {}),
             ...(native?.phase === "commentary" ||
             native?.phase === "final_answer"
               ? { phase: native.phase }
