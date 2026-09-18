@@ -30,9 +30,13 @@ export type WorkspaceConfig = {
   version: 1;
   workspaceId: string;
   root: string;
-  runtimeThreadId?: string;
-  runtimeStartedTurn?: boolean;
 };
+function hasHistory(snapshot?: CodexTransport.Snapshot) {
+  return Boolean(snapshot && (
+    Object.keys(snapshot.submissions).length ||
+    Object.values(snapshot.threads).some(thread => thread.turns.length)
+  ));
+}
 export async function atomicJson(file: string, data: unknown) {
   const temp = `${file}.${randomUUID()}.tmp`;
   try {
@@ -70,6 +74,12 @@ export class CodexRuntime {
   }
   get connected() {
     return this.transport.connection?.status === "connected";
+  }
+  get runtimeThreadId() {
+    return this.snapshot().activeThreadId;
+  }
+  get hasHistory() {
+    return hasHistory(this.snapshot());
   }
   get error() {
     return this.snapshot().error;
@@ -116,7 +126,8 @@ export class CodexRuntime {
       const codexHome = await prepareCodexHome(root);
       const configPath = path.join(dir, "config.json");
       try {
-        this.config = JSON.parse(await readFile(configPath, "utf8"));
+        const saved = JSON.parse(await readFile(configPath, "utf8"));
+        this.config = { version: saved.version, workspaceId: saved.workspaceId, root: saved.root };
         if (
           this.config.version !== 1 ||
           !this.config.workspaceId ||
@@ -139,7 +150,6 @@ export class CodexRuntime {
           version: 1,
           workspaceId: randomUUID(),
           root,
-          runtimeStartedTurn: false,
         };
         await atomicJson(configPath, this.config);
       }
@@ -211,9 +221,11 @@ export class CodexRuntime {
         ),
       };
       let initialState: CodexTransport.Snapshot | undefined;
+      const snapshotPath = path.join(codexHome.home, "harness.json");
+      this.turnSettings = {};
       try {
         const saved = JSON.parse(
-          await readFile(path.join(dir, "harness.json"), "utf8"),
+          await readFile(snapshotPath, "utf8"),
         );
         if (
           saved.version !== 1 ||
@@ -229,33 +241,11 @@ export class CodexRuntime {
           throw new Error(
             "Harness recovery state belongs to a different workspace.",
           );
-        // The snapshot commits before dispatch and is authoritative for native identity.
-        // A crash may occur before the compatibility config write completes.
-        if (initialState!.activeThreadId)
-          this.config.runtimeThreadId = initialState!.activeThreadId;
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       }
-      // Only an explicitly unused legacy session may be replaced if its rollout is absent.
-      if (
-        !initialState &&
-        this.config.runtimeThreadId &&
-        this.config.runtimeStartedTurn === false
-      )
-        initialState = {
-          activeThreadId: this.config.runtimeThreadId,
-          threads: {
-            [this.config.runtimeThreadId]: {
-              id: this.config.runtimeThreadId,
-              turns: [],
-            },
-          },
-          completed: [],
-          queue: [],
-          submissions: {},
-          runId: null,
-          error: null,
-        };
+      let savedThreadId = initialState?.activeThreadId;
+      let savedHasHistory = hasHistory(initialState);
       const owner = this;
       const resource = CodexTransport({
         threadId: this.config.workspaceId,
@@ -264,7 +254,6 @@ export class CodexRuntime {
           reconnectMs: false,
           requestTimeoutMs: 60000,
         }),
-        codexThreadId: this.config.runtimeThreadId,
         initialState,
         session: options as CodexProtocol.ThreadStartParams,
         resume: options as CodexProtocol.ThreadResumeParams,
@@ -281,26 +270,20 @@ export class CodexRuntime {
         save: async (snapshot) => {
           if (
             snapshot.activeThreadId &&
-            this.config.runtimeThreadId &&
-            snapshot.activeThreadId !== this.config.runtimeThreadId &&
-            this.config.runtimeStartedTurn !== false
+            savedThreadId &&
+            snapshot.activeThreadId !== savedThreadId &&
+            savedHasHistory
           )
             throw new Error("Runtime returned a different thread on resume.");
           // This write is the durable admission boundary before native execution.
-          await atomicJson(path.join(dir, "harness.json"), {
+          await atomicJson(snapshotPath, {
             version: 1,
             workspaceId: this.config.workspaceId,
             snapshot,
             turnSettings: this.turnSettings,
           });
-          if (
-            (snapshot.activeThreadId ||
-              this.config.runtimeStartedTurn === false) &&
-            this.config.runtimeThreadId !== snapshot.activeThreadId
-          ) {
-            this.config.runtimeThreadId = snapshot.activeThreadId;
-            await atomicJson(configPath, this.config);
-          }
+          savedThreadId = snapshot.activeThreadId;
+          savedHasHistory = hasHistory(snapshot);
         },
         onEvent: (event) => {
           if (event.type === "notification") {
@@ -387,7 +370,6 @@ export class CodexRuntime {
         (m) => m.id === this.currentModel,
       )?.defaultEffort;
       await this.transport.flush();
-      await atomicJson(configPath, this.config);
       return this.config;
     } catch (error) {
       await this.close();
@@ -417,14 +399,6 @@ export class CodexRuntime {
       throw new Error(
         "This reasoning effort is not supported by the selected model.",
       );
-    if (this.config.runtimeStartedTurn !== true) {
-      const config = { ...this.config, runtimeStartedTurn: true };
-      await atomicJson(
-        path.join(this.config.root, ".canvasdoc", "config.json"),
-        config,
-      );
-      Object.assign(this.config, config);
-    }
     this.turnSettings[requestId] = {
       ...(model ? { model } : {}),
       ...(effort ? { effort } : {}),
@@ -549,6 +523,7 @@ export class CodexRuntime {
     );
     return {
       runs,
+      runtimeThreadId: snapshot.activeThreadId,
       connected: this.connected,
       error: snapshot.error,
       approvals: this.client.requests.map((request) => ({

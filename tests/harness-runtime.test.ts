@@ -118,6 +118,7 @@ test(
       );
       const pid = Number(await readFile(path.join(root, "child.pid"), "utf8"));
       const hanging = assert.rejects(runtime.rpc("test/hang"), /unmounted/);
+      const threadId = runtime.runtimeThreadId;
       await runtime.close();
       await hanging;
       assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
@@ -125,7 +126,7 @@ test(
       runtime = new CodexRuntime(root, process.execPath);
       const resumed = await runtime.start();
       assert.equal(resumed.workspaceId, config.workspaceId);
-      assert.equal(resumed.runtimeThreadId, config.runtimeThreadId);
+      assert.equal(runtime.runtimeThreadId, threadId);
       const fresh = nextEvent(runtime, approvalMethod);
       await runtime.send("again", "request-2");
       const freshId = (await fresh).id!;

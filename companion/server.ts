@@ -73,10 +73,10 @@ try {
 }
 const identity = new WorkspaceAccount(stateDir, config.workspaceId);
 await identity.load();
-const unboundHasWork = Boolean(config.runtimeStartedTurn !== false || runs.length || Object.keys(receipts).length);
+const unboundHasWork = Boolean(runtime.hasHistory || runs.length || Object.keys(receipts).length);
 const clients = new Set<WebSocket>();
 let runtimeAvailable = runtime.connected;
-let runtimeThreadId = config.runtimeThreadId;
+let runtimeThreadId = runtime.runtimeThreadId;
 let approvals = runtime.view().approvals;
 const admitting = new Set<string>();
 let persistence = Promise.resolve();
@@ -124,9 +124,9 @@ function scheduleView() {
   eventQueue = eventQueue.then(async () => {
     scheduled = false;
     const view = runtime.view();
-    if (runtimeAvailable !== view.connected || runtimeThreadId !== config.runtimeThreadId) {
+    if (runtimeAvailable !== view.connected || runtimeThreadId !== view.runtimeThreadId) {
       runtimeAvailable = view.connected;
-      runtimeThreadId = config.runtimeThreadId;
+      runtimeThreadId = view.runtimeThreadId;
       broadcast({ type: "runtime-status", connected: runtimeAvailable, runtimeThreadId,
         message: runtimeAvailable ? undefined : "Codex disconnected. Reconnect the agent to reconcile its history." });
     }
@@ -218,7 +218,7 @@ wss.on("connection", (socket, request) => {
               workspace: {
                 workspaceId: config.workspaceId,
                 root: config.root,
-                runtimeThreadId: config.runtimeThreadId,
+                runtimeThreadId: runtime.runtimeThreadId,
               },
               runs,
               models: runtime.models,
@@ -433,7 +433,7 @@ server.listen(port, "127.0.0.1", () =>
       ready: true,
       port,
       root: config.root,
-      runtimeThreadId: config.runtimeThreadId,
+      runtimeThreadId: runtime.runtimeThreadId,
       tokenFile,
     }),
   ),

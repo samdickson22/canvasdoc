@@ -31,12 +31,13 @@ uncertain-outcome reconciliation, stop, input requests, child history, and nativ
 message projection. The custom stdio connection preserves executable prefixes and
 waits for child exit before releasing the workspace lock.
 
-`.canvasdoc/harness.json` stores versioned atomic execution snapshots and
+`.canvasdoc/codex-home/harness.json` stores versioned atomic execution snapshots and
 per-request model choices. Browser storage still owns conversations, drafts, and
 personal tasks. `.canvasdoc/delivery.json` maps requests to conversations and
 tracks browser delivery receipts; it does not dispatch a second execution queue.
-Existing used sessions attach by their saved native thread ID and hydrate native
-history. A missing used session fails recovery instead of creating another agent.
+The private home's snapshot owns native thread identity and recovery. Workspace
+configuration stores only the workspace identity and location. A missing used
+session inside the private home fails recovery instead of creating another agent.
 
 The browser keeps its existing authenticated companion connection. Statewire
 provides the local transport state; no HTTP host, remote database, or hosted

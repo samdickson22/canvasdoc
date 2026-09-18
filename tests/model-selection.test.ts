@@ -59,7 +59,7 @@ test(
       assert.ok(
         calls.every(
           (c) =>
-            c.threadId === runtime.config.runtimeThreadId &&
+            c.threadId === runtime.runtimeThreadId &&
             c.cwd === runtime.config.root,
         ),
       );

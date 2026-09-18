@@ -37,6 +37,15 @@ test("packaged launcher signs in and starts Codex in the same private home acros
   const external = path.join(temp, "desktop-home");
   await mkdir(root);
   await mkdir(external);
+  await mkdir(path.join(root, ".canvasdoc"));
+  const oldConfig = JSON.stringify({ version: 1, root, workspaceId: "existing-workspace",
+    runtimeThreadId: "missing-global-thread", runtimeStartedTurn: true });
+  const oldSnapshot = JSON.stringify({ version: 1, workspaceId: "existing-workspace", snapshot: {
+    activeThreadId: "missing-global-thread", threads: {}, queue: [], submissions: {},
+    completed: [], runId: null, error: null,
+  } });
+  await writeFile(path.join(root, ".canvasdoc/config.json"), oldConfig);
+  await writeFile(path.join(root, ".canvasdoc/harness.json"), oldSnapshot);
   await writeFile(path.join(external, "sentinel"), "unchanged");
   const log = path.join(temp, "calls.jsonl");
   const bin = path.join(temp, "codex-fixture.mjs");
@@ -108,5 +117,8 @@ else if (args.includes('login')) {
   assert.equal(calls.filter(c => c.args.includes("login") && !c.args.includes("status")).length, 1);
   assert.equal(calls.filter(c => c.args.includes("app-server")).length, 2);
   assert.equal(await readFile(path.join(external, "sentinel"), "utf8"), "unchanged");
+  assert.equal(await readFile(path.join(root, ".canvasdoc/config.json"), "utf8"), oldConfig);
+  assert.equal(await readFile(path.join(root, ".canvasdoc/harness.json"), "utf8"), oldSnapshot);
+  assert.ok(!(await readFile(path.join(root, "rpc.jsonl"), "utf8")).includes("missing-global-thread"));
   assert.match(await readFile(path.join(root, ".agents/skills/unslop/SKILL.md"), "utf8"), /name: unslop/);
 });

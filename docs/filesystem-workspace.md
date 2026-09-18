@@ -8,6 +8,8 @@ One main Codex agent runs from that root through Harness SDK. Assignment directo
 
 The agent's working directory is the selected workspace. Its `CODEX_HOME` is the private `.canvasdoc/codex-home/` directory within that workspace. Sign-in, native sessions, and Codex settings live there, separate from the desktop app's default home. The launcher and companion also keep SQLite-backed Codex state in that private directory. They do not copy credentials or change the desktop app's configuration.
 
+`config.json` under `.canvasdoc/` owns the workspace identity and location. The private home's `harness.json` owns the native thread ID, execution snapshot, and per-request model settings. A fresh private home starts a fresh agent; saved thread IDs and execution snapshots outside that home are not loaded. Browser conversations, delivery receipts, files, and workspace skills keep their existing locations.
+
 ## Agent guidance and learned skills
 
 The companion loads [AGENT.md](../companion/AGENT.md) as the coursework agent's developer instructions on startup and recovery. This is separate from the repository's development instructions and does not overwrite a user's workspace `AGENTS.md`.

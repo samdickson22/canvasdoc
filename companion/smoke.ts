@@ -44,7 +44,7 @@ try {
     JSON.stringify({
       phase: "started",
       workspaceId: first.workspaceId,
-      threadId: first.runtimeThreadId,
+      threadId: runtime.runtimeThreadId,
     }),
   );
   const marker = `canvasdoc-${randomUUID()}`;
@@ -54,11 +54,11 @@ try {
   );
   const written = (await readFile(path.join(root, "proof.txt"), "utf8")).trim();
   if (written !== marker) throw new Error("File proof did not match.");
-  const id = first.runtimeThreadId;
+  const id = runtime.runtimeThreadId;
   await runtime.close();
   runtime = new CodexRuntime(root);
-  const resumed = await runtime.start();
-  if (resumed.runtimeThreadId !== id)
+  await runtime.start();
+  if (runtime.runtimeThreadId !== id)
     throw new Error("Main thread identity changed.");
   const answer = await turn(
     runtime,

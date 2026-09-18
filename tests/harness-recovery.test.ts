@@ -27,65 +27,42 @@ async function workspace(t: any) {
   });
   return root;
 }
-test("migrates a used legacy session from native history without replay or a new agent", async (t) => {
+test("private home ignores the old thread and queue while preserving workspace data", async (t) => {
   const root = await workspace(t);
   await mkdir(path.join(root, ".canvasdoc"));
-  const threadId = "lifecycle-persistent-session";
-  await writeFile(
-    path.join(root, ".canvasdoc/config.json"),
-    JSON.stringify({
-      version: 1,
-      workspaceId: "legacy-workspace",
-      root,
-      runtimeThreadId: threadId,
-      runtimeStartedTurn: true,
-    }),
-  );
-  await writeFile(
-    path.join(root, "native-state.json"),
-    JSON.stringify({
-      id: threadId,
-      historyMode: "legacy",
-      status: { type: "idle" },
-      turns: [
-        {
-          id: "legacy-turn",
-          status: "completed",
-          itemsView: "full",
-          error: null,
-          items: [
-            {
-              id: "legacy-user",
-              type: "userMessage",
-              clientId: "legacy-request",
-              content: [
-                { type: "text", text: "legacy input", text_elements: [] },
-              ],
-            },
-            {
-              id: "legacy-reply",
-              type: "agentMessage",
-              text: "Recovered original response",
-            },
-          ],
-        },
-      ],
-    }),
-  );
-  const runtime = new CodexRuntime(root, process.execPath);
+  const configPath = path.join(root, ".canvasdoc/config.json");
+  const oldConfig = JSON.stringify({version: 1, workspaceId: "existing-workspace", root,
+    runtimeThreadId: "missing-global-thread", runtimeStartedTurn: true});
+  const oldSnapshot = JSON.stringify({version: 1, workspaceId: "existing-workspace", snapshot: {
+    activeThreadId: "missing-global-thread", threads: {},
+    queue: [{message: {id: "never-replay-old-work", text: "Old queued work"}}],
+    submissions: {}, completed: [], runId: null, error: null,
+  }});
+  await writeFile(configPath, oldConfig);
+  await writeFile(path.join(root, ".canvasdoc/harness.json"), oldSnapshot);
+  await writeFile(path.join(root, "material.txt"), "Saved coursework");
+  let runtime = new CodexRuntime(root, process.execPath);
   try {
     await runtime.start();
-    assert.equal(runtime.config.runtimeThreadId, threadId);
-    assert.equal(runtime.view().runs["legacy-request"].status, "completed");
-    assert.equal(
-      runtime.view().runs["legacy-request"].messages[0].parts[0].type,
-      "text",
-    );
-    await assert.rejects(readFile(path.join(root, "executions.jsonl")), {
-      code: "ENOENT",
-    });
+    assert.equal(runtime.config.workspaceId, "existing-workspace");
+    assert.equal(runtime.runtimeThreadId, undefined);
+    assert.equal(runtime.hasHistory, false);
+    await assert.rejects(readFile(path.join(root, "executions.jsonl")), {code: "ENOENT"});
+    await runtime.send("SCENARIO:complete", "new-private-request");
+    const threadId = runtime.runtimeThreadId;
+    assert.equal(threadId, "lifecycle-persistent-session");
+    await runtime.close();
+    runtime = new CodexRuntime(root, process.execPath);
+    await runtime.start();
+    assert.equal(runtime.runtimeThreadId, threadId);
+    assert.equal(runtime.hasHistory, true);
+    assert.equal((await readFile(path.join(root, "executions.jsonl"), "utf8")).trim().split("\n").length, 1);
+    assert.equal(await readFile(configPath, "utf8"), oldConfig);
+    assert.equal(await readFile(path.join(root, ".canvasdoc/harness.json"), "utf8"), oldSnapshot);
+    assert.equal(await readFile(path.join(root, "material.txt"), "utf8"), "Saved coursework");
     const log = await readFile(path.join(root, "rpc.jsonl"), "utf8");
-    assert.ok(!log.includes('"thread/start"'));
+    assert.ok(!log.includes("missing-global-thread"));
+    assert.ok(!log.includes("never-replay-old-work"));
   } finally {
     await runtime.close();
   }
@@ -94,7 +71,7 @@ test("a snapshot write failure blocks execution and still releases the process a
   const root = await workspace(t);
   const runtime = new CodexRuntime(root, process.execPath);
   await runtime.start();
-  const snapshot = path.join(root, ".canvasdoc/harness.json");
+  const snapshot = path.join(root, ".canvasdoc/codex-home/harness.json");
   await rename(snapshot, snapshot + ".backup");
   await mkdir(snapshot);
   await assert.rejects(
@@ -137,26 +114,22 @@ test("an unconfirmed lost response stays blocked after restart instead of being 
   }
 });
 
-test("a used legacy session cannot silently resume as another native thread", async (t) => {
+test("a used private session cannot silently resume as another native thread", async (t) => {
   const root = await workspace(t);
-  await mkdir(path.join(root, ".canvasdoc"));
-  await writeFile(
-    path.join(root, ".canvasdoc/config.json"),
-    JSON.stringify({
-      version: 1,
-      workspaceId: "legacy-workspace",
-      root,
-      runtimeThreadId: "different-used-session",
-      runtimeStartedTurn: true,
-    }),
-  );
+  await mkdir(path.join(root, ".canvasdoc/codex-home"), {recursive: true});
+  await writeFile(path.join(root, ".canvasdoc/config.json"), JSON.stringify({
+    version: 1, workspaceId: "existing-workspace", root,
+  }));
+  const snapshotPath = path.join(root, ".canvasdoc/codex-home/harness.json");
+  const threadId = "different-used-session";
+  await writeFile(snapshotPath, JSON.stringify({version: 1, workspaceId: "existing-workspace", snapshot: {
+    activeThreadId: threadId,
+    threads: {[threadId]: {id: threadId, turns: [{id: "finished-turn", status: "completed", items: []}]}},
+    queue: [], submissions: {}, completed: [], runId: null, error: null,
+  }}));
   const runtime = new CodexRuntime(root, process.execPath);
   await assert.rejects(runtime.start(), /different thread/);
-  const saved = JSON.parse(
-    await readFile(path.join(root, ".canvasdoc/config.json"), "utf8"),
-  );
-  assert.equal(saved.runtimeThreadId, "different-used-session");
-  await assert.rejects(readFile(path.join(root, "executions.jsonl")), {
-    code: "ENOENT",
-  });
+  const saved = JSON.parse(await readFile(snapshotPath, "utf8"));
+  assert.equal(saved.snapshot.activeThreadId, threadId);
+  await assert.rejects(readFile(path.join(root, "executions.jsonl")), {code: "ENOENT"});
 });
