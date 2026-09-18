@@ -15,7 +15,7 @@ import {
 import { assignmentCompleted, setAssignmentCompletion } from "./planner";
 import type { Course, PersonalTask, Todo, PlannerOverride } from "./types";
 import { dueGroup } from "./model";
-import { preferences } from "./preferences";
+import { useTimeZone } from "./preferences";
 import { store } from "./store";
 import spaceBetween from "./bettercampus/spaceBetween";
 import strokeWidth from "./bettercampus/strokeWidth";
@@ -44,6 +44,7 @@ export function TodoList({
   retry: () => void;
   onAdd: () => void;
 }) {
+  const timeZone = useTimeZone();
   const [overrides, setOverrides] = useState<Record<string, PlannerOverride>>(
     {},
   );
@@ -259,7 +260,7 @@ export function TodoList({
     .map((label) => ({
       label,
       items: visible.filter(
-        (i) => dueGroup(i.due, new Date(), preferences.timeZone) === label,
+        (i) => dueGroup(i.due, new Date(), timeZone) === label,
       ),
     }))
     .filter((g) => g.items.length);
@@ -479,7 +480,7 @@ export function TodoList({
                         <strong>{item.title}</strong>
                         <span>
                           {item.due
-                            ? `Due ${new Date(item.due).toLocaleString(undefined, { month: "2-digit", day: "2-digit", hour: "numeric", minute: "2-digit", timeZone: preferences.timeZone })}`
+                            ? `Due ${new Date(item.due).toLocaleString(undefined, { month: "2-digit", day: "2-digit", hour: "numeric", minute: "2-digit", timeZone })}`
                             : "No due date"}
                           <em>
                             {item.personal

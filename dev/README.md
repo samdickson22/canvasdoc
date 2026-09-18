@@ -30,6 +30,8 @@ Setup builds the upstream development image, installs dependencies and assets, i
 
 Canvas binds to `http://127.0.0.1:3210`; the rich-content service binds to `http://127.0.0.1:3212`. On this remote Mac, private Tailscale Serve routes expose Canvas at `https://mac-mini.tail39179a.ts.net:3211` and the rich-content service at port `3213`. These are tailnet-only routes, not public Funnel endpoints. Use the T3 in-app browser for manual verification.
 
+For file downloads and material-sync checks, use the `CANVASDOC_ORIGIN` configured in `dev/.env`. Opening the same instance through a different hostname can leave signed file downloads without the matching browser session.
+
 The current checkout is `1c9f0bb8013ed69c4f2efe11fd483025469b7e6c`. Services are web, jobs, PostgreSQL 14, Redis 7, and the Canvas rich-content API. The Canvas image uses the upstream Ruby 3.4 development Dockerfile.
 
 To install the Canvasdoc development UI after Canvas is running, use `npm ci`, `npm run dev:install`, and `npm run dev` from the repository root. The loader is enabled only in Rails development. The watcher leaves the current browser page alone; reload in T3 when ready to see a new build.

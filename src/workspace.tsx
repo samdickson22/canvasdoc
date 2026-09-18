@@ -62,7 +62,17 @@ export function Workspace({
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [fileActions, setFileActions] = useState<HTMLDivElement | null>(null);
   const [maximized, setMaximized] = useState(false);
-  const [explorerOpen, setExplorerOpen] = useState(true);
+  const [narrow, setNarrow] = useState(() => window.matchMedia("(max-width: 760px)").matches);
+  const [explorerOpen, setExplorerOpen] = useState(() => !window.matchMedia("(max-width: 760px)").matches);
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 760px)");
+    const resize = () => {
+      setNarrow(media.matches);
+      if (media.matches) setExplorerOpen(false);
+    };
+    media.addEventListener("change", resize);
+    return () => media.removeEventListener("change", resize);
+  }, []);
   const [tabs, dispatchTab] = useReducer(fileTabs, {
     paths: [],
     selected: null,
@@ -78,13 +88,14 @@ export function Workspace({
   const [tab, setTab] = useState<"outputs" | "sources">("outputs");
   const [splitSize, setSplitSize] = useState(60);
   const [explorerSize, setExplorerSize] = useState(32);
-  const viewerOnly = inspectorOpen && maximized;
+  const viewerOnly = inspectorOpen && (maximized || narrow);
   const showExplorer = explorerOpen || !selected;
   const openFile = useCallback((path: string) => {
     dispatchTab({ type: "open", path });
     reread();
     setInspectorOpen(true);
-  }, []);
+    if (narrow) setExplorerOpen(false);
+  }, [narrow]);
   const hideViewer = () => {
     setInspectorOpen(false);
     setMaximized(false);
@@ -301,6 +312,7 @@ export function Workspace({
               </div>
               <div className="workspace-view-controls">
                 <button
+                  hidden={narrow}
                   aria-label={
                     viewerOnly ? "Restore split view" : "Expand file viewer"
                   }
@@ -370,7 +382,7 @@ export function Workspace({
             <div
               className="workspace-document-split workspace-pane-grid"
               style={{
-                gridTemplateColumns: !selected
+                gridTemplateColumns: !selected || (narrow && showExplorer)
                   ? "0px 0px minmax(0, 1fr)"
                   : !showExplorer
                     ? "minmax(0, 1fr) 0px 0px"
@@ -380,7 +392,7 @@ export function Workspace({
               <div className="workspace-pane" id="workspace-document-pane">
                 <div
                   className="workspace-preview workspace-document"
-                  hidden={!selected}
+                  hidden={!selected || (narrow && showExplorer)}
                   role="tabpanel"
                   aria-label={selected ? fileName(selected) : "File preview"}
                 >
@@ -407,7 +419,7 @@ export function Workspace({
                 label="Resize document and file explorer"
                 value={100 - explorerSize}
                 onChange={(value) => setExplorerSize(100 - value)}
-                hidden={!selected || !showExplorer}
+                hidden={!selected || !showExplorer || narrow}
               />
               <div className="workspace-pane" id="workspace-explorer-pane">
                 <aside
@@ -656,6 +668,11 @@ function FilePreview({ file, actions, openFile }: { file: Preview; actions: HTML
   const bytes = Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0));
   const text = new TextDecoder().decode(bytes.subarray(0, 256 * 1024));
   const truncated = bytes.length > 256 * 1024;
+  const pdfViewer = typeof chrome !== "undefined" && chrome.runtime?.id
+    ? chrome.runtime.getURL("pdf/viewer.html")
+    : new URL("/canvasdoc/pdf/viewer.html", location.origin).href;
+  const pdfViewerOrigin = typeof chrome !== "undefined" && chrome.runtime?.id
+    ? `chrome-extension://${chrome.runtime.id}` : location.origin;
   useEffect(() => {
     if (file.previewKind === "unavailable") {
       setUrl("");
@@ -722,11 +739,13 @@ function FilePreview({ file, actions, openFile }: { file: Preview; actions: HTML
           alt={file.path}
         />
       ) : file.mime === "application/pdf" ? (
-        <iframe
-          className="workspace-pdf"
-          src={url || undefined}
-          title={file.path}
-        />
+          <iframe
+            key={file.modified}
+            className="workspace-pdf"
+            src={pdfViewer}
+            title={file.path}
+            onLoad={event => event.currentTarget.contentWindow?.postMessage({type:"canvasdoc:pdf",base64:file.base64}, pdfViewerOrigin)}
+          />
       ) : /\.(md|markdown)$/i.test(file.path) ? (
         <div className="workspace-markdown">
           <MarkdownDocument.Provider value={{path: file.path, open: openFile}}>

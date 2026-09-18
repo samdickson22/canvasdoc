@@ -500,6 +500,9 @@ select {
 
 /* Home keeps coursework visible while its single conversation opens on demand. */
 .home-agent { margin:0 auto; }
+.home-agent-entry { display:flex; justify-content:flex-end; margin-bottom:6px; }
+.home-agent-entry button { display:flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--paper); font-size:12px; }
+.launcher-home { top:12px; bottom:auto; }
 .home-agent:has(.home-agent-compact) { max-width:820px; }
 .home-agent-panel { display:flex; flex-direction:column; height:100dvh; background:white; overflow:hidden; }
 .home-agent-panel[hidden] { display:none; }

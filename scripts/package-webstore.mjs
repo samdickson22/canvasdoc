@@ -1,4 +1,4 @@
-import {readFile,writeFile,mkdir,copyFile} from 'node:fs/promises';
+import {readFile,writeFile,mkdir,copyFile,cp} from 'node:fs/promises';
 import {deflateSync} from 'node:zlib';
 import {execFileSync} from 'node:child_process';
 const dir='release/webstore';await mkdir(dir,{recursive:true});
@@ -6,6 +6,7 @@ const manifest=JSON.parse(await readFile('dist/manifest.json','utf8'));
 const origin='https://canvas.calpoly.edu/*';
 manifest.content_scripts=manifest.content_scripts.map(script=>({...script,matches:[origin]}));
 manifest.host_permissions=[origin,'https://*.instructure.com/*','https://*.instructureusercontent.com/*'];
+manifest.web_accessible_resources=manifest.web_accessible_resources.map(resource=>({...resource,matches:[origin]}));
 delete manifest.key;
 manifest.icons={};
 // Small original window mark, generated at each native icon size.
@@ -22,7 +23,8 @@ for(const size of [16,32,48,128]){
 }
 await writeFile(`${dir}/manifest.json`,JSON.stringify(manifest,null,2));
 const files=['canvasdoc.js','background.js','bootstrap.js','bootstrap.css'];for(const file of files)await copyFile(`dist/${file}`,`${dir}/${file}`);
+await cp('dist/pdf',`${dir}/pdf`,{recursive:true});
 await mkdir('release/artifacts',{recursive:true});
 const zip=`release/artifacts/canvasdoc-webstore-${manifest.version}.zip`;
-execFileSync('python3',['-c','import sys,zipfile,pathlib; root=pathlib.Path(sys.argv[1]); z=zipfile.ZipFile(sys.argv[2],"w",zipfile.ZIP_DEFLATED); [z.write(root/name,name) for name in sys.argv[3:]]',dir,zip,'manifest.json',...files,...Object.values(manifest.icons)]);
+execFileSync('python3',['-c','import sys,zipfile,pathlib; root=pathlib.Path(sys.argv[1]); z=zipfile.ZipFile(sys.argv[2],"w",zipfile.ZIP_DEFLATED); names=sys.argv[3:]+[str(p.relative_to(root)) for p in (root/"pdf").rglob("*") if p.is_file()]; [z.write(root/name,name) for name in names]',dir,zip,'manifest.json',...files,...Object.values(manifest.icons)]);
 console.log(`Store upload package: ${zip} (not published; review docs/release-checklist.md)`);

@@ -38,6 +38,11 @@
   "background": {
     "service_worker": "background.js"
   },
+  "content_security_policy": {"extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"},
+  "web_accessible_resources": [{
+    "resources": ["pdf/viewer.html"],
+    "matches": ["https://mac-mini.tail39179a.ts.net/*", "http://localhost/*", "https://canvas.calpoly.edu/*"]
+  }],
   "host_permissions": [
     "https://mac-mini.tail39179a.ts.net:3211/*",
     "http://localhost:3210/*",

@@ -40,7 +40,7 @@ import {
   connectNative,
   usesNativeConnection,
 } from "./runtime/client";
-import { preferences } from "./preferences";
+import { useTimeZone } from "./preferences";
 
 export type Mounts = {
   sidebar: HTMLElement;
@@ -53,10 +53,10 @@ export type Mounts = {
   original: HTMLElement[];
 };
 const shortName = (name: string) => name.replace(/^\[DEV\]\s*/, "");
-const dateLabel = (value: string | null) =>
+const dateLabel = (value: string | null, timeZone?: string) =>
   value
     ? new Date(value).toLocaleString(undefined, {
-        timeZone: preferences.timeZone,
+        timeZone,
         month: "short",
         day: "numeric",
         hour: "numeric",
@@ -222,7 +222,7 @@ export function App({
           <aside
             className="sidebar"
             aria-label={
-              context.kind === "home" ? "To-do list" : "Assignment conversation"
+              context.kind === "home" ? "To-do list" : context.kind === "personal" ? "Task conversation" : context.kind === "assignment" ? "Assignment conversation" : "Page conversation"
             }
           >
             <header className="sidebar-header">
@@ -286,9 +286,9 @@ export function App({
             )}
           </aside>
           </>
-        ) : (
-          <button className="launcher" aria-label={context.kind === "home" ? "Open to-do list" : "Open Canvasdoc conversation"} onClick={() => void transitionView(() => setOpen(true))}>
-            <MessageSquare size={18} /> Canvasdoc
+        ) : context.kind === "home" && homeChatOpen ? null : (
+          <button className={`launcher ${context.kind === "home" ? "launcher-home" : ""}`} aria-label={context.kind === "home" ? "Open to-do list" : "Open Canvasdoc conversation"} onClick={() => void transitionView(() => setOpen(true))}>
+            <MessageSquare size={18} /> {context.kind === "home" ? "To-do" : "Canvasdoc"}
           </button>
         ),
         mounts.sidebar,
@@ -297,10 +297,12 @@ export function App({
         createPortal(
           context.kind === "home" ? (
             <section className="home-agent" aria-label="Canvasdoc assistant">
+              {!homeChatOpen && <div className="home-agent-entry"><button onClick={() => setHomeChatOpen(true)}><MessageSquare size={15} /> Open conversation</button></div>}
               <div ref={homeChatPanel} id="home-agent-panel" className={`home-agent-panel ${homeChatOpen ? "" : "home-agent-compact"}`} onKeyDown={event => { if (event.key === "Escape") closeHomeChat(); }}>
                 <header className="home-agent-header" hidden={!homeChatOpen}>
                   <button className="home-back" onClick={closeHomeChat}><ArrowLeft size={16} /> Back to dashboard</button>
                   <button className="connection-status" data-status={connection.status} onClick={onConnect}><i /> {connectionLabel}</button>
+                  {!open && <button className="icon-button" aria-label="Open to-do list" title="Open to-do list" onClick={() => setOpen(true)}><MessageSquare size={18} /></button>}
                 </header>
                 <Conversation context={context} home compact={!homeChatOpen} onSend={() => setHomeChatOpen(true)} onConnect={onConnect} />
               </div>
@@ -392,6 +394,7 @@ export function App({
 }
 
 function PersonalPage({ task }: { task?: PersonalTask }) {
+  const timeZone = useTimeZone();
   return (
     <main className="personal-page">
       <a href="/" className="back-link">
@@ -401,7 +404,7 @@ function PersonalPage({ task }: { task?: PersonalTask }) {
         <>
           <div className="eyebrow">PERSONAL TASK</div>
           <h1>{task.title}</h1>
-          <p className="muted">{dateLabel(task.dueAt)}</p>
+          <p className="muted">{dateLabel(task.dueAt, timeZone)}</p>
           {task.description && (
             <p className="personal-description">{task.description}</p>
           )}
@@ -516,6 +519,7 @@ function TaskForm({
             return;
           }
           onClose();
+          location.assign(`/?canvasdoc-task=${encodeURIComponent(task.id)}`);
         } catch (err) {
           setError(err instanceof Error ? err.message : "Could not save task.");
         }

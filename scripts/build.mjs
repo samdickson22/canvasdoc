@@ -1,5 +1,5 @@
 import { context, build as bundle } from "esbuild";
-import { mkdir, writeFile, copyFile, readFile } from "node:fs/promises";
+import { mkdir, writeFile, copyFile, readFile, cp, rm } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -41,6 +41,14 @@ const build = await context({
         });
         build.onEnd(async (result) => {
           if (result.errors.length) return;
+          await rm(`${output}/pdf`, { recursive: true, force:true });
+          await mkdir(`${output}/pdf`, { recursive: true });
+          await bundle({entryPoints:["src/pdf-viewer.ts"],outfile:`${output}/pdf/viewer.js`,bundle:true,format:"iife",target:"chrome120",minify:true});
+          await copyFile("extension/pdf-viewer.html", `${output}/pdf/viewer.html`);
+          await copyFile("node_modules/pdfjs-dist/build/pdf.worker.mjs", `${output}/pdf/pdf.worker.js`);
+          await copyFile("node_modules/pdfjs-dist/LICENSE", `${output}/pdf/LICENSE`);
+          for (const directory of ["cmaps", "standard_fonts", "wasm"])
+            await cp(`node_modules/pdfjs-dist/${directory}`, `${output}/pdf/${directory}`, { recursive:true });
           await bundle({
             entryPoints: ["extension/background.ts"],
             outfile: `${output}/background.js`,
@@ -62,6 +70,8 @@ const build = await context({
             for (const file of ["bootstrap.js", "bootstrap.css", "canvasdoc.js", "version.json"]) {
               await copyFile(`${output}/${file}`, `${devOutput}/${file}`);
             }
+            await rm(`${devOutput}/pdf`, { recursive:true, force:true });
+            await cp(`${output}/pdf`, `${devOutput}/pdf`, { recursive:true });
           }
           console.log(`Canvasdoc built ${new Date().toLocaleTimeString()}`);
         });

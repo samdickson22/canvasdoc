@@ -7,12 +7,12 @@ import assistantStyles from "../dist/assistant-ui.css";
 import hostStyles from "./host.css";
 import { initializeConnection } from "./runtime/client";
 import { startMaterialSync } from "./material-sync";
-import { preferences } from "./preferences";
+import { setTimeZone } from "./preferences";
 
 declare global {
   interface Window {
     __canvasdoc?: { dispose: () => void };
-    ENV?: { current_user_id?: string | number };
+    ENV?: { current_user_id?: string | number; TIMEZONE?: string };
   }
 }
 
@@ -35,13 +35,16 @@ async function mount() {
   )
     return;
   // /users/self works in the extension's isolated world as well as the dev loader.
-  let profile: {id?: string | number; time_zone?: string} = {id: window.ENV?.current_user_id};
-  if (!profile.id) {
+  let profile: {id?: string | number; time_zone?: string} = {id: window.ENV?.current_user_id, time_zone: window.ENV?.TIMEZONE};
+  if (!profile.id || !profile.time_zone) {
     // Canvas embeds the current user in ENV even in the extension's isolated world.
     for (const script of document.scripts) {
       if (!script.textContent?.includes('ENV')) continue;
       const id = script.textContent.match(/"current_user_id"\s*:\s*"?(\d+)"?/);
-      if (id) { profile.id = id[1]; break; }
+      const timeZone = script.textContent.match(/"TIMEZONE"\s*:\s*("(?:[^"\\]|\\.)*")/);
+      if (id) profile.id ??= id[1];
+      if (timeZone) profile.time_zone ??= JSON.parse(timeZone[1]);
+      if (profile.id && profile.time_zone) break;
     }
   }
   if (!profile.id) {
@@ -55,11 +58,11 @@ async function mount() {
   if (!profile.time_zone) {
     void fetch("/api/v1/users/self/profile", {credentials:"same-origin"})
       .then(response => response.ok ? response.json() : null)
-      .then(fresh => { if (fresh?.id && String(fresh.id) === String(profile.id) && typeof fresh.time_zone === "string") preferences.timeZone = fresh.time_zone; })
+      .then(fresh => { if (fresh?.id && String(fresh.id) === String(profile.id) && typeof fresh.time_zone === "string") setTimeZone(fresh.time_zone); })
       .catch(() => {});
   }
   if (typeof profile.time_zone === "string")
-    preferences.timeZone = profile.time_zone;
+    setTimeZone(profile.time_zone);
   await initializeStore(String(profile.id));
   initializeConnection();
   startDevRefresh();

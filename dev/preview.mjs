@@ -25,11 +25,12 @@ createServer(async (req, res) => {
   const name = pathname.startsWith("/canvasdoc/")
     ? pathname.slice("/canvasdoc/".length)
     : "";
-  if (assets.has(name)) {
+  const pdfAsset = /^pdf\/[\w./-]+$/.test(name) && !name.includes("..");
+  if (assets.has(name) || pdfAsset) {
     try {
       const bytes = await readFile(resolve(root, "dist", name));
       res.writeHead(200, {
-        "Content-Type": assets.get(name),
+        "Content-Type": assets.get(name) ?? (name.endsWith(".html") ? "text/html" : /\.(m?js)$/.test(name) ? "application/javascript" : name.endsWith(".wasm") ? "application/wasm" : "application/octet-stream"),
         "Cache-Control": "no-store",
         "X-Canvasdoc-Checkout": root,
       });

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDF preview</title>
+<style>
+  * { box-sizing:border-box; }
+  body { margin:0; background:#edf0eb; color:#30372d; font:13px system-ui,sans-serif; }
+  header { position:sticky; top:0; z-index:1; display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px; padding:8px; background:#fafbf8; border-bottom:1px solid #dce2d7; }
+  button,select { border:1px solid #dce2d7; border-radius:5px; padding:5px 8px; background:white; color:inherit; font:inherit; }
+  button:disabled { opacity:.4; }
+  main { padding:12px; overflow:auto; }
+  canvas { display:block; margin:auto; background:white; box-shadow:0 1px 5px #0002; }
+  #status { text-align:center; padding:0 12px; }
+  details { margin:12px auto; max-width:900px; } #page-text { white-space:pre-wrap; padding:12px; background:white; }
+</style>
+<header aria-label="PDF controls">
+  <button id="previous" aria-label="Previous PDF page" disabled>Previous</button>
+  <span id="page" aria-live="polite">PDF</span>
+  <button id="next" aria-label="Next PDF page" disabled>Next</button>
+  <select id="zoom" aria-label="PDF zoom">
+    <option value="fit">Fit width</option>
+    <option value="1">100%</option>
+    <option value="1.5">150%</option>
+    <option value="2">200%</option>
+  </select>
+</header>
+<p id="status" role="status">Loading PDF…</p>
+<main aria-label="PDF document"><canvas aria-label="PDF page"></canvas><details><summary>Page text</summary><div id="page-text"></div></details></main>
+<script src="viewer.js" defer></script>
+</html>

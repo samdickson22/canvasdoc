@@ -160,6 +160,7 @@ html.canvasdoc-dashboard .canvasdoc-course-grade:hover { text-decoration:underli
 
 /* Sending from Home replaces the center pane, rather than covering the cards. */
 html.canvasdoc-home-workspace body { overflow:hidden; }
+html.canvasdoc-home-workspace #mobile-header { display:none !important; }
 html.canvasdoc-home-workspace #content > :not(#canvasdoc-main) { display:none !important; }
 html.canvasdoc-home-workspace body.canvasdoc-home #content { padding:0 !important; }
 html.canvasdoc-home-workspace #canvasdoc-main {
