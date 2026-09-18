@@ -108,4 +108,4 @@ See the [release checklist](docs/release-checklist.md) for release preparation.
 
 ## License
 
-Canvasdoc’s original code is MIT. Reused assistant-ui and Tasks for Canvas components retain their upstream notices. The BetterCanvas grade-badge styling is AGPL-3.0; distribution of the combined extension must satisfy its source and notice requirements. See `src/bettercampus/README.md` and `src/bettercampus/BETTERCANVAS-LICENSE`. The separate Canvas LMS development checkout has its own license and is not included in this repository.
+Canvasdoc’s original code is MIT. Reused assistant-ui and Tasks for Canvas components retain their upstream notices. See [Tasks for Canvas attribution](src/bettercampus/README.md). The separate Canvas LMS development checkout has its own license and is not included in this repository.

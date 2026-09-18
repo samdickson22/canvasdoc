@@ -42,7 +42,7 @@ Internal React components and helper functions are not public APIs. Future forma
 - Suggested description: “A local coursework agent inside Canvas, with assignment conversations, course materials, and a persistent workspace on your computer.” State clearly that a local companion and Codex account are required and current support is Cal Poly only.
 - Complete Chrome's data-use disclosures to match [the privacy policy](privacy.md), including course content, chat content, and local runtime/model-provider processing.
 - Provide reviewer instructions and synthetic test access; never provide a student's real credentials.
-- Resolve corresponding-source distribution for the BetterCanvas-derived AGPL styling before distributing the extension. Retaining notices alone does not settle that release requirement.
+- Verify the packaged third-party notices match the code included in the release; rebuild the notices directory when dependencies or reused code change.
 - Verify the native bridge with the store-issued ID before rollout. On a separate Chrome profile and synthetic workspace, verify installation from npm, workspace selection, private Codex sign-in, browser pairing, send/stream/stop, reconnect after companion restart, file preview/download, and uninstall. Confirm existing workspace data is preserved when updating the CLI.
 
 ## Permissions and purpose

@@ -143,20 +143,23 @@ html.canvasdoc-dashboard .ic-DashboardCard {
   max-width:100%;
   margin:0;
 }
-/* Grade badge presentation from UseBetterCanvas/bettercanvas css/content.css (AGPL-3.0).
-   Scoped to Canvasdoc; grade data and accessible labels remain Canvasdoc-owned. */
+/* Keep the grade link in the card's normal flow beneath its title. */
 html.canvasdoc-dashboard .canvasdoc-course-grade {
-  position:absolute;
-  top:15px;
-  left:15px;
-  padding:2px 9px;
-  border-radius:200px;
-  color:var(--ic-brand-font-color-dark-lightened-30);
-  background:#fff;
-  transition:.2s opacity;
-  text-decoration:none;
+  display:block;
+  margin:0 1rem .75rem;
+  padding-block:.5rem;
+  border-block-start:1px solid #e4e8e2;
+  color:#315343;
+  font-size:.8125rem;
+  font-variant-numeric:tabular-nums;
+  text-decoration:underline;
+  text-underline-offset:.2em;
+  overflow-wrap:anywhere;
 }
-html.canvasdoc-dashboard .canvasdoc-course-grade:hover { text-decoration:underline; }
+html.canvasdoc-dashboard .canvasdoc-course-grade:focus-visible {
+  outline:2px solid currentColor;
+  outline-offset:3px;
+}
 
 /* Sending from Home replaces the center pane, rather than covering the cards. */
 html.canvasdoc-home-workspace body { overflow:hidden; }
