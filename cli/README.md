@@ -24,7 +24,7 @@ Chat attachments support files up to 5 MB each. The connector saves attached fil
 
 Workspace lists files from your Canvasdoc folder and previews text, PDFs, images, and sandboxed HTML. Preview and download are limited to 25 MiB per file; text rendering is capped at 256 KiB. Hidden directories, dependency folders, and symlinks are excluded from the listing; files outside the chosen folder are not exposed.
 
-The chat model and reasoning-effort choices come from the connected Codex runtime. Selecting a different model applies to the next turn while retaining the same main-agent thread and Canvasdoc folder.
+Canvasdoc defaults to GPT-5.6 Luna with medium reasoning. Available choices come from the connected Codex runtime. Your saved model selection takes precedence; selecting a different model applies to the next turn while retaining the same main-agent thread and Canvasdoc folder. If the selected model is unavailable, choose another model from the selector.
 
 ## Course materials
 

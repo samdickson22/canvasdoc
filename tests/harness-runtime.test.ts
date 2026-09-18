@@ -80,6 +80,12 @@ test(
     const approvalMethod = "item/commandExecution/requestApproval";
     try {
       const config = await runtime.start();
+      assert.equal(runtime.currentModel, "gpt-5.6-luna");
+      assert.equal(runtime.currentEffort, "medium");
+      const catalog = runtime.models;
+      runtime.models = catalog.filter(model => model.id !== "gpt-5.6-luna");
+      await assert.rejects(runtime.send("unavailable", "unavailable-default"), /gpt-5.6-luna.*not available/);
+      runtime.models = catalog;
       const pending = nextEvent(runtime, approvalMethod);
       await runtime.send("hello", "request-1");
       const approval = await pending;
@@ -101,6 +107,9 @@ test(
         { id: 42, result: { decision: "accept" } },
       );
       assert.equal(messages.filter((m) => m.method === "initialize").length, 1);
+      const firstTurn = messages.find(m => m.method === "turn/start");
+      assert.equal(firstTurn.params.model, "gpt-5.6-luna");
+      assert.equal(firstTurn.params.effort, "medium");
       assert.equal(
         messages.filter((m) => m.method === "initialized").length,
         1,
@@ -128,7 +137,7 @@ test(
       assert.equal(resumed.workspaceId, config.workspaceId);
       assert.equal(runtime.runtimeThreadId, threadId);
       const fresh = nextEvent(runtime, approvalMethod);
-      await runtime.send("again", "request-2");
+      await runtime.send("again", "request-2", "model-b", "high");
       const freshId = (await fresh).id!;
       assert.notEqual(freshId, staleId);
       await assert.rejects(
@@ -150,6 +159,9 @@ test(
         .trim()
         .split("\n")
         .map((line) => JSON.parse(line));
+      const chosenTurn = after.find(m => m.method === "turn/start" && m.params.clientUserMessageId === "request-2");
+      assert.equal(chosenTurn.params.model, "model-b");
+      assert.equal(chosenTurn.params.effort, "high");
       assert.equal(
         after.filter(
           (m) =>

@@ -117,7 +117,7 @@ export async function serve(mode, threadId) {
       };
     if (m.method === "model/list")
       result = {
-        data: ["gpt-6-astra", "model-b"].map((model) => ({
+        data: ["gpt-6-astra", "gpt-5.6-luna", "model-b"].map((model) => ({
           model,
           isDefault: model === "gpt-6-astra",
           displayName:

@@ -56,8 +56,8 @@ export class CodexRuntime {
     efforts: string[];
     defaultEffort: string;
   }[] = [];
-  currentModel?: string;
-  currentEffort?: string;
+  currentModel = "gpt-5.6-luna";
+  currentEffort = "medium";
   config!: WorkspaceConfig;
   private child?: ChildProcessWithoutNullStreams;
   private regenerating = false;
@@ -347,7 +347,6 @@ export class CodexRuntime {
             limit: 100,
             includeHidden: false,
           });
-          this.currentModel ??= page.data.find((m: any) => m.isDefault)?.model;
           this.models.push(
             ...page.data
               .filter((m: any) => !m.hidden)
@@ -364,12 +363,8 @@ export class CodexRuntime {
           cursor = page.nextCursor;
         } while (cursor && this.models.length < 1000);
       } catch {
-        /* The runtime can still use its configured model if discovery is unavailable. */
+        /* Sending requires a discovered model; keep the connection available to retry. */
       }
-      this.currentModel ??= this.models[0]?.id;
-      this.currentEffort ??= this.models.find(
-        (m) => m.id === this.currentModel,
-      )?.defaultEffort;
       await this.transport.flush();
       return this.config;
     } catch (error) {
@@ -390,12 +385,15 @@ export class CodexRuntime {
   rpc(method: string, params: Record<string, unknown> = {}): Promise<any> {
     return this.client.request(method, params);
   }
-  private configureTurn(requestId: string, model?: string, effort?: string) {
+  private configureTurn(requestId: string, model = this.currentModel, effort?: string) {
     const selected = this.models.find((m) => m.id === model);
-    if (model && model !== this.currentModel && !selected)
+    if (!selected)
       throw new Error(
-        "This model is not available in the connected Codex runtime.",
+        this.models.length
+          ? `Model ${model} is not available in the connected Codex runtime. Select an available model.`
+          : "Could not load available Codex models. Restart the companion to retry.",
       );
+    effort ??= model === this.currentModel ? this.currentEffort : selected.defaultEffort;
     if (effort && !selected?.efforts.includes(effort))
       throw new Error(
         "This reasoning effort is not supported by the selected model.",
