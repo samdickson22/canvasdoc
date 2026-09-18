@@ -121,7 +121,7 @@ async function applyRun(run: any) {
       createdAt: run.createdAt,
       revision: run.revision,
     });
-  if (run.text || run.parts?.length || run.files?.length || run.error || ["completed", "error", "interrupted", "cancelled"].includes(run.status)) {
+  if (run.status !== "queued" || run.text || run.parts?.length || run.files?.length || run.error) {
     const id = replyId;
     const index = messages.findIndex((m) => m.id === id);
     const message = {

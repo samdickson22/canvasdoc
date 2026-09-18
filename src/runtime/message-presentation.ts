@@ -137,11 +137,19 @@ export function summarizeActivity(
       p.type === "tool-call",
   );
   const active = tools.filter((p) => p.result === undefined && !p.isError);
-  if (running && active.length) {
-    const tool = active[active.length - 1];
+  const latestActivity = parts.at(-1);
+  if (running && latestActivity?.type === "reasoning") {
+    const heading = latestActivity.text.split("\n").find(s => s.trim())
+      ?.replace(/^[#*\s]+|[*\s]+$/g, "");
+    return heading ? compact(heading) : "Thinking";
+  }
+  if (running && latestActivity?.type === "tool-call") {
+    const tool = active.at(-1) ?? latestActivity;
+    const command = typeof tool.args.command === "string" ? tool.args.command.trim() : "";
+    const program = command.match(/^(?:\S*\/)?([\w.+-]+)/)?.[1];
     const label = (
       {
-        command: "Running command",
+        command: program ? `Running ${program}` : "Running command",
         read: "Reading files",
         search: "Searching",
         edit: "Editing files",
@@ -150,6 +158,7 @@ export function summarizeActivity(
         tool: `Using ${tool.toolName}`,
       } as Record<string, string>
     )[toolCategory(tool)];
+    if (tool.isError) return `Failed: ${tool.toolName}`;
     return `${label}${active.length > 1 ? ` · ${active.length} active` : ""}`;
   }
   if (running || !tools.length) {

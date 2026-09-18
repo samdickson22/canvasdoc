@@ -22,6 +22,8 @@ export function LiveActivity({ hasQueuedMessages = false }: { hasQueuedMessages?
   const run = useAuiState(s => s.message.metadata.custom.run);
   if (!run && hasQueuedMessages) return null;
   const last = parts.at(-1);
+  // The last activity group owns the live row once reasoning or tools arrive.
+  if (last?.type === "reasoning" || last?.type === "tool-call") return null;
   const label = !run ? "Waiting for agent" : last?.type === "text" && last.providerMetadata?.canvasdoc?.work === false
     ? "Writing response"
     : summarizeActivity(parts, true);
@@ -92,6 +94,8 @@ export function ActivityGroup({
   running,
 }: PropsWithChildren<{ indices: readonly number[]; running: boolean }>) {
   const parts = useAuiState((s) => s.message.parts);
+  const messageRunning = useAuiState((s) => s.message.status?.type === "running");
+  const active = messageRunning && (running || indices.includes(parts.length - 1));
   const selected = indices
     .map((i) => parts[i])
     .filter(Boolean) as DisplayPart[];
@@ -106,8 +110,8 @@ export function ActivityGroup({
     >
       <ToolGroupTrigger
         count={selected.length}
-        active={running}
-        label={summarizeActivity(selected, running)}
+        active={active}
+        label={summarizeActivity(selected, active)}
       />
       <ToolGroupContent className="chat-activity-content">
         {children}

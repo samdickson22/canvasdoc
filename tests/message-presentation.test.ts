@@ -169,6 +169,23 @@ test("a working response retains its running state when another user message is 
   assert.equal(presentMessage({ ...base, text: "Checking.", run: { status: "working" } }).status?.type, "running");
 });
 
+test("live activity follows the latest reasoning or tool and keeps successful tools visible", () => {
+  const parts: DisplayPart[] = [];
+  assert.equal(summarizeActivity(parts, true), "Thinking");
+  parts.push({ type: "reasoning", text: "**Listing available skill categories**" });
+  assert.equal(summarizeActivity(parts, true), "Listing available skill categories");
+  const tool: DisplayPart = { type: "tool-call", toolCallId: "list", toolName: "Run command", args: { command: "ls .agents/skills" }, argsText: "{}" };
+  parts.push(tool);
+  assert.equal(summarizeActivity(parts, true), "Running ls");
+  parts.push({ type: "reasoning", text: "**Reviewing the available skills**" });
+  assert.equal(summarizeActivity(parts, true), "Reviewing the available skills");
+  parts.pop();
+  tool.result = "skills";
+  assert.equal(summarizeActivity(parts, true), "Running ls");
+  parts.push({ type: "reasoning", text: "" });
+  assert.equal(summarizeActivity(parts, true), "Thinking");
+});
+
 test("saved user quotes are restored to assistant-ui message metadata", () => {
   const quote = { text: "Selected passage", messageId: "source" };
   const message = presentMessage({ ...base, role: "user", text: "Explain this", quote });

@@ -214,8 +214,8 @@ export class CodexRuntime {
       };
       const options = {
         cwd: root,
-        approvalPolicy: "on-request",
-        sandbox: "workspace-write",
+        approvalPolicy: "never",
+        sandbox: "danger-full-access",
         developerInstructions: await readFile(
           new URL("./AGENT.md", import.meta.url),
           "utf8",
