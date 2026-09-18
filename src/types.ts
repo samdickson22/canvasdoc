@@ -48,7 +48,7 @@ export type PersonalTask = {
 export type SavedMessage = {
   quote?: { text: string; messageId: string };
   revision?: number;
-  run?: { status: string; startedAt?: string; completedAt?: string; error?: string };
+  run?: { requestId?: string; sourceRequestId?: string; status: string; startedAt?: string; completedAt?: string; error?: string };
   files?: string[];
   artifacts?: import("./workspace-files").ArtifactEvidence[];
   parts?: import("../companion/message-parts").DisplayPart[];

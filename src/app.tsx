@@ -297,7 +297,6 @@ export function App({
         createPortal(
           context.kind === "home" ? (
             <section className="home-agent" aria-label="Canvasdoc assistant">
-              {!homeChatOpen && <div className="home-agent-entry"><button onClick={() => setHomeChatOpen(true)}><MessageSquare size={15} /> Open conversation</button></div>}
               <div ref={homeChatPanel} id="home-agent-panel" className={`home-agent-panel ${homeChatOpen ? "" : "home-agent-compact"}`} onKeyDown={event => { if (event.key === "Escape") closeHomeChat(); }}>
                 <header className="home-agent-header" hidden={!homeChatOpen}>
                   <button className="home-back" onClick={closeHomeChat}><ArrowLeft size={16} /> Back to dashboard</button>

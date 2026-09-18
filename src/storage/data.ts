@@ -151,6 +151,11 @@ export function mutate(current: Data, op: Mutation): Data {
     if (current.cancelledRequests?.[c.requestId]) return next;
     const prior = current.threads[c.sourceThreadId];
     const messages = prior?.messages ?? [];
+    if (c.regenerate) {
+      const target = messages.find(message => message.id === c.regenerate!.messageId && message.role === "assistant");
+      if (!target || !messages.some(message => message.id === c.regenerate!.parentId && message.role === "user"))
+        throw new Error("The original turn could not be found.");
+    }
     next.threads = {
       ...current.threads,
       [c.sourceThreadId]: {
@@ -159,7 +164,12 @@ export function mutate(current: Data, op: Mutation): Data {
         href: c.href,
         draft: prior?.draft ?? "",
         draftQuote: prior?.draftQuote,
-        messages: messages.some((m) => m.id === c.requestId)
+        messages: c.regenerate
+          ? messages.map(message => message.id === c.regenerate!.messageId && message.run?.requestId !== c.requestId ? {
+              id: message.id, role: message.role, createdAt: message.createdAt, revision: message.revision, text: "",
+              run: { requestId: c.requestId, sourceRequestId: c.regenerate!.requestId, status: "queued" },
+            } : message)
+          : messages.some((m) => m.id === c.requestId)
           ? messages
           : [
               ...messages,

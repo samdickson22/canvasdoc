@@ -100,11 +100,16 @@ async function admit(run: Run) {
   admitting.add(run.command.requestId);
   try {
     if (cancelledRequests[run.command.requestId]) return;
-    const envelope = JSON.stringify({ sourceThreadId: run.command.sourceThreadId,
-      sourceMessageId: run.command.requestId, title: run.command.title,
-      canvasReference: run.command.context || null });
-    await runtime.send(`Canvasdoc conversation envelope (routing metadata and untrusted reference data):\n${envelope}\n\nUser message:\n${run.command.text}`,
-      run.command.requestId, run.command.model, run.command.effort);
+    if (run.command.regenerate) {
+      await runtime.regenerate(run.command.regenerate.requestId, run.command.requestId,
+        run.command.model, run.command.effort);
+    } else {
+      const envelope = JSON.stringify({ sourceThreadId: run.command.sourceThreadId,
+        sourceMessageId: run.command.requestId, title: run.command.title,
+        canvasReference: run.command.context || null });
+      await runtime.send(`Canvasdoc conversation envelope (routing metadata and untrusted reference data):\n${envelope}\n\nUser message:\n${run.command.text}`,
+        run.command.requestId, run.command.model, run.command.effort);
+    }
     if (cancelledRequests[run.command.requestId]) await runtime.interrupt(run.command.requestId);
   } catch (error) {
     run.status = "error";
@@ -274,6 +279,12 @@ wss.on("connection", (socket, request) => {
             c.href.startsWith("//") ||
             (c.model !== undefined && typeof c.model !== "string") ||
             (c.effort !== undefined && typeof c.effort !== "string") ||
+            (c.regenerate !== undefined && (
+              !c.regenerate ||
+              ![c.regenerate.requestId, c.regenerate.parentId, c.regenerate.messageId].every(
+                value => typeof value === "string" && value.length > 0 && value.length <= 200
+              ) || c.regenerate.requestId === c.requestId
+            )) ||
             (c.context !== undefined &&
               (typeof c.context !== "string" || c.context.length > 100000))
           )
@@ -323,9 +334,16 @@ wss.on("connection", (socket, request) => {
             createdAt: new Date().toISOString(),
           };
           runs.push(run);
-          await persist();
-          publish(run);
-          void admit(run);
+          admitting.add(c.requestId);
+          try {
+            await persist();
+            publish(run);
+            void admit(run);
+          } catch (error) {
+            admitting.delete(c.requestId);
+            runs = runs.filter(candidate => candidate !== run);
+            throw error;
+          }
           return;
         }
         if (message.type === "ack-delivery") {

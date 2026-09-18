@@ -8,6 +8,7 @@ export async function serve(mode, threadId) {
   } catch {
     thread = { id: threadId, turns: [], historyMode: "legacy", status: { type: "idle" } };
   }
+  threadId = thread.id;
   for (const turn of thread.turns)
     if (turn.status === "inProgress") turn.status = "interrupted";
   const persist = () =>
@@ -100,6 +101,14 @@ export async function serve(mode, threadId) {
     if (m.method === "account/read") result = { requiresOpenaiAuth: false };
     if (["thread/start", "thread/resume", "thread/read"].includes(m.method))
       result = { thread, model: "gpt-6-astra", reasoningEffort: "medium" };
+    if (m.method === "thread/fork") {
+      const index = thread.turns.findIndex(turn => turn.id === (m.params.beforeTurnId ?? m.params.lastTurnId));
+      thread = { ...thread, id: `${threadId}-fork`, forkedFromId: threadId,
+        turns: thread.turns.slice(0, index + (m.params.beforeTurnId ? 0 : 1)) };
+      threadId = thread.id;
+      persist();
+      result = { thread };
+    }
     if (m.method === "thread/timeline/list")
       result = {
         data: [],

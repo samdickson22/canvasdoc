@@ -1,4 +1,5 @@
 export type UserCommand = {
+  regenerate?: { requestId: string; parentId: string; messageId: string };
   model?: string;
   effort?: string;
   attachments?: import("@assistant-ui/react").CompleteAttachment[];

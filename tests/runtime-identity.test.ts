@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { build } from "esbuild";
 import vm from "node:vm";
+import { mutate } from "../src/storage/data.ts";
 
 // Bundle the real browser consumer; replace only storage and browser transports.
 async function browser(native = false, persistMessage = async (_message: any) => {}) {
@@ -13,6 +14,8 @@ async function browser(native = false, persistMessage = async (_message: any) =>
   const data:any={threads:{},outbox:{},cancelledRequests:{}};
   const sent:any[]=[];const sockets:any[]=[];const values=new Map<string,string>();
   const store={account:()=>account,get:()=>data,committed:()=>data,acknowledge:async(id:string)=>{delete data.outbox[id]},
+    enqueue:async(command:any)=>{Object.assign(data,mutate(data,{type:"enqueue",command,createdAt:new Date().toISOString()}));return true},
+    error:()=>"Synthetic storage error",
     saveMessage:async(thread:any,message:any)=>{
       const previous=data.threads[thread.id];
       const messages=[...(previous?.messages ?? [])];
@@ -26,7 +29,7 @@ async function browser(native = false, persistMessage = async (_message: any) =>
     acknowledgeCancellation:async(id:string)=>{delete data.cancelledRequests[id];return true},
   };
   class Socket {static OPEN=1;readyState=1;onopen:any;onmessage:any;onclose:any;onerror:any;constructor(){sockets.push(this)}send(s:string){sent.push(JSON.parse(s))}close(){this.readyState=3}}
-  const context:any={testStore:store,WebSocket:Socket,URL,console,setTimeout,clearTimeout,sessionStorage:{getItem:(k:string)=>values.get(k),setItem:(k:string,v:string)=>values.set(k,v),removeItem:(k:string)=>values.delete(k)}};
+  const context:any={testStore:store,WebSocket:Socket,URL,crypto,console,setTimeout,clearTimeout,sessionStorage:{getItem:(k:string)=>values.get(k),setItem:(k:string,v:string)=>values.set(k,v),removeItem:(k:string)=>values.delete(k)}};
   if (native) context.chrome = {runtime:{id:"synthetic-extension",connect(){
     const port:any={onMessage:{addListener(fn:any){port.receive=fn}},onDisconnect:{addListener(){}},postMessage:(m:any)=>sent.push(m),disconnect(){}};
     sockets.push(port);return port;
@@ -157,4 +160,49 @@ test("native disconnect preserves the connector rejection and reconnect clears i
  assert.equal(b.client.connectionState().status,"disconnected");
  b.client.connectNative();assert.equal(b.client.connectionState().error,undefined);
  b.sockets[1].receive(b.hello());assert.equal(b.client.connectionState().status,"connected");b.client.disconnect();
+});
+
+test("regeneration replaces only its reply, preserves the draft and attachments, and ignores old delivery", async () => {
+  const b = await browser();
+  const socket = b.connect();
+  b.receive(socket, b.hello());
+  const context = { threadId: "home", title: "Home", href: "/", kind: "home" };
+  const original = { id: "original-request", role: "user", text: "Explain this.", createdAt: "2026-01-01",
+    attachments: [{ id: "file-1", name: "notes.txt", content: [{ type: "text", text: "Read uploads/notes.txt" }] }] };
+  b.data.threads.home = { id: "home", title: "Home", href: "/", draft: "Keep this draft", messages: [
+    original, { id: "assistant:original-request", role: "assistant", text: "Old response", createdAt: "2026-01-01", revision: 5,
+      run: { requestId: original.id, status: "completed" } },
+  ] };
+  try {
+    const requestId = await b.client.regenerateMessage(context, original.id, "assistant:original-request");
+    await assert.rejects(b.client.regenerateMessage(context, original.id, "assistant:original-request"), /Finish or stop/);
+    const command = b.sent.find(m => m.type === "send").command;
+    assert.equal(command.text, original.text);
+    assert.deepEqual(command.attachments, original.attachments);
+    assert.equal(command.regenerate.requestId, original.id);
+    assert.equal(command.regenerate.messageId, "assistant:original-request");
+    assert.equal(b.data.threads.home.messages.length, 2);
+    assert.equal(b.data.threads.home.draft, "Keep this draft");
+    assert.equal(b.data.threads.home.messages[0], original);
+    const reply = () => b.data.threads.home.messages[1];
+    b.receive(socket, { type: "run", run: { command: { ...command, requestId: original.id, regenerate: undefined },
+      status: "completed", text: "Late original response", revision: 99, createdAt: "2026-01-01" } });
+    assert.equal(reply().text, "");
+    b.receive(socket, { type: "run", run: { command, turnId: "new-turn", status: "working", text: "New", revision: 10, createdAt: "2026-01-01" } });
+    assert.equal(reply().text, "New");
+    b.receive(socket, { type: "run", run: { command, turnId: "new-turn", status: "completed", text: "New response", revision: 11, createdAt: "2026-01-01" } });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(reply().text, "New response");
+    assert.equal(reply().run.requestId, requestId);
+    assert.equal(b.data.threads.home.messages.length, 2);
+    assert.ok(b.sent.some(m => m.type === "ack-delivery" && m.requestId === requestId));
+    const second = await b.client.regenerateMessage(context, original.id, reply().id);
+    const retried = b.sent.find(m => m.type === "send" && m.command.requestId === second).command;
+    assert.equal(retried.regenerate.requestId, requestId);
+    b.receive(socket, { type: "send-rejected", requestId: second, message: "Finish current work first" });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(reply().run.status, "error");
+    assert.equal(reply().run.sourceRequestId, requestId);
+    assert.equal(b.data.threads.home.messages.length, 2);
+  } finally { b.client.disconnect(); }
 });

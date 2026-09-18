@@ -85,7 +85,7 @@ export function presentMessage(message: SavedMessage): ThreadMessageLike {
                       reason: "stop" as const,
                     },
                   }
-                : status === "working"
+                : status === "working" || status === "queued"
                   ? { status: { type: "running" as const } }
                   : {}),
         }

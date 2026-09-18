@@ -9,7 +9,7 @@ import {
   type ThreadMessageLike,
   type AppendMessage,
 } from "@assistant-ui/react";
-import { useConnection, sendMessage, stopRun, reconnectAgent, answerApproval, answerQuestions, uploadFile, type Approval } from "./runtime/client";
+import { useConnection, sendMessage, regenerateMessage, stopRun, reconnectAgent, answerApproval, answerQuestions, uploadFile, type Approval } from "./runtime/client";
 import { ChatGPT } from "./assistant-ui/components/assistant-ui/elements/chatgpt";
 import { PortalContainerContext } from "./assistant-ui/lib/portal-container";
 import { createAttachmentAdapter, type AttachmentUploadState } from "./runtime/attachments";
@@ -176,19 +176,12 @@ export function Conversation({
     },
     convertMessage: (message) => message,
     onNew,
-    onReload: async (parentId, { runConfig }) => {
-      const original = store.get().threads[context.threadId]?.messages.find(message => message.id === parentId && message.role === "user");
-      if (!original) {
-        setSendError("The original request could not be found.");
-        return;
-      }
-      await onNew({
-        role: "user", parentId, sourceId: null, runConfig,
-        createdAt: new Date(),
-        content: [{ type: "text", text: `Give me a new response to this earlier request:\n\n${original.text}` }],
-        attachments: original.attachments ?? [],
-        metadata: { custom: { quote: original.quote } },
-      });
+    onReload: async (parentId, { sourceId }) => {
+      setSendError("");
+      setPreparing(true);
+      try { await regenerateMessage(context, parentId, sourceId); }
+      catch (error) { setSendError((error as Error).message); }
+      finally { setPreparing(false); }
     },
   });
   useEffect(() => () => {

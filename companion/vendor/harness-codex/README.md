@@ -39,6 +39,11 @@ The private home's snapshot owns native thread identity and recovery. Workspace
 configuration stores only the workspace identity and location. A missing used
 session inside the private home fails recovery instead of creating another agent.
 
+Regeneration re-enqueues the original user input at its saved anchor with a new
+delivery ID. Harness forks at the original turn boundary; the browser replaces
+the selected assistant reply without appending another user message. Completed
+deliveries remain associated with their original native threads across forks.
+
 The browser keeps its existing authenticated companion connection. Statewire
 provides the local transport state; no HTTP host, remote database, or hosted
-service is introduced. Voice and history branching are not exposed in the UI.
+service is introduced. Voice and branch selection are not exposed in the UI.

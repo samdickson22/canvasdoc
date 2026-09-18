@@ -101,20 +101,28 @@ async function applyRun(run: any) {
     return;
   void store.acknowledge(c.requestId);
   const previous = store.get().threads[c.sourceThreadId];
-  const priorReply = previous?.messages.find(m => m.id === `assistant:${c.requestId}`);
+  const userId = c.regenerate?.parentId ?? c.requestId;
+  const replyId = c.regenerate?.messageId ?? `assistant:${c.requestId}`;
+  const priorReply = previous?.messages.find(m => m.id === replyId);
+  if (priorReply?.run?.requestId && priorReply.run.requestId !== c.requestId &&
+      priorReply.run.requestId !== c.regenerate?.requestId) {
+    if (["completed", "interrupted", "cancelled", "error"].includes(run.status))
+      try { send({ type: "ack-delivery", requestId: c.requestId }); } catch {}
+    return;
+  }
   if ((priorReply?.revision ?? -1) > (run.revision ?? -1)) return;
   update({ runs: { ...state.runs, [c.requestId]: run } });
   const messages = [...(previous?.messages ?? [])];
-  if (!messages.some((m) => m.id === c.requestId))
+  if (!messages.some((m) => m.id === userId))
     messages.push({
-      id: c.requestId,
+      id: userId,
       role: "user",
       text: c.text,
       createdAt: run.createdAt,
       revision: run.revision,
     });
-  if (run.text || run.parts?.length || run.files?.length || run.error || ["interrupted", "cancelled"].includes(run.status)) {
-    const id = `assistant:${c.requestId}`;
+  if (run.text || run.parts?.length || run.files?.length || run.error || ["completed", "error", "interrupted", "cancelled"].includes(run.status)) {
+    const id = replyId;
     const index = messages.findIndex((m) => m.id === id);
     const message = {
       id,
@@ -123,7 +131,8 @@ async function applyRun(run: any) {
       parts: run.parts,
       files: run.files,
       artifacts: run.artifacts,
-      run: { status: run.status, startedAt: run.startedAt, completedAt: run.completedAt, error: run.error },
+      run: { requestId: c.requestId, sourceRequestId: run.turnId ? c.requestId : c.regenerate?.requestId ?? c.requestId,
+        status: run.status, startedAt: run.startedAt, completedAt: run.completedAt, error: run.error },
       revision: run.revision,
       createdAt: run.createdAt,
     };
@@ -134,7 +143,7 @@ async function applyRun(run: any) {
   // Publish all changed messages optimistically before waiting for storage.
   // Awaiting the user-message save first makes every text update queue behind disk I/O.
   await Promise.all(messages.filter(message =>
-    (message.id === c.requestId || message.id === `assistant:${c.requestId}`) &&
+    (message.id === userId || message.id === replyId) &&
     JSON.stringify(previous?.messages.find(prior => prior.id === message.id)) !== JSON.stringify(message),
   ).map(message => store.saveMessage({
       id: c.sourceThreadId,
@@ -146,10 +155,10 @@ async function applyRun(run: any) {
   const persisted = store.committed().threads[c.sourceThreadId];
   if (
     ["completed", "interrupted", "cancelled", "error"].includes(run.status) &&
-    persisted?.messages.some((m) => m.id === c.requestId) &&
+    persisted?.messages.some((m) => m.id === userId) &&
     (!(run.text || run.parts?.length || run.files?.length) ||
       persisted.messages.some(
-        (m) => m.id === `assistant:${c.requestId}` && m.text === run.text && JSON.stringify(m.parts) === JSON.stringify(run.parts) && JSON.stringify(m.files) === JSON.stringify(run.files) && JSON.stringify(m.artifacts) === JSON.stringify(run.artifacts),
+        (m) => m.id === replyId && m.text === run.text && JSON.stringify(m.parts) === JSON.stringify(run.parts) && JSON.stringify(m.files) === JSON.stringify(run.files) && JSON.stringify(m.artifacts) === JSON.stringify(run.artifacts),
       ))
   ) {
     try {
@@ -236,8 +245,8 @@ function receive(event: { data: string }) {
   if (m.type === "send-rejected") {
     const command=store.get().outbox?.[m.requestId];
     if(command) {
-      void store.acknowledge(m.requestId);
-      update({error:m.message,runs:{...state.runs,[m.requestId]:{command,status:"error",error:m.message,text:"",createdAt:new Date().toISOString()}}});
+      update({error:m.message});
+      void applyRun({command,status:"error",error:m.message,text:"",revision:Date.now(),createdAt:new Date().toISOString()});
     }
     return;
   }
@@ -387,6 +396,7 @@ export async function sendMessage(
   canvasContext?: string,
   attachments?: import("@assistant-ui/react").CompleteAttachment[],
   requestId = crypto.randomUUID(),
+  regenerate?: import("./protocol").UserCommand["regenerate"],
 ) {
   const account = store.account();
   update({error:undefined});
@@ -402,11 +412,32 @@ export async function sendMessage(
     model: store.get().model?.id ?? state.currentModel,
     effort: store.get().model?.effort ?? state.currentEffort,
     attachments,
+    ...(regenerate ? { regenerate } : {}),
   };
   if (!(await store.enqueue(command))) throw new Error(store.error());
   if (account !== store.account()) throw new Error("Canvas account changed. Reconnect your computer.");
   if (state.status === "connected" && !store.get().cancelledRequests?.[requestId]) send({ type: "send", command });
   return requestId;
+}
+export async function regenerateMessage(context: PageContext, parentId: string | null, messageId: string | null) {
+  if (state.status !== "connected") throw new Error("Connect your computer to regenerate a response.");
+  if (Object.keys(store.get().outbox ?? {}).length || Object.values(state.runs).some(run =>
+    ["queued", "working", "uncertain", "recovering"].includes(run.status)))
+    throw new Error("Finish or stop the agent's current work before regenerating.");
+  const messages = store.get().threads[context.threadId]?.messages ?? [];
+  const original = messages.find(message => message.id === parentId && message.role === "user");
+  const reply = messages.find(message => message.id === messageId && message.role === "assistant");
+  if (!original || !reply) throw new Error("The original turn could not be found.");
+  if (["queued", "working", "uncertain", "recovering"].includes(reply.run?.status ?? ""))
+    throw new Error("Finish or stop this response before regenerating.");
+  const sourceRequestId = reply.run?.sourceRequestId ?? reply.run?.requestId ?? original.id;
+  if (context.kind === "home") {
+    rememberHomeRequest(original.id);
+    if (reply.id.startsWith("assistant:")) rememberHomeRequest(reply.id.slice("assistant:".length));
+  }
+  return sendMessage(context, original.text, undefined, original.attachments, crypto.randomUUID(), {
+    requestId: sourceRequestId, parentId: original.id, messageId: reply.id,
+  });
 }
 export async function stopRun(requestId: string) {
   if (!(await store.cancel(requestId))) throw new Error(store.error());

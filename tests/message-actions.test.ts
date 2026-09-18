@@ -6,7 +6,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { parseHTML } from "linkedom";
 
-test("Read Aloud uses browser speech, supports Stop, and Regenerate sends a fresh request", async () => {
+test("Read Aloud uses browser speech, supports Stop, and Regenerate reloads the selected turn", async () => {
   const { window } = parseHTML('<!doctype html><html><body><div id="root"></div></body></html>');
   const saved = new Map<string, string>();
   Object.assign(globalThis, {
@@ -37,7 +37,7 @@ test("Read Aloud uses browser speech, supports Stop, and Regenerate sends a fres
     // Keep Conversation, its browser store, and assistant-ui's input/runtime
     // real. Only replace unrelated network operations and presentation chrome.
     const mocks: Record<string, string> = {
-      client: `const state={status:'connected',runs:{},approvals:[]}; export const useConnection=()=>state; export const sendMessage=async(...args)=>{globalThis.sent.push(args)}; export const stopRun=async()=>{}; export const reconnectAgent=()=>{}; export const answerApproval=()=>{}; export const answerQuestions=()=>{}; export const uploadFile=async()=>'';`,
+      client: `const state={status:'connected',runs:{},approvals:[]}; export const useConnection=()=>state; export const sendMessage=async()=>{throw new Error("Regeneration must not append a user message")}; export const regenerateMessage=async(...args)=>{globalThis.sent.push(args)}; export const stopRun=async()=>{}; export const reconnectAgent=()=>{}; export const answerApproval=()=>{}; export const answerQuestions=()=>{}; export const uploadFile=async()=>'';`,
       chat: `import {ActionBarPrimitive,AuiIf,MessagePrimitive,ThreadPrimitive,useAui} from '@assistant-ui/react'; import {finalAnswerText} from './src/runtime/message-presentation.ts'; export function ChatGPT({onReadAloud}){globalThis.aui=useAui();return <ThreadPrimitive.Messages>{({message})=>message.role==='assistant'?<MessagePrimitive.Root><ActionBarPrimitive.Copy>Copy</ActionBarPrimitive.Copy><ActionBarPrimitive.Reload>Regenerate</ActionBarPrimitive.Reload><AuiIf condition={s=>s.message.speech==null}><ActionBarPrimitive.Speak disabled={!finalAnswerText(message.parts)} onClick={()=>onReadAloud(finalAnswerText(message.parts))}>Read aloud</ActionBarPrimitive.Speak></AuiIf><AuiIf condition={s=>s.message.speech!=null}><ActionBarPrimitive.StopSpeaking>Stop reading</ActionBarPrimitive.StopSpeaking></AuiIf></MessagePrimitive.Root>:null}</ThreadPrimitive.Messages>}`,
       materials: `export const materialContext=()=>'';`,
       catchup: `export const catchUp=async()=>{};`,
@@ -83,7 +83,9 @@ test("Read Aloud uses browser speech, supports Stop, and Regenerate sends a fres
     button("Regenerate").click();
     await new Promise(resolve => setTimeout(resolve, 50));
     assert.equal(sent.length, 1);
-    assert.match(sent[0][1], /Give me a new response.*earlier request:[\s\S]*Explain gravity\./);
+    assert.equal(sent[0][1], "question");
+    assert.equal(sent[0][2], "answer");
+    assert.equal(store.get().threads[thread.id].messages.filter((m: any) => m.role === "user").length, 1);
     assert.ok(store.get().threads[thread.id].messages.some((m: any) => m.id === "answer"));
     button("Read aloud").click();
     await new Promise(resolve => setTimeout(resolve, 20));

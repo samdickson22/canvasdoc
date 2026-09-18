@@ -60,6 +60,7 @@ export class CodexRuntime {
   currentEffort?: string;
   config!: WorkspaceConfig;
   private child?: ChildProcessWithoutNullStreams;
+  private regenerating = false;
   private transportRoot?: ReturnType<
     typeof createTapRoot<CodexTransport.Instance>
   >;
@@ -272,7 +273,7 @@ export class CodexRuntime {
             snapshot.activeThreadId &&
             savedThreadId &&
             snapshot.activeThreadId !== savedThreadId &&
-            savedHasHistory
+            savedHasHistory && !this.regenerating
           )
             throw new Error("Runtime returned a different thread on resume.");
           // This write is the durable admission boundary before native execution.
@@ -389,7 +390,7 @@ export class CodexRuntime {
   rpc(method: string, params: Record<string, unknown> = {}): Promise<any> {
     return this.client.request(method, params);
   }
-  async send(text: string, requestId: string, model?: string, effort?: string) {
+  private configureTurn(requestId: string, model?: string, effort?: string) {
     const selected = this.models.find((m) => m.id === model);
     if (model && model !== this.currentModel && !selected)
       throw new Error(
@@ -403,9 +404,34 @@ export class CodexRuntime {
       ...(model ? { model } : {}),
       ...(effort ? { effort } : {}),
     };
+  }
+  async send(text: string, requestId: string, model?: string, effort?: string) {
+    this.configureTurn(requestId, model, effort);
     await this.transport.send([{ type: "text", text, text_elements: [] }], {
       id: requestId,
     });
+  }
+  async regenerate(sourceRequestId: string, requestId: string, model?: string, effort?: string) {
+    const snapshot = this.snapshot();
+    if (this.regenerating || snapshot.queue.length ||
+        Object.values(snapshot.threads).some(thread => thread.turns.some(turn => turn.status === "inProgress")))
+      throw new Error("Finish or stop the agent's current work before regenerating.");
+    const submission = snapshot.submissions[sourceRequestId];
+    if (!submission || !snapshot.threads[submission.threadId])
+      throw new Error("This turn is no longer in the agent history. Send the request again to start a new turn.");
+    this.configureTurn(requestId, model, effort);
+    this.regenerating = true;
+    try {
+      // The persisted submission owns the original input and turn boundary.
+      // Harness performs the fork and dispatch under a new delivery ID.
+      await this.transport.commands["run/enqueue"]({
+        runId: requestId,
+        runAnchorMessageId: submission.parentId,
+        message: { ...submission.message, id: requestId },
+      });
+    } finally {
+      this.regenerating = false;
+    }
   }
   async interrupt(requestId: string) {
     return this.transport.interruptMessage(requestId);
@@ -429,17 +455,6 @@ export class CodexRuntime {
   }
   view() {
     const snapshot = this.snapshot();
-    const thread = snapshot.activeThreadId
-      ? snapshot.threads[snapshot.activeThreadId]
-      : undefined;
-    const messages = projectThread(
-      thread as CodexProtocol.Thread | undefined,
-      this.client.requests,
-      snapshot.completed,
-      thread && snapshot.timelines?.[thread.id],
-      thread && snapshot.progress?.[thread.id],
-    );
-    const turns = thread?.turns ?? [];
     const runs: Record<
       string,
       {
@@ -452,7 +467,7 @@ export class CodexRuntime {
     for (const queued of snapshot.queue)
       runs[queued.message.id] = { status: "queued", messages: [] };
     for (const submission of Object.values(snapshot.submissions)) {
-      const turn = turns.find((t) => t.id === submission.turnId);
+      const turn = snapshot.threads[submission.threadId]?.turns.find((t) => t.id === submission.turnId);
       runs[submission.message.id] = {
         turnId: turn?.id,
         messages: [],
@@ -488,34 +503,37 @@ export class CodexRuntime {
               : {}),
       };
     }
-    // Native user IDs also recover deliveries admitted by the pre-Harness connector.
-    for (const turn of turns) {
-      const ids = turn.items
-        .filter((i) => i.type === "userMessage")
-        .map((i) => i.clientId)
-        .filter((id): id is string => !!id);
-      for (const [id, submission] of Object.entries(snapshot.submissions))
-        if (submission.turnId === turn.id && !ids.includes(id)) ids.push(id);
-      for (const id of ids) {
-        const run = (runs[id] ??= {
-          turnId: turn.id,
-          messages: [],
-          status:
-            turn.status === "failed"
-              ? "error"
-              : turn.status === "inProgress"
-                ? this.connected
-                  ? "working"
-                  : "recovering"
-                : turn.status,
-          ...(turn.error ? { error: turn.error.message } : {}),
-        });
-        run.messages = Object.values(messages).filter(
-          (m) =>
-            m.role === "assistant" &&
-            (m.metadata?.provider?.codex as { turnId?: string })?.turnId ===
-              turn.id,
-        );
+    for (const thread of Object.values(snapshot.threads)) {
+      const messages = projectThread(thread as CodexProtocol.Thread, this.client.requests,
+        snapshot.completed, snapshot.timelines?.[thread.id], snapshot.progress?.[thread.id]);
+      for (const turn of thread.turns) {
+        const ids = turn.items
+          .filter((i) => i.type === "userMessage")
+          .map((i) => i.clientId)
+          .filter((id): id is string => !!id);
+        for (const [id, submission] of Object.entries(snapshot.submissions))
+          if (submission.threadId === thread.id && submission.turnId === turn.id && !ids.includes(id)) ids.push(id);
+        for (const id of ids) {
+          const run = (runs[id] ??= {
+            turnId: turn.id,
+            messages: [],
+            status:
+              turn.status === "failed"
+                ? "error"
+                : turn.status === "inProgress"
+                  ? this.connected
+                    ? "working"
+                    : "recovering"
+                  : turn.status,
+            ...(turn.error ? { error: turn.error.message } : {}),
+          });
+          run.messages = Object.values(messages).filter(
+            (m) =>
+              m.role === "assistant" &&
+              (m.metadata?.provider?.codex as { turnId?: string })?.turnId ===
+                turn.id,
+          );
+        }
       }
     }
     const active = Object.entries(runs).find(([, run]) =>
