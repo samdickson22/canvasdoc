@@ -72,7 +72,7 @@ Click **Reload** for Canvasdoc in `chrome://extensions`, then refresh Canvas. Ch
 
 History exports run asynchronously. Browser storage remains the primary application store; ordinary navigation and drafting do not wait for a backup. Restoring an export is explicit.
 
-See the [privacy policy](docs/privacy.md) for more detail.
+See the public [privacy policy](https://canvasdoc-public.vercel.app/privacy/) for more detail. For help, visit [Canvasdoc support](https://canvasdoc-public.vercel.app/support/) or email [sjedickson+canvasdoc@gmail.com](mailto:sjedickson+canvasdoc@gmail.com).
 
 ## Development
 
