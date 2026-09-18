@@ -28,34 +28,6 @@ test("a send atomically stores the message and the identical retry command in th
   assert.equal(Object.keys(data.outbox!).length, 0);
   assert.equal(data.threads[command.sourceThreadId].messages.length, 1);
 });
-test("a draft saved from another tab preserves messages committed since that tab read the thread", () => {
-  const command = {
-    requestId: "request-12345",
-    sourceThreadId: "home",
-    title: "Home",
-    href: "/",
-    text: "hello",
-  };
-  let data = mutate(empty(), {
-    type: "enqueue",
-    command,
-    createdAt: new Date().toISOString(),
-  });
-  data = mutate(data, {
-    type: "thread",
-    thread: {
-      id: "home",
-      title: "Home",
-      href: "/",
-      draft: "next question",
-      messages: [],
-      updatedAt: new Date().toISOString(),
-    },
-  });
-  assert.equal(data.threads.home.messages.length, 1);
-  assert.equal(data.threads.home.draft, "next question");
-});
-
 const metadata = { id: "home", title: "Home", href: "/", updatedAt: "2026-09-16T12:00:00Z" };
 const response = (revision: number, text: string) => ({
   id: "assistant:request-12345", role: "assistant" as const, text,
@@ -71,12 +43,10 @@ test("draft mutations preserve the latest response and response updates preserve
   assert.equal(data.threads.home.messages[0].text, "Final response");
 });
 
-test("out-of-order snapshots and stale whole-thread saves cannot rewind versioned messages", () => {
+test("out-of-order snapshots cannot rewind versioned messages", () => {
   let data = mutate(empty(), { type: "message", thread: metadata, message: response(5, "Complete") });
   data = mutate(data, { type: "message", thread: metadata, message: response(4, "Partial") });
   data = mutate(data, { type: "message", thread: metadata, message: response(5, "Duplicate") });
-  const { revision: _, ...legacy } = response(1, "Legacy partial");
-  data = mutate(data, { type: "thread", thread: { ...metadata, draft: "", messages: [legacy] } });
   assert.equal(data.threads.home.messages[0].text, "Complete");
   assert.equal(data.threads.home.messages[0].revision, 5);
 });

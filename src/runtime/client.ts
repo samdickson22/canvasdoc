@@ -37,42 +37,43 @@ function handshake() {
 }
 let savedConnection: { url: string; token: string } | undefined;
 const listeners = new Set<() => void>();
-const uploads = new Map<string, { resolve: (path: string) => void; reject: (error: Error) => void }>();
-const fileRequests = new Map<string, { resolve: (result: any) => void; reject: (error: Error) => void }>();
-const materialRequests = new Map<string, { resolve: (result: any) => void; reject: (error: Error) => void }>();
+const requests = new Map<string, { resolve: (value: any) => void; reject: (error: Error) => void }>();
 const approvalReplies = new Map<string, { resolve: () => void; reject: (error: Error) => void }>();
-export function materialRequest<T>(operation: Record<string, unknown>): Promise<T> {
-  if (!state.materials) return Promise.reject(new Error("Update canvasdoc-cli to enable course material syncing."));
+function request<T>(message: object, timeout: number, timeoutMessage: string): Promise<T> {
   const id = crypto.randomUUID();
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { materialRequests.delete(id); reject(new Error("Material sync timed out. It will retry.")); }, 60000);
-    materialRequests.set(id, {resolve: value => {clearTimeout(timer); resolve(value)}, reject: error => {clearTimeout(timer); reject(error)}});
-    try { send({type:"materials", id, account:store.account(), ...operation}); }
-    catch (error) { materialRequests.delete(id); clearTimeout(timer); reject(error); }
+    const finish = () => { clearTimeout(timer); requests.delete(id); };
+    const timer = setTimeout(() => pending.reject(new Error(timeoutMessage)), timeout);
+    const pending = {
+      resolve: (value: T) => { finish(); resolve(value); },
+      reject: (error: Error) => { finish(); reject(error); },
+    };
+    requests.set(id, pending);
+    try { send({ ...message, id }); }
+    catch (error) { pending.reject(error as Error); }
   });
+}
+function rejectRequests() {
+  const error = new Error("Computer disconnected. Reconnect and try again.");
+  for (const pending of requests.values()) pending.reject(error);
+  for (const pending of approvalReplies.values()) pending.reject(error);
+  approvalReplies.clear();
+}
+export function materialRequest<T>(operation: Record<string, unknown>): Promise<T> {
+  if (!state.materials) return Promise.reject(new Error("Connect your computer to sync course materials."));
+  return request({ ...operation, type: "materials" }, 60000, "Material sync timed out. It will retry.");
 }
 export const connectionState = () => state;
 export const subscribeConnection = (listener: () => void) => { listeners.add(listener); return () => {listeners.delete(listener)}; };
 export function workspaceRequest<T>(type: "files-list" | "files-read", path?: string): Promise<T> {
-  const id = crypto.randomUUID();
-  return new Promise((resolve,reject) => {
-    const timer = setTimeout(() => {fileRequests.delete(id);reject(new Error("Reconnect your computer to load files."));},15000);
-    fileRequests.set(id,{resolve:r=>{clearTimeout(timer);resolve(r)},reject:e=>{clearTimeout(timer);reject(e)}});
-    try {send({type,id,path})} catch(error) {fileRequests.delete(id);clearTimeout(timer);reject(error)}
-  });
+  return request({ type, path }, 15000, "Reconnect your computer to load files.");
 }
 export async function uploadFile(file: File): Promise<string> {
   if (file.size > 5 * 1024 * 1024) throw new Error("Files must be 5 MB or smaller.");
   const bytes = new Uint8Array(await file.arrayBuffer());
   let binary = "";
   for (let i = 0; i < bytes.length; i += 32768) binary += String.fromCharCode(...bytes.subarray(i, i + 32768));
-  const id = crypto.randomUUID();
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { uploads.delete(id); reject(new Error("File upload timed out. Reconnect and try again.")); }, 30000);
-    uploads.set(id, { resolve: path => { clearTimeout(timer); resolve(path); }, reject: error => { clearTimeout(timer); reject(error); } });
-    try { send({ type: "upload", id, name: file.name, base64: btoa(binary) }); }
-    catch (error) { uploads.delete(id); clearTimeout(timer); reject(error); }
-  });
+  return request({ type: "upload", name: file.name, base64: btoa(binary) }, 30000, "File upload timed out. Reconnect and try again.");
 }
 function update(patch: Partial<State>) {
   state = { ...state, ...patch };
@@ -192,6 +193,7 @@ export function connect(url: string, token: string) {
     )
   )
     throw new Error("Use a secure connector URL or local loopback.");
+  rejectRequests();
   savedConnection = { url, token };
   sessionStorage.setItem(
     "canvasdoc:dev-connection",
@@ -212,6 +214,7 @@ export function connect(url: string, token: string) {
   current.onerror = () => update({ error: "Could not reach your computer." });
   current.onclose = (event) => {
     if (socket !== current) return;
+    rejectRequests();
     update({ status: "disconnected" });
     if (event.code !== 1008 && savedConnection)
       reconnectTimer = setTimeout(() => {
@@ -237,9 +240,10 @@ function receive(event: { data: string }) {
   } catch {
     return;
   }
-  if (m.type === "materials-result") {
-    const request = materialRequests.get(m.id); materialRequests.delete(m.id);
-    if (m.error) request?.reject(new Error(m.error)); else request?.resolve(m.result);
+  if (["materials-result", "files-result", "upload-result"].includes(m.type)) {
+    const pending = requests.get(m.id);
+    if (m.error) pending?.reject(new Error(m.error));
+    else pending?.resolve(m.type === "upload-result" ? m.path : m.result);
     return;
   }
   if (m.type === "send-rejected") {
@@ -248,18 +252,6 @@ function receive(event: { data: string }) {
       update({error:m.message});
       void applyRun({command,status:"error",error:m.message,text:"",revision:Date.now(),createdAt:new Date().toISOString()});
     }
-    return;
-  }
-  if (m.type === "files-result") {
-    const request = fileRequests.get(m.id); fileRequests.delete(m.id);
-    if (m.error) request?.reject(new Error(m.error)); else request?.resolve(m.result);
-    return;
-  }
-  if (m.type === "upload-result") {
-    const pending = uploads.get(m.id);
-    uploads.delete(m.id);
-    if (m.error) pending?.reject(new Error(m.error));
-    else if (typeof m.path === "string") pending?.resolve(m.path);
     return;
   }
   if (m.type === "connected") {
@@ -324,6 +316,7 @@ function receive(event: { data: string }) {
     backupTimer = setTimeout(scheduleBackup, 10000);
   }
   if (m.type === "native-disconnected") {
+    rejectRequests();
     const previous = nativePort;
     nativePort = undefined;
     update({ status: "disconnected", error: state.error || m.message, canReconnectAgent: false });
@@ -358,6 +351,7 @@ export function initializeConnection() {
 }
 export function connectNative() {
   if (!isExtension) return;
+  rejectRequests();
   const previous = nativePort;
   nativePort = undefined;
   previous?.disconnect();
@@ -372,12 +366,14 @@ export function connectNative() {
   current.onDisconnect.addListener(() => {
     const error = chrome.runtime.lastError;
     if (nativePort !== current) return;
+    rejectRequests();
     nativePort = undefined;
     update({ status: "disconnected", error: state.error || error?.message || "Chrome's connection to Canvasdoc closed. Reconnect to try again." });
   });
 }
 export const usesNativeConnection = isExtension;
 export function disconnect() {
+  rejectRequests();
   connectionAccount = undefined;
   nativePort?.disconnect();
   nativePort = undefined;

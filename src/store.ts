@@ -1,8 +1,7 @@
 import { useSyncExternalStore } from "react";
-import type { PersonalTask, SavedMessage, ThreadRecord } from "./types";
+import type { PersonalTask, SavedMessage } from "./types";
 import { browserStorage } from "./storage/browser.ts";
 import { empty, mutate, type Data, type DraftUpdate, type Mutation, type ThreadMetadata } from "./storage/data.ts";
-export { parseSavedData } from "./storage/data.ts";
 let key = "";
 let data = empty();
 let committed = empty();
@@ -115,9 +114,6 @@ export const store = {
     };
   },
   error: () => storageError,
-  saveThread(thread: ThreadRecord) {
-    return update({ type: "thread", thread });
-  },
   saveDraft(draft: DraftUpdate) {
     return update({ type: "draft", draft });
   },

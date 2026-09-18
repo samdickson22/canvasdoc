@@ -83,7 +83,7 @@ export type DraftUpdate = ThreadMetadata & Pick<ThreadRecord, "draft" | "draftQu
 function mergeMessage(messages: Map<string, SavedMessage>, message: SavedMessage) {
   const prior = messages.get(message.id);
   // Only the companion's increasing snapshot revision can supersede a
-  // versioned message. Older tabs and legacy whole-thread saves cannot rewind it.
+  // versioned message. Out-of-order snapshots cannot rewind it.
   if (prior?.revision !== undefined && (message.revision === undefined || message.revision <= prior.revision)) return;
   messages.set(message.id, message);
 }
@@ -94,7 +94,6 @@ export type Mutation =
   | { type: "material-catalog"; catalog: NonNullable<Data["materialCatalog"]> }
   | { type: "canvas-cache"; cache: NonNullable<Data['canvasCache']> }
   | { type: "model"; model: { id: string; effort?: string } }
-  | { type: "thread"; thread: ThreadRecord }
   | { type: "draft"; draft: DraftUpdate }
   | { type: "message"; thread: ThreadMetadata; message: SavedMessage }
   | { type: "task"; task: PersonalTask }
@@ -129,14 +128,6 @@ export function mutate(current: Data, op: Mutation): Data {
     next.threads = {
       ...current.threads,
       [op.thread.id]: { ...prior, ...op.thread, draft: prior?.draft ?? "", messages: [...messages.values()] },
-    };
-  } else if (op.type === "thread") {
-    const prior = current.threads[op.thread.id];
-    const messages = new Map((prior?.messages ?? []).map((m) => [m.id, m]));
-    for (const message of op.thread.messages) mergeMessage(messages, message);
-    next.threads = {
-      ...current.threads,
-      [op.thread.id]: { ...op.thread, messages: [...messages.values()] },
     };
   } else if (op.type === "task")
     next.tasks = current.tasks.some((t) => t.id === op.task.id)

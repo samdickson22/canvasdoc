@@ -1,8 +1,8 @@
-import {readFile,writeFile,mkdir,copyFile,cp} from 'node:fs/promises';
-import {deflateSync} from 'node:zlib';
-import {execFileSync} from 'node:child_process';
-const dir='release/webstore';await mkdir(dir,{recursive:true});
-const manifest=JSON.parse(await readFile('dist/manifest.json','utf8'));
+import { writeFile } from 'node:fs/promises';
+import { deflateSync } from 'node:zlib';
+import { stageExtension, zipDirectory } from './package-utils.mjs';
+const dir = 'release/webstore';
+const manifest = await stageExtension(dir);
 const origin='https://canvas.calpoly.edu/*';
 manifest.content_scripts=manifest.content_scripts.map(script=>({...script,matches:[origin]}));
 manifest.host_permissions=[origin,'https://*.instructure.com/*','https://*.instructureusercontent.com/*'];
@@ -22,9 +22,6 @@ for(const size of [16,32,48,128]){
  const file=`icon-${size}.png`;await writeFile(`${dir}/${file}`,Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',ihdr),chunk('IDAT',deflateSync(rows)),chunk('IEND',Buffer.alloc(0))]));manifest.icons[size]=file;
 }
 await writeFile(`${dir}/manifest.json`,JSON.stringify(manifest,null,2));
-const files=['canvasdoc.js','background.js','bootstrap.js','bootstrap.css'];for(const file of files)await copyFile(`dist/${file}`,`${dir}/${file}`);
-await cp('dist/pdf',`${dir}/pdf`,{recursive:true});
-await mkdir('release/artifacts',{recursive:true});
-const zip=`release/artifacts/canvasdoc-webstore-${manifest.version}.zip`;
-execFileSync('python3',['-c','import sys,zipfile,pathlib; root=pathlib.Path(sys.argv[1]); z=zipfile.ZipFile(sys.argv[2],"w",zipfile.ZIP_DEFLATED); names=sys.argv[3:]+[str(p.relative_to(root)) for p in (root/"pdf").rglob("*") if p.is_file()]; [z.write(root/name,name) for name in names]',dir,zip,'manifest.json',...files,...Object.values(manifest.icons)]);
+const zip = `release/artifacts/canvasdoc-webstore-${manifest.version}.zip`;
+await zipDirectory(dir, zip);
 console.log(`Store upload package: ${zip} (not published; review docs/release-checklist.md)`);

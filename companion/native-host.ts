@@ -1,13 +1,11 @@
 import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { WebSocket } from "ws";
 import { nativeFrames } from "./native-framing.ts";
 
 // Chrome starts this small framing adapter; the independent connector owns Codex.
-const configuration = process.argv[2] === "--connection-config"
-  ? JSON.parse(await readFile(process.argv[3], "utf8"))
-  : { origin: process.argv[3], port: Number(process.argv[4] || 3218), token: (await readFile(path.join(process.argv[2], ".canvasdoc/dev-connection-token"), "utf8")).trim() };
-const { origin, port, token } = configuration;
+if (process.argv[2] !== "--connection-config" || !process.argv[3])
+  throw new Error("Usage: native-host --connection-config PATH");
+const { origin, port, token } = JSON.parse(await readFile(process.argv[3], "utf8"));
 if (typeof origin !== "string" || !Number.isInteger(port) || port < 1 || port > 65535 || typeof token !== "string" || !token)
   throw new Error("Native host configuration is missing.");
 function send(value: unknown) {

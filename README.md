@@ -48,8 +48,6 @@ Both scripts install dependencies from the lockfile when needed. `start.sh` pack
 
 Each workspace uses `.canvasdoc/codex-home/` for Codex sessions, sign-in, and settings. Canvasdoc's threads stay out of the desktop app's default history, so ChatGPT can remain open. First use requires signing in for that folder. Materials, outputs, and bundled or learned skills remain in the workspace; skills and settings installed only in your personal Codex home are separate.
 
-The first launch with a fresh private home starts a fresh agent. Earlier agent history and pending execution from the shared home are not imported. Existing browser chats, files, workspace skills, and Canvas account binding stay in place.
-
 ## Update
 
 Stop the companion with **Ctrl+C**, then run:
@@ -98,7 +96,7 @@ Read [AGENTS.md](AGENTS.md) for product decisions and coding-agent instructions.
 - [Filesystem and Workspace decisions](docs/filesystem-workspace.md)
 - [Loading behavior](docs/loading.md)
 
-Optional packaging commands:
+Local packaging commands, none of which publish:
 
 ```bash
 node scripts/package-cli.mjs       # npm tarball in release/artifacts

@@ -1,24 +1,49 @@
-# Extension release preparation
+# Canvasdoc release checklist
+
+The companion CLI is already distributed on npm as `canvasdoc-cli`. The first public extension release and subsequent CLI updates have separate publication steps. Building packages does not publish either product.
+
+## Choose and publish the release
+
+1. Check `npm view canvasdoc-cli version dist-tags --json` and choose an unused version for the next CLI update. Update the root `package.json` and lockfile together. Published npm versions cannot be replaced; see [npm publish](https://docs.npmjs.com/cli/v11/commands/npm-publish/).
+2. Commit the intended release changes and build all packages from that checkout. Confirm the extension and CLI versions match. A same-version local archive is not evidence that npm contains those changes.
+3. Verify the packaged companion and extension together using synthetic data. Complete the clean-profile checks below before rollout.
+4. When publishing is authorized, publish the verified `release/artifacts/canvasdoc-cli-<version>.tgz` archive. Do not publish the private repository root. Confirm the registry version and archive integrity, then verify installation of that exact npm version.
+5. Upload the matching Web Store ZIP and complete the store review process. Record the released commit, versions, and verification evidence in the release or PR, not as a running log in this document.
 
 ## Build and update
 
 Run `./build.sh`, `node scripts/package-cli.mjs`, `node scripts/package-extension.mjs`, and `node scripts/package-webstore.mjs` from the repository root. Verify the install and runtime behavior affected by the release; a full regression suite is not a prerequisite.
 
-The unpacked testing bundle includes the matching CLI archive. The Web Store ZIP contains only extension runtime files and icons; it excludes development origins, workspace data, source maps, credentials, and the local unpacked-extension key. Neither command publishes anything.
+The unpacked testing bundle includes the matching CLI archive. The Web Store ZIP contains extension runtime files, icons, and license notices; it excludes development origins, workspace data, source maps, credentials, and the local unpacked-extension key. These commands only create local artifacts.
+
+`package.json` owns the release version, Node requirement, and packaged Codex dependency version. The extension build writes that version into its generated manifest. Packaging rejects an extension or CLI whose version differs from the release version and recreates its staging folders before copying files. CLI setup helpers are bundled into the launcher rather than shipped as extra entry points.
 
 The npm CLI ships minified JavaScript. Harness is bundled into the companion entry points; the package must not contain its source tree, source maps, or a Harness dependency that downloads source at install time. `package-cli.mjs` checks the exact archive file list and rejects source metadata in its JavaScript outputs. Agent guidance, skills, and required license notices remain readable. Minification is packaging, not source secrecy: distributed JavaScript can still be inspected. Harness's MIT copyright and license notice is retained as `HARNESS-LICENSE`; private repository visibility does not change that license.
 
 For an unpacked update: stop the connector, pull, run `./build.sh`, restart with `./start.sh`, reload the extension in `chrome://extensions`, and refresh Canvas. Keep the checkout path unchanged. UI-only updates do not require restarting the connector; file protocol/runtime changes do.
 
-## Store configuration still required
+## Data contracts
+
+Existing CLI installations can already contain real work. Preserve these user-owned records; the first public product release establishes the baseline for future compatible upgrades:
+
+- Browser data under `canvasdoc:v1:<origin>:<userId>`, including conversations, drafts, tasks, queued sends, and cancellations. Draft and message mutations are separate so tabs cannot replace each other's conversation snapshots.
+- Workspace identity and account binding in `.canvasdoc/config.json` and `.canvasdoc/account.json`, plus user files and skills. Relocation is explicit.
+- Codex sign-in, sessions, and Harness recovery state in the workspace's private `.canvasdoc/codex-home/`.
+- The delivery journal in `.canvasdoc/delivery.json` and versioned browser recovery exports under `.canvasdoc/history/`. Delivery receipts prevent duplicate execution; these are not a second execution engine.
+- Launcher settings in `~/.config/canvasdoc/settings.json` and the Chrome native host name `com.canvasdoc.connector`.
+
+Internal React components and helper functions are not public APIs. Future format changes need an explicit upgrade path that preserves user data. Do not reset a real workspace to make a release check pass.
+
+## Store configuration and verification
 
 - Supply the store-issued extension ID to `canvasdoc-cli --extension-id <store-id> --origin https://canvas.calpoly.edu`. The development build's ID is not interchangeable with the published ID.
-- Host the privacy policy at a stable public URL and enter that URL in the developer dashboard.
+- Host the [privacy policy](privacy.md) at a stable public URL and enter that URL in the developer dashboard. Provide a publicly reachable privacy/support contact; an issues link in a private repository is not accessible to ordinary users.
 - Capture actual, current product screenshots for the listing. Do not submit mockups as product screenshots.
 - Suggested description: “A local coursework agent inside Canvas, with assignment conversations, course materials, and a persistent workspace on your computer.” State clearly that a local companion and Codex account are required and current support is Cal Poly only.
-- Complete Chrome's data-use disclosures to match `privacy.md`, including course content, chat content, and local runtime/model-provider processing.
+- Complete Chrome's data-use disclosures to match [the privacy policy](privacy.md), including course content, chat content, and local runtime/model-provider processing.
 - Provide reviewer instructions and synthetic test access; never provide a student's real credentials.
-- Verify the native bridge with the store-issued ID before rollout. Check a clean install, reconnect, and uninstall on a separate Chrome profile. Prerelease upgrades have no backward compatibility guarantee.
+- Resolve corresponding-source distribution for the BetterCanvas-derived AGPL styling before distributing the extension. Retaining notices alone does not settle that release requirement.
+- Verify the native bridge with the store-issued ID before rollout. On a separate Chrome profile and synthetic workspace, verify installation from npm, workspace selection, private Codex sign-in, browser pairing, send/stream/stop, reconnect after companion restart, file preview/download, and uninstall. Confirm existing workspace data is preserved when updating the CLI.
 
 ## Permissions and purpose
 
@@ -32,6 +57,6 @@ There is no `<all_urls>`, cookie-reading API permission, or browser-history perm
 
 ## Current limitations to disclose
 
-Preview/download through the inspector supports files up to 25 MB. Text rendering is limited to 256 KB; the download retains the full file. HTML artifacts run in an opaque-origin sandbox with remote subresource access blocked; linked local assets are not bundled. Other binary formats offer download instead of a misleading text preview. Larger files remain accessible directly in the workspace folder.
+Preview/download through the inspector supports files up to 25 MiB. Chat uploads are limited to 5 MiB each. Text rendering is limited to 256 KiB; the download retains the full file. HTML artifacts run in an opaque-origin sandbox with remote subresource access blocked; linked local assets are not bundled. Other binary formats offer download instead of a misleading text preview. Larger files remain accessible directly in the workspace folder.
 
 Publishing and store approval remain separate from packaging and local test results.

@@ -65,9 +65,11 @@ let receipts: Record<string, { hash: string; status: string }> = {};
 let cancelledRequests: Record<string, true> = {};
 try {
   const saved = JSON.parse(await readFile(journalFile, "utf8"));
-  runs = Array.isArray(saved) ? saved : saved.runs;
-  receipts = Array.isArray(saved) ? {} : saved.receipts;
-  cancelledRequests = Array.isArray(saved) ? {} : saved.cancelledRequests ?? {};
+  if (!saved || !Array.isArray(saved.runs) || !saved.receipts || !saved.cancelledRequests ||
+      typeof saved.receipts !== "object" || Array.isArray(saved.receipts) ||
+      typeof saved.cancelledRequests !== "object" || Array.isArray(saved.cancelledRequests))
+    throw new Error("Unsupported delivery journal. Preserve this workspace and restore its current journal before restarting.");
+  ({ runs, receipts, cancelledRequests } = saved);
 } catch (error) {
   if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
 }

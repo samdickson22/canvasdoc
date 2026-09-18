@@ -57,9 +57,20 @@ const build = await context({
             target: "chrome120",
             minify: true,
           });
-          for (const file of ["manifest.json", "bootstrap.js", "bootstrap.css"]) {
+          for (const file of ["bootstrap.js", "bootstrap.css"]) {
             await copyFile(`extension/${file}`, `${output}/${file}`);
           }
+          const manifest = JSON.parse(await readFile("extension/manifest.json", "utf8"));
+          const metadata = JSON.parse(await readFile("package.json", "utf8"));
+          await writeFile(`${output}/manifest.json`, JSON.stringify({ ...manifest, version: metadata.version }, null, 2));
+          await mkdir(`${output}/notices`, { recursive: true });
+          for (const [source, name] of [
+            ["LICENSE", "CANVASDOC-LICENSE"],
+            ["src/assistant-ui/LICENSE", "ASSISTANT-UI-LICENSE"],
+            ["src/bettercampus/LICENSE", "TASKS-FOR-CANVAS-LICENSE"],
+            ["src/bettercampus/BETTERCANVAS-LICENSE", "BETTERCANVAS-LICENSE"],
+            ["src/bettercampus/README.md", "BETTERCANVAS-ATTRIBUTION.md"],
+          ]) await copyFile(source, `${output}/notices/${name}`);
           const version = String(Date.now());
           await writeFile(
             `${output}/version.json`,
