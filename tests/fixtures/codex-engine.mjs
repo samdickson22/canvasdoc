@@ -49,11 +49,11 @@ export async function serve(mode, threadId) {
     active = undefined;
     pending = undefined;
   };
-  const approval = (question = false) => {
+  const approval = (question = false, mcp = false) => {
     pending = 42;
     emit({
       id: pending,
-      method: question
+      method: mcp ? "mcpServer/elicitation/request" : question
         ? "item/tool/requestUserInput"
         : "item/commandExecution/requestApproval",
       params: {
@@ -62,6 +62,11 @@ export async function serve(mode, threadId) {
         itemId: active?.items.at(-1).id,
         command: "printf synthetic-approval",
         reason: "Synthetic approval test; no command will execute.",
+        ...(mcp ? {
+          serverName: "cua_repl", mode: "form",
+          message: 'Allow Browser use to access https://synthetic.example?',
+          requestedSchema: {type: "object", properties: {}},
+        } : {}),
         ...(question
           ? {
               questions: [
@@ -93,7 +98,7 @@ export async function serve(mode, threadId) {
                 Object.values(m.result.answers)
                   .flatMap((a) => a.answers)
                   .join(", ")
-            : "DECISION: " + m.result.decision,
+            : "DECISION: " + (m.result.action ?? m.result.decision),
         );
       continue;
     }
@@ -232,9 +237,9 @@ export async function serve(mode, threadId) {
         finish("completed", "[Chapter](chapter%231.md) [Created](created.csv) [Missing](missing.md) [Directory](folder) [Escape](../outside.md) [Symlink](escape.md) [Office](table.xlsx) [Source](uploads/source.txt) [Assignment](/courses/1/assignments/1) [Section](#requirements) [Canvas file](/files/123/download) [Web](//example.com/report.pdf)");
       }, 350);
       else if (scenario === "complete") later(() => finish(), 350);
-      else if (["approval", "question", "resolve"].includes(scenario))
+      else if (["approval", "question", "resolve", "mcp-approval"].includes(scenario))
         later(() => {
-          approval(scenario === "question");
+          approval(scenario === "question", scenario === "mcp-approval");
           if (scenario === "resolve")
             later(() => {
               emit({

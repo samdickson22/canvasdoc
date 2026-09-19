@@ -105,13 +105,14 @@ async function mount() {
       ? Array.from(content.children).filter(
           (element): element is HTMLElement => element instanceof HTMLElement,
         )
-      : [];
+      : context.kind === "personal" && main ? [main.host] : [];
+  const hasWorkspace = context.kind === "assignment" || context.kind === "personal";
   const tabs =
-    context.kind === "assignment"
+    hasWorkspace
       ? region("canvasdoc-tabs", content, true)
       : null;
   const workspace =
-    context.kind === "assignment"
+    hasWorkspace
       ? region("canvasdoc-workspace", content)
       : null;
   if (workspace) {

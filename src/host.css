@@ -14,7 +14,7 @@ body.canvasdoc-sidebar-open #right-side-wrapper,
 body.canvasdoc-home #right-side-wrapper {
   display: none !important;
 }
-body.canvasdoc-personal #content > :not(#canvasdoc-main) {
+body.canvasdoc-personal #content > :not(#canvasdoc-main):not(#canvasdoc-tabs):not(#canvasdoc-workspace) {
   display: none !important;
 }
 body.canvasdoc-home #content {

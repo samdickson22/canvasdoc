@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { registerNative } from './native-setup.mjs';
+import { setupComputerUse } from './computer-use.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
 import { readFile } from 'node:fs/promises';
@@ -13,7 +14,7 @@ import { prepareCodexHome } from '../companion/codex-home.ts';
 const args = process.argv.slice(2);
 const help = `Canvasdoc\n\nUsage: npx canvasdoc-cli [--folder PATH] [--origin URL] [--no-open] [--relocate]\n\nFirst run chooses a folder and Canvas URL. Later runs resume the same agent.\nKeep this terminal open while using Canvasdoc. Chat attachments support files up to 5 MB. Node.js 22.13 or later is required.\nThe Canvasdoc browser extension or development UI must already be installed.
 Update this connector to use the chat model and reasoning-effort selector.\n\n--folder PATH  Select or create a Canvasdoc folder\n--extension-id ID  Register the Chrome extension on this Mac\n--origin URL   Canvas site allowed to connect\n--relocate     Resume an existing agent from its moved folder (requires --folder)
---no-open      Start without opening a browser\n--help         Show this help\n--version      Show version`;
+--setup-browser  Configure Chrome tab control and native Mac app tools, then exit\n--setup-computer-use  Configure native Mac app tools for this workspace and exit\n--no-open      Start without opening a browser\n--help         Show this help\n--version      Show version`;
 
 async function main() {
   if (args.includes('--help')) return console.log(help);
@@ -23,7 +24,9 @@ async function main() {
   }
   const options = {};
   for (let i = 0; i < args.length; i++) {
-    if (args[i] === '--no-open') options.noOpen = true;
+    if (args[i] === '--setup-browser') options.setupBrowser = true;
+    else if (args[i] === '--setup-computer-use') options.setupComputerUse = true;
+    else if (args[i] === '--no-open') options.noOpen = true;
     else if (args[i] === '--relocate') options.relocate = true;
     else if (['--folder', '--origin', '--extension-id'].includes(args[i]) && args[i + 1] && !args[i + 1].startsWith('--')) options[args[i].slice(2)] = args[++i];
     else throw new Error(`Unknown or incomplete option: ${args[i]}\n${help}`);
@@ -64,6 +67,11 @@ async function main() {
   if (prefix.length) {
     const bundled = spawnSync(bin, [...prefix, '--version'], { env: codexHome.env, stdio: 'ignore' });
     if (bundled.error || bundled.status !== 0) throw new Error('The bundled Codex could not start. Install Codex for your platform and rerun npx canvasdoc-cli.');
+  }
+  if (options.setupComputerUse || options.setupBrowser) {
+    await setupComputerUse({ bin, prefix, codexHome, root, chrome: !!options.setupBrowser });
+    console.log(`${options.setupBrowser ? "Chrome browser control and native Computer Use" : "Native Computer Use"} configured for ${root}. Restart the companion when its current work has finished. macOS and app-access approvals remain required.`);
+    return;
   }
   const status = spawnSync(bin, [...prefix, ...codexHome.args, 'login', 'status'], { cwd: root, env: codexHome.env, stdio: 'ignore' });
   if (status.status !== 0) {

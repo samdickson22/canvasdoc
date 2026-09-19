@@ -1,3 +1,4 @@
+import { isMcpConfirmation } from "./runtime/elicitation";
 import { catchUp } from "./catch-up";
 import { transitionView } from "./transitions";
 import { FileLinkThread } from "./workspace-link";
@@ -217,7 +218,7 @@ export function Conversation({
     });
   }, [runtime, context.threadId, context.title, context.href]);
   return (
-    <FileLinkThread.Provider value={context.kind === "assignment" ? context.threadId : ""}>
+    <FileLinkThread.Provider value={context.kind === "assignment" || context.kind === "personal" ? context.threadId : ""}>
     <AssistantRuntimeProvider runtime={runtime}>
       <div
         ref={setPortalContainer}
@@ -255,7 +256,8 @@ function RuntimeApproval({ approval, connected }: { approval: Approval; connecte
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const questions = approval.method === "item/tool/requestUserInput" ? approval.params.questions ?? [] : [];
-  const canApprove = ["item/commandExecution/requestApproval", "item/fileChange/requestApproval"].includes(approval.method);
+  const mcpConfirmation = isMcpConfirmation(approval.method, approval.params);
+  const canApprove = mcpConfirmation || ["item/commandExecution/requestApproval", "item/fileChange/requestApproval"].includes(approval.method);
   const respond = async (decision: "accept" | "decline") => {
     setError("");
     setSending(true);
@@ -266,6 +268,8 @@ function RuntimeApproval({ approval, connected }: { approval: Approval; connecte
   return (
     <section className="approval-card" aria-label={questions.length ? "Agent questions" : "Agent approval"}>
       <strong>{questions.length ? "The agent needs your answer" : canApprove ? "Permission needed" : "The agent needs input"}</strong>
+      {mcpConfirmation && <p>{approval.params.message}</p>}
+      {mcpConfirmation && <p>Requested by {approval.params.serverName}. Applies to this request only.</p>}
       {approval.params.reason && <p>{approval.params.reason}</p>}
       {approval.params.command && <pre>{approval.params.command}</pre>}
       {approval.params.grantRoot && <p>Folder: {approval.params.grantRoot}</p>}

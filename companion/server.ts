@@ -1,3 +1,4 @@
+import { mcpConfirmationAnswer } from "../src/runtime/elicitation.ts";
 import type { ArtifactEvidence } from "../src/workspace-files.ts";
 import { verifyArtifacts } from "./artifact-evidence.ts";
 import { WorkspaceAccount, IdentityError } from "./account-identity.ts";
@@ -377,7 +378,9 @@ wss.on("connection", (socket, request) => {
         if (message.type === "approval") {
           const a = approvals.find(a => a.id === String(message.id));
           if (!a) throw new Error("Approval no longer pending");
-          if (a.method === "item/tool/requestUserInput") {
+          if (a.method === "mcpServer/elicitation/request") {
+            await runtime.answer(a.id, mcpConfirmationAnswer(a.params, message.decision));
+          } else if (a.method === "item/tool/requestUserInput") {
             const answers: Record<string, { answers: string[] }> = {};
             for (const question of a.params.questions ?? []) {
               const text = message.answers?.[question.id];

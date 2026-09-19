@@ -44,7 +44,7 @@ export function Workspace({
   toolbar,
   context,
   conversationHost,
-  onAssignment,
+  onOverview,
   onConnect,
   requestedFile,
   active,
@@ -54,7 +54,7 @@ export function Workspace({
   active: boolean;
   requestedFile?: { path: string };
   conversationHost: HTMLElement;
-  onAssignment: () => void;
+  onOverview: () => void;
   onConnect: () => void;
 }) {
   const connection = useConnection();
@@ -480,12 +480,12 @@ export function Workspace({
                             <MaterialStatus />
                             <button
                               className="workspace-source"
-                              onClick={onAssignment}
+                              onClick={onOverview}
                             >
                               <FileText size={15} />
                               <span>
-                                Assignment in Canvas
-                                <small>Official requirements</small>
+                                {context.kind === "personal" ? "Personal task" : "Assignment in Canvas"}
+                                <small>{context.kind === "personal" ? "Task description" : "Official requirements"}</small>
                               </span>
                             </button>
                           </>

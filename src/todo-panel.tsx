@@ -217,7 +217,7 @@ export function TodoList({
   const inPeriod = (item: (typeof items)[number]) =>
     period === "all" ||
     (item.due && +new Date(item.due) >= +date && +new Date(item.due) < +end);
-  const periodItems = items.filter(inPeriod);
+  const periodItems = items.filter(item => !item.personal && inPeriod(item));
   const bars = courses
     .filter((c) => periodItems.some((i) => i.courseId === c.id))
     .map((c) => ({
@@ -235,6 +235,7 @@ export function TodoList({
   const visible = items
     .filter(
       (i) =>
+        !i.personal &&
         (selected === null || i.courseId === selected) &&
         (departing[i.id] ?? i.completed) === completed &&
         (inPeriod(i) ||
@@ -249,7 +250,7 @@ export function TodoList({
         (a.due ? +new Date(a.due) : Infinity) -
         (b.due ? +new Date(b.due) : Infinity),
     );
-  const groups = [
+  const courseworkGroups = [
     "Overdue",
     "Today",
     "Tomorrow",
@@ -259,11 +260,17 @@ export function TodoList({
   ]
     .map((label) => ({
       label,
+      personal: false,
       items: visible.filter(
         (i) => dueGroup(i.due, new Date(), timeZone) === label,
       ),
     }))
     .filter((g) => g.items.length);
+  const personalItems = items.filter(item => item.personal &&
+    (departing[item.id] ?? item.completed) === completed);
+  const groups = [...courseworkGroups, ...(personalItems.length ? [{
+    label: "Personal tasks", personal: true, items: personalItems,
+  }] : [])];
   const width = Math.min(
     14,
     strokeWidth(Math.max(1, bars.length), 130, 55, spaceBetween(bars.length)),
@@ -338,8 +345,9 @@ export function TodoList({
             Include earlier overdue work
           </label>
           <p>
-            Course rings filter the list. Progress comes from Canvas
-            submissions, planner checkmarks, and completed personal tasks.
+            Course rings and dates filter coursework. Progress comes from Canvas
+            submissions and planner checkmarks. Personal tasks stay visible
+            regardless of the selected course or dates.
           </p>
         </div>
       )}
@@ -428,12 +436,16 @@ export function TodoList({
         {todos.length ? "Could not refresh. Showing saved coursework." : error}
         <button onClick={retry}>Retry</button>
       </div>}
-      {loading && !todos.length ? (
-        <p className="loading">Loading coursework…</p>
-      ) : groups.length ? (
+      {loading && !todos.length && <p className="loading">Loading coursework…</p>}
+      {groups.length ? (
         groups.map((g) => (
-          <section className="bc-group" key={g.label}>
-            <button
+          <section className={`bc-group${g.personal ? " bc-personal-tasks" : ""}`} key={g.label} aria-label={g.label}>
+            {g.personal ? (
+              <>
+                <hr className="bc-personal-divider" />
+                <div className="bc-group-heading"><span>Personal tasks</span><small>{g.items.length}</small></div>
+              </>
+            ) : <button
               className="bc-group-heading"
               aria-expanded={!collapsed.includes(g.label)}
               onClick={() =>
@@ -454,8 +466,8 @@ export function TodoList({
                     : undefined,
                 }}
               />
-            </button>
-            {!collapsed.includes(g.label) &&
+            </button>}
+            {(g.personal || !collapsed.includes(g.label)) &&
               g.items.map((item) => (
                 <div
                   key={item.id}
@@ -541,7 +553,7 @@ export function TodoList({
               ))}
           </section>
         ))
-      ) : (
+      ) : !loading ? (
         <div className="bc-empty">
           <Check size={24} />
           <strong>
@@ -558,7 +570,7 @@ export function TodoList({
             View all dates and courses
           </button>
         </div>
-      )}
+      ) : null}
       <button className="bc-add" onClick={onAdd}>
         <Plus size={18} /> Add task
       </button>

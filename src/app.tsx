@@ -329,7 +329,7 @@ export function App({
           <div
             className="assignment-tabs"
             role="tablist"
-            aria-label="Assignment view"
+            aria-label={context.kind === "personal" ? "Task view" : "Assignment view"}
           >
             <button
               role="tab"
@@ -345,7 +345,7 @@ export function App({
                 }
               }}
             >
-              Assignment
+              {context.kind === "personal" ? "Task" : "Assignment"}
             </button>
             <button
               role="tab"
@@ -371,7 +371,7 @@ export function App({
         )}
       {mounts.workspace &&
         createPortal(
-          <Workspace toolbar={workspaceToolbar} active={workspace} requestedFile={requestedFile} context={context} conversationHost={mounts.conversationHost!} onAssignment={() => void transitionView(() => setWorkspace(false))} onConnect={onConnect} />,
+          <Workspace toolbar={workspaceToolbar} active={workspace} requestedFile={requestedFile} context={context} conversationHost={mounts.conversationHost!} onOverview={() => void transitionView(() => setWorkspace(false))} onConnect={onConnect} />,
           mounts.workspace,
         )}
       {modal &&

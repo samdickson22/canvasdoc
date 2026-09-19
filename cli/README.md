@@ -37,3 +37,17 @@ The extension owns the material index and checks for updates while Canvas is ope
 The companion bundles assignment review, study preparation, and document/code artifact procedures. Codex discovers them in your Canvasdoc folder's `.agents/skills/` and loads applicable instructions on demand. Procedures use available sources and installed authoring tools; they do not add a required authoring tool stack.
 
 Existing skills and edited bundled files are preserved. Canvasdoc updates only files whose contents still match its ownership record in `.canvasdoc/bundled-skills.json`. To restore a bundled procedure after editing it, remove that procedure's `SKILL.md` and restart the companion. These procedures are maintained with the application; they do not learn or import skills automatically.
+
+## Optional native Computer Use on macOS
+
+Install the ChatGPT desktop app and enable its Computer Use feature first. Configure the selected Canvasdoc workspace with `canvasdoc-cli --folder /path/to/Canvasdoc --origin https://canvas.calpoly.edu --setup-computer-use`, then restart the companion after its current work finishes.
+
+This registers the installed unified Computer Use runtime as `cua_repl` in the workspace's private Codex configuration. It can inspect and operate native Mac apps, including signed-in Chrome windows. macOS Screen Recording, Accessibility, and the native service's app-access approvals still apply. This does not set up a separate browser automation session.
+
+The setup references the installed desktop runtime and requires it to remain installed. It does not copy desktop credentials, sessions, permission lists, or proprietary runtime files into Canvasdoc. This optional integration depends on the installed desktop runtime and may need reconfiguration after a desktop update. To remove it, run `CODEX_HOME=/path/to/Canvasdoc/.canvasdoc/codex-home codex mcp remove cua_repl`.
+
+### Chrome tabs in your existing profile
+
+To also enable structured browser control, install and connect the official ChatGPT Chrome extension through the ChatGPT desktop app, then run `canvasdoc-cli --folder /path/to/Canvasdoc --origin https://canvas.calpoly.edu --setup-browser` and restart the companion. This includes native Computer Use and enables only the Chrome browser backend, not the desktop app's in-app browser.
+
+The agent can create task tab groups, open tabs in the connected signed-in Chrome profile, and inspect and interact with pages using browser controls. Existing tabs remain user-owned unless explicitly selected for a task. Website-access approvals remain enforced by the browser bridge. Credentials and browser cookies stay in Chrome; Canvasdoc keeps its private Codex home. The ChatGPT desktop app and its connected Chrome extension are required for this optional local integration.
