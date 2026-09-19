@@ -46,7 +46,7 @@ test("extension background serializes concurrent tabs without losing either task
         {
           type: "canvasdoc:storage:commit",
           key: "canvasdoc:test",
-          op: {
+          ops: [{
             type: "task",
             task: {
               id,
@@ -58,7 +58,7 @@ test("extension background serializes concurrent tabs without losing either task
               completed: false,
               createdAt: new Date().toISOString(),
             },
-          },
+          }],
         },
         {
           id: "test-extension",

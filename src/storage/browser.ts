@@ -17,18 +17,18 @@ export const browserStorage = {
     }
     return parseSavedData(localStorage.getItem(key));
   },
-  async commit(key: string, op: Mutation): Promise<Data> {
+  async commit(key: string, ops: Mutation[]): Promise<Data> {
     if (extension) {
       const result = await chrome.runtime.sendMessage({
         type: "canvasdoc:storage:commit",
         key,
-        op,
+        ops,
       });
       if (result.error) throw new Error(result.error);
       return parseSavedData(JSON.stringify(result.data));
     }
     const commit = () => {
-      const data = mutate(parseSavedData(localStorage.getItem(key)), op);
+      const data = ops.reduce(mutate, parseSavedData(localStorage.getItem(key)));
       localStorage.setItem(key, JSON.stringify(data));
       return data;
     };

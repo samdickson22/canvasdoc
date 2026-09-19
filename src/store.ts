@@ -6,9 +6,9 @@ let key = "";
 let data = empty();
 let committed = empty();
 let storageError = "";
-type PendingWrite = { op: Mutation; started: boolean; result: Promise<boolean> };
+type PendingWrite = { op: Mutation; started: boolean; result: Promise<boolean>; resolve: (ok: boolean) => void };
 let pending: PendingWrite[] = [];
-let tail = Promise.resolve();
+let writing = false;
 let unsubscribe: undefined | (() => void);
 const listeners = new Set<() => void>();
 function emit() {
@@ -39,6 +39,11 @@ export async function initializeStore(userId: string) {
 }
 function update(op: Mutation): Promise<boolean> {
   const last = pending.at(-1);
+  if (last && !last.started && last.op.type === "draft" && op.type === "draft" && last.op.draft.id === op.draft.id) {
+    last.op = op;
+    project();
+    return last.result;
+  }
   // Streaming events are full snapshots. Replace an unsaved snapshot instead
   // of making the next user message wait behind every intermediate version.
   if (last && !last.started && last.op.type === "message" && op.type === "message" &&
@@ -51,31 +56,39 @@ function update(op: Mutation): Promise<boolean> {
     project();
     return last.result;
   }
-  const entry: PendingWrite = { op, started: false, result: Promise.resolve(true) };
+  const entry: PendingWrite = { op, started: false, result: Promise.resolve(true), resolve() {} };
+  entry.result = new Promise(resolve => { entry.resolve = resolve; });
   pending.push(entry);
-  let ok = true;
-  const operation = tail.then(async () => {
-    entry.started = true;
-    try {
-      committed = await browserStorage.commit(key, entry.op);
-      pending = pending.filter((item) => item !== entry);
-      storageError = "";
-      project();
-      window.dispatchEvent(new Event("canvasdoc:committed"));
-    } catch {
-      ok = false;
-      pending = pending.filter((item) => item !== entry);
-      project();
-      storageError =
-        "Changes could not be saved in this browser. Keep this page open and try again.";
-      emit();
-    }
-  });
-  tail = operation.catch(() => {});
-  entry.result = operation.then(() => ok);
   project();
+  if (!writing) {
+    writing = true;
+    queueMicrotask(() => { void persist(); });
+  }
   return entry.result;
 }
+async function persist() {
+  while (pending.length) {
+    // Save all changes accumulated during the previous write in one transaction.
+    // A send still waits for durable storage, without one account rewrite per edit.
+    const batch = [...pending];
+    batch.forEach(entry => { entry.started = true; });
+    let ok = true;
+    try {
+      committed = await browserStorage.commit(key, batch.map(entry => entry.op));
+      storageError = "";
+    } catch {
+      ok = false;
+      storageError = "Changes could not be saved in this browser. Keep this page open and try again.";
+    }
+    const finished = new Set(batch);
+    pending = pending.filter(entry => !finished.has(entry));
+    project();
+    if (ok) window.dispatchEvent(new Event("canvasdoc:committed"));
+    batch.forEach(entry => { entry.resolve(ok); });
+  }
+  writing = false;
+}
+
 export const store = {
   saveCatchUp(state: NonNullable<Data["catchUp"]>) { return update({type:"catch-up",state}); },
   setWorkspaceNavigationCollapsed(collapsed: boolean) { return update({type:"workspace-navigation",collapsed}); },
@@ -83,7 +96,7 @@ export const store = {
   cacheCanvas(cache: NonNullable<Data['canvasCache']>) { return update({type:"canvas-cache",cache}); },
   setModel(id: string, effort?: string) { return update({type:"model",model:{id,effort}}); },
   async flush() {
-    await tail;
+    while (pending.length) await Promise.all(pending.map(entry => entry.result));
     return !storageError && pending.length === 0;
   },
   get: () => data,

@@ -31,9 +31,11 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       if (message.type === "canvasdoc:storage:load") return current;
       if (message.type !== "canvasdoc:storage:commit")
         throw new Error("Unknown storage operation");
-      const next = mutate(current, message.op as Mutation);
-      parseSavedData(JSON.stringify(next));
-      await chrome.storage.local.set({ [message.key]: JSON.stringify(next) });
+      if (!Array.isArray(message.ops) || !message.ops.length) throw new Error("Invalid storage batch");
+      const next = (message.ops as Mutation[]).reduce(mutate, current);
+      const serialized = JSON.stringify(next);
+      parseSavedData(serialized);
+      await chrome.storage.local.set({ [message.key]: serialized });
       return next;
     });
   queues.set(message.key, run);
