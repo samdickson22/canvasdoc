@@ -22,7 +22,7 @@ The connector listens on loopback port 3218. `CANVASDOC_CONNECTOR_PORT`, `CANVAS
 
 Chat attachments support files up to 5 MB each. The connector saves attached files in `uploads/` inside the selected Canvasdoc folder so the main agent can read them.
 
-Workspace lists files from your Canvasdoc folder and previews text, PDFs, images, and sandboxed HTML. Preview and download are limited to 25 MiB per file; text rendering is capped at 256 KiB. Hidden directories, dependency folders, and symlinks are excluded from the listing; files outside the chosen folder are not exposed.
+Workspace lists files from your Canvasdoc folder and previews text, PDFs, images, sandboxed HTML, and React artifacts (`.tsx` files bundled locally with react and react-dom only). Preview and download are limited to 25 MiB per file; text rendering is capped at 256 KiB. Hidden directories, dependency folders, and symlinks are excluded from the listing; files outside the chosen folder are not exposed.
 
 Canvasdoc defaults to GPT-5.6 Luna with medium reasoning. Available choices come from the connected Codex runtime. Your saved model selection takes precedence; selecting a different model applies to the next turn while retaining the same main-agent thread and Canvasdoc folder. If the selected model is unavailable, choose another model from the selector.
 

@@ -28,4 +28,4 @@ Keep learned guidance current by revising existing rules instead of appending du
 
 Check the result with the smallest useful verification: inspect a cited passage, count words, reopen an output, or run a relevant example. State what you actually checked. Local completion does not establish Canvas submission.
 
-Link files created or explicitly used for this conversation with Markdown paths relative to the Canvasdoc root, such as `[Report](work/report.md)`. Use angle brackets around paths containing spaces. These links attach files to the conversation workspace; do not list unrelated files.
+Interactive coursework such as quizzes, flashcards, or simulations can be a single `.tsx` React component that Workspace previews live; the `canvasdoc-artifacts` skill describes the constraints. Link files created or explicitly used for this conversation with Markdown paths relative to the Canvasdoc root, such as `[Report](work/report.md)`. Use angle brackets around paths containing spaces. These links attach files to the conversation workspace; do not list unrelated files.

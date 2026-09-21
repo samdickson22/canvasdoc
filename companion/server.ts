@@ -14,6 +14,7 @@ import { HistoryExporter } from "./history-export.ts";
 import { MaterialMirror } from "./materials.ts";
 import { saveUpload } from "./uploads.ts";
 import { listWorkspaceFiles, readWorkspaceFile } from "./files.ts";
+import { bundleArtifact } from "./artifacts.ts";
 import type { UserCommand } from "../src/runtime/protocol.ts";
 
 const rootArg = process.argv[2];
@@ -247,9 +248,11 @@ wss.on("connection", (socket, request) => {
           );
           return;
         }
-        if (message.type === "files-list" || message.type === "files-read") {
+        if (message.type === "files-list" || message.type === "files-read" || message.type === "files-bundle") {
           try {
-            const result = message.type === "files-list" ? await listWorkspaceFiles(config.root) : await readWorkspaceFile(config.root, message.path);
+            const result = message.type === "files-list" ? await listWorkspaceFiles(config.root)
+              : message.type === "files-bundle" ? await bundleArtifact(config.root, message.path)
+              : await readWorkspaceFile(config.root, message.path);
             socket.send(JSON.stringify({ type: "files-result", id: message.id, result }));
           } catch (error) {
             socket.send(JSON.stringify({ type: "files-result", id: message.id, error: (error as Error).message }));

@@ -1,7 +1,7 @@
 import { readdir, readFile, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 
-async function within(root: string, relative: string) {
+export async function within(root: string, relative: string) {
   if (typeof relative !== "string" || path.isAbsolute(relative) || relative.split(/[\\/]/).some(p => p.startsWith("."))) throw new Error("Choose a workspace file.");
   const target = await realpath(path.join(root, relative));
   if (!target.startsWith(root + path.sep)) throw new Error("File is outside the Canvasdoc folder.");
@@ -51,6 +51,6 @@ export async function readWorkspaceFile(root: string, relative: string) {
   if (info.size > 25 * 1024 * 1024) return {...metadata,base64:'',previewKind:'unavailable',notice:'This file exceeds the 25 MB preview and download limit. Open it from your Canvasdoc folder.'};
   const bytes = await readFile(target);
   const binary = bytes.includes(0) || ['.docx','.xlsx','.pptx','.doc','.xls','.ppt','.odt','.ods','.odp','.zip','.gz','.exe'].includes(ext);
-  const previewKind = metadata.mime.startsWith('image/') ? 'image' : ext === '.pdf' ? 'pdf' : binary ? 'download' : ['.html','.htm'].includes(ext) ? 'html' : /\.(md|markdown)$/i.test(relative) ? 'markdown' : 'text';
+  const previewKind = metadata.mime.startsWith('image/') ? 'image' : ext === '.pdf' ? 'pdf' : binary ? 'download' : ['.html','.htm'].includes(ext) ? 'html' : ['.tsx','.jsx'].includes(ext) ? 'react' : /\.(md|markdown)$/i.test(relative) ? 'markdown' : 'text';
   return {...metadata,mime:binary && !mimeTypes[ext]?'application/octet-stream':metadata.mime,base64:bytes.toString('base64'),previewKind};
 }

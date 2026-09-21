@@ -1,5 +1,6 @@
 import { createPortal } from "react-dom";
 import { sandboxedHtml } from "./html-preview";
+import { ReactArtifactPreview } from "./react-artifact";
 import { useData } from "./store";
 import {
   belongsToAssignment,
@@ -404,7 +405,7 @@ export function Workspace({
                       hidden={path !== selected}
                     >
                       {previews[path] ? (
-                        <FilePreview file={previews[path]} openFile={openFile} actions={path === selected ? fileActions : null} />
+                        <FilePreview file={previews[path]} openFile={openFile} actions={path === selected ? fileActions : null} threadId={context.threadId} />
                       ) : loading && path === selected ? (
                         <p className="workspace-file-hint">Loading preview…</p>
                       ) : (
@@ -663,7 +664,7 @@ function FileTreeItem({
     </li>
   );
 }
-function FilePreview({ file, actions, openFile }: { file: Preview; actions: HTMLElement | null; openFile: (path: string) => void }) {
+function FilePreview({ file, actions, openFile, threadId }: { file: Preview; actions: HTMLElement | null; openFile: (path: string) => void; threadId: string }) {
   const [htmlSource, setHtmlSource] = useState(false);
   const [url, setUrl] = useState("");
   const bytes = Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0));
@@ -701,7 +702,7 @@ function FilePreview({ file, actions, openFile }: { file: Preview; actions: HTML
             <Download size={14} />
           </a>
         )}
-        {file.previewKind === "html" && (
+        {(file.previewKind === "html" || file.previewKind === "react") && (
           <div className="workspace-artifact-views" aria-label="Artifact view">
             <button
               aria-pressed={!htmlSource}
@@ -725,6 +726,8 @@ function FilePreview({ file, actions, openFile }: { file: Preview; actions: HTML
           Preview is not available for this file type. Download it to open in
           its application.
         </p>
+      ) : file.previewKind === "react" && !htmlSource ? (
+        <ReactArtifactPreview path={file.path} modified={file.modified} threadId={threadId} />
       ) : file.previewKind === "html" && !htmlSource ? (
         <iframe
           className="workspace-pdf"

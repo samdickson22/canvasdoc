@@ -65,8 +65,8 @@ export function materialRequest<T>(operation: Record<string, unknown>): Promise<
 }
 export const connectionState = () => state;
 export const subscribeConnection = (listener: () => void) => { listeners.add(listener); return () => {listeners.delete(listener)}; };
-export function workspaceRequest<T>(type: "files-list" | "files-read", path?: string): Promise<T> {
-  return request({ type, path }, 15000, "Reconnect your computer to load files.");
+export function workspaceRequest<T>(type: "files-list" | "files-read" | "files-bundle", path?: string): Promise<T> {
+  return request({ type, path }, type === "files-bundle" ? 30000 : 15000, "Reconnect your computer to load files.");
 }
 export async function uploadFile(file: File): Promise<string> {
   if (file.size > 5 * 1024 * 1024) throw new Error("Files must be 5 MB or smaller.");

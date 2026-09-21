@@ -13,7 +13,7 @@ await cp('companion/bundled-skills', `${out}/bundled-skills`, { recursive: true 
 await copyFile('companion/vendor/harness-codex/LICENSE', `${out}/HARNESS-LICENSE`);
 for (const [entry, output, external] of [
   ['cli/canvasdoc.mjs', 'canvasdoc', []],
-  ['companion/server.ts', 'connector', ['pdfjs-dist']],
+  ['companion/server.ts', 'connector', ['pdfjs-dist', 'esbuild']],
   ['companion/extract-worker.ts', 'extract-worker', ['pdfjs-dist']],
   ['companion/native-host.ts', 'native-host', []],
 ]) {
@@ -38,7 +38,7 @@ for (const file of ['canvasdoc.mjs','connector.mjs','native-host.mjs','extract-w
     throw new Error(`Release bundle exposes source metadata: ${file}`);
   }
 }
-await writeFile(`${out}/package.json`, JSON.stringify({ name: 'canvasdoc-cli', version, description: 'Local Canvasdoc setup and persistent Codex connector', type: 'module', bin: { 'canvasdoc-cli': './canvasdoc.mjs' }, license: 'MIT', engines: metadata.engines, files: ['AGENT.md', 'bundled-skills', 'HARNESS-LICENSE', 'LICENSE', 'canvasdoc.mjs', 'connector.mjs', 'native-host.mjs', 'extract-worker.mjs', 'README.md'], dependencies: { '@openai/codex': metadata.dependencies['@openai/codex'], 'pdfjs-dist': metadata.dependencies['pdfjs-dist'] } }, null, 2));
+await writeFile(`${out}/package.json`, JSON.stringify({ name: 'canvasdoc-cli', version, description: 'Local Canvasdoc setup and persistent Codex connector', type: 'module', bin: { 'canvasdoc-cli': './canvasdoc.mjs' }, license: 'MIT', engines: metadata.engines, files: ['AGENT.md', 'bundled-skills', 'HARNESS-LICENSE', 'LICENSE', 'canvasdoc.mjs', 'connector.mjs', 'native-host.mjs', 'extract-worker.mjs', 'README.md'], dependencies: { '@openai/codex': metadata.dependencies['@openai/codex'], 'pdfjs-dist': metadata.dependencies['pdfjs-dist'], esbuild: metadata.devDependencies.esbuild, react: metadata.dependencies.react, 'react-dom': metadata.dependencies['react-dom'] } }, null, 2));
 await copyFile('cli/README.md', `${out}/README.md`);
 
 if(process.argv.includes('--no-pack')) { console.log(`Built Canvasdoc CLI ${version} from this checkout.`); process.exit(0); }

@@ -198,6 +198,20 @@ export function Conversation({
     if (runtime.thread.getState().speech) runtime.thread.stopSpeaking();
   }, [runtime, context.threadId]);
   useEffect(() => {
+    const compose = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (detail?.threadId !== context.threadId || typeof detail.text !== "string") return;
+      runtime.thread.composer.setText(detail.text);
+      queueMicrotask(() => {
+        const input = portalContainer?.querySelector<HTMLTextAreaElement>("textarea");
+        input?.focus();
+        input?.setSelectionRange(input.value.length, input.value.length);
+      });
+    };
+    window.addEventListener("canvasdoc:compose", compose);
+    return () => window.removeEventListener("canvasdoc:compose", compose);
+  }, [runtime, context.threadId, portalContainer]);
+  useEffect(() => {
     return runtime.thread.composer.unstable_on("attachmentAddError", (event) =>
       setSendError(event.message),
     );
