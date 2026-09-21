@@ -1,8 +1,18 @@
 # Canvasdoc support
 
-Updated September 18, 2026.
+Updated September 21, 2026.
 
 Email [sjedickson+canvasdoc@gmail.com](mailto:sjedickson+canvasdoc@gmail.com) for installation help, bug reports, or privacy requests. Canvasdoc is developed by Sam Dickson and currently supports Cal Poly Canvas with a local companion and a Codex account.
+
+## Installing and starting the companion
+
+Canvasdoc needs a companion running on your Mac. Install the [Chrome extension](https://chromewebstore.google.com/detail/pbibigofgbljlhhaadjgiikdkjiahhap), install [Node.js](https://nodejs.org/) 22.13 or later, then run this in Terminal:
+
+```
+npx canvasdoc-cli@latest --extension-id pbibigofgbljlhhaadjgiikdkjiahhap --origin https://canvas.calpoly.edu
+```
+
+The first run asks you to choose a Canvasdoc folder and signs you in to Codex for that folder. Keep the Terminal window open while you use Canvasdoc. Later runs remember your folder and only need `npx canvasdoc-cli@latest`.
 
 ## Reporting a problem
 
