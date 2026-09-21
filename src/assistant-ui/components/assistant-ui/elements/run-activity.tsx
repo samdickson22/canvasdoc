@@ -1,4 +1,4 @@
-import { useEffect, useState, type PropsWithChildren } from "react";
+import { createContext, useEffect, useState, type PropsWithChildren } from "react";
 import {
   useAuiState,
   type DataMessagePart,
@@ -32,6 +32,9 @@ export function LiveActivity({ hasQueuedMessages = false, preparing = false }: {
     <span className="shimmer motion-reduce:animate-none">{label}</span>
   </div>;
 }
+
+/** Lets a tool that needs a decision open its collapsed work history. */
+export const WorkHistoryControl = createContext<(open: boolean) => void>(() => {});
 
 export function WorkHistory({
   children,
@@ -72,13 +75,13 @@ export function WorkHistory({
     <ToolGroupRoot
       variant="ghost"
       className="chat-work-history"
-      open={expanded ?? failed}
+      open={expanded ?? false}
       onOpenChange={setExpanded}
     >
       <ToolGroupTrigger count={tools.length} active={running}
         label={running ? summarizeActivity(message.parts as readonly DisplayPart[], true) : label} />
       <ToolGroupContent className="chat-work-content">
-        {children}
+        <WorkHistoryControl.Provider value={setExpanded}>{children}</WorkHistoryControl.Provider>
       </ToolGroupContent>
     </ToolGroupRoot>
   </>;

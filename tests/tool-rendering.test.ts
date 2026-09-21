@@ -64,17 +64,18 @@ test("tool renderer distinguishes failure, interruption, live output, and succes
       argsText: "{}",
     };
     const failed = render({ ...base, args: { command: "npm test" }, result: "Tests failed", isError: true });
-    assert.match(failed, /Command failed/);
-    assert.match(failed, /Tests failed/);
+    assert.match(failed, /lucide-circle-x/);
     assert.doesNotMatch(failed, /lucide-check/);
+    assert.doesNotMatch(failed, /Tests failed/, "details stay collapsed until opened");
     const complete = render({ ...base, args: { command: "/bin/zsh -lc 'npm test'" }, result: "Finished", isError: false });
     assert.match(complete, />Ran</);
     assert.match(complete, /npm test/);
     assert.doesNotMatch(complete, /zsh -lc/);
     assert.match(complete, /lucide-check/);
-    const running = render({ ...base, artifact: { output: "Still working" } });
-    assert.match(running, /Still working/);
+    const running = render({ ...base, args: { command: "npm test" }, artifact: { output: "Still working" } });
+    assert.match(running, />Running</);
     assert.match(running, /animate-spin/);
+    assert.doesNotMatch(running, /Still working/, "details stay collapsed until opened");
     assert.doesNotMatch(running, /lucide-check/);
     const interrupted = render({
       ...base,

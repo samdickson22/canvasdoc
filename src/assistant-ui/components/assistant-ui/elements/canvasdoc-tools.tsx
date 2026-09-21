@@ -1,6 +1,6 @@
 // Per-tool renderers for the Codex items Canvasdoc's companion normalizes. Built on the
 // terminal-block, file-tree, tool-call, and tool-error designs from assistant-ui's elements.
-import { useState, type PropsWithChildren, type ReactNode } from "react";
+import { useContext, useEffect, useState, type PropsWithChildren, type ReactNode } from "react";
 import type { ToolCallMessagePartProps } from "@assistant-ui/react";
 import { AlertCircleIcon, CheckIcon, ChevronRightIcon, FileIcon, FolderIcon, Loader2Icon, XCircleIcon } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../../ui/collapsible";
@@ -8,6 +8,7 @@ import { cn } from "../../../lib/utils";
 import { chip, collapsePanel, field, mono, paper, ShimmerLabel, take } from "./surfaces";
 import { useConnection } from "../../../../runtime/client";
 import { ToolFallback } from "./tool-fallback.aui";
+import { WorkHistoryControl } from "./run-activity";
 
 type Lifecycle = "running" | "completed" | "failed" | "interrupted";
 const lifecycle = (p: ToolCallMessagePartProps): Lifecycle => {
@@ -30,7 +31,7 @@ const StatusIcon = ({ state }: { state: Lifecycle }) =>
 
 /** One row in the work history: verb, target chip, status, and details on demand. */
 function ToolRow({ state, verb, activeVerb, target, children }: PropsWithChildren<{ state: Lifecycle; verb: string; activeVerb: string; target?: string }>) {
-  const [open, setOpen] = useState(state === "running" || state === "failed");
+  const [open, setOpen] = useState(false);
   const running = state === "running";
   return (
     <Collapsible data-slot="tool-row" open={open} onOpenChange={setOpen} className="w-full">
@@ -130,6 +131,10 @@ function RequestResult({ request, result }: { request: ReactNode; result: ReactN
 export function CodexTool(props: ToolCallMessagePartProps) {
   const relative = useRelative();
   const state = lifecycle(props);
+  // Approvals and questions from MCP tools must stay reachable inside the collapsed history.
+  const openHistory = useContext(WorkHistoryControl);
+  const requiresAction = props.status?.type === "requires-action";
+  useEffect(() => { if (requiresAction) openHistory(true); }, [requiresAction, openHistory]);
   const args = props.args as Record<string, unknown>;
   const output = typeof props.result === "string" ? props.result
     : typeof args.aggregatedOutput === "string" ? args.aggregatedOutput
