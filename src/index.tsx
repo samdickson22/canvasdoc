@@ -87,6 +87,16 @@ async function mount() {
     style.textContent = `@layer theme, base, canvasdoc, components, utilities; @layer canvasdoc { ${styles} } ${assistantStyles}`;
     const container = document.createElement("div");
     shadow.append(style, container);
+    // Canvas binds document-level shortcuts such as Shift+/ and treats the retargeted host as a
+    // non-input target. Printable keys typed into Canvasdoc fields stop at the host; navigation
+    // keys and shortcuts with modifiers still reach the page and assistant-ui's document listeners.
+    for (const type of ["keydown", "keypress", "keyup"] as const)
+      host.addEventListener(type, (event: KeyboardEvent) => {
+        const target = event.composedPath()[0];
+        const editable = target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement ||
+          (target instanceof HTMLElement && target.isContentEditable);
+        if (editable && event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) event.stopPropagation();
+      });
     if (prepend) parent.prepend(host);
     else parent.append(host);
     hosts.push(host);
