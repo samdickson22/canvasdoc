@@ -9,7 +9,7 @@ import {
   ToolGroupTrigger,
   ToolGroupContent,
 } from "./tool-group.aui";
-import { ToolFallback } from "./tool-fallback.aui";
+import { CodexTool } from "./canvasdoc-tools";
 import {
   formatRunDuration,
   summarizeActivity,
@@ -85,22 +85,7 @@ export function WorkHistory({
 }
 
 export function ActivityTool(props: ToolCallMessagePartProps) {
-  const output = (props.artifact as { output?: string } | undefined)?.output;
-  return (
-    <div>
-      <ToolFallback
-        {...props}
-        {...(props.providerMetadata?.canvasdoc?.lifecycle === "interrupted"
-          ? { status: { type: "incomplete", reason: "cancelled" } }
-          : {})}
-      />
-      {output && props.result === undefined ? (
-        <pre className="chat-live-output" aria-label="Live command output">
-          {output}
-        </pre>
-      ) : null}
-    </div>
-  );
+  return <CodexTool {...props} />;
 }
 
 export function RunOutcome() {

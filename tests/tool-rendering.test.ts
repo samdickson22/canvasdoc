@@ -63,11 +63,14 @@ test("tool renderer distinguishes failure, interruption, live output, and succes
       args: {},
       argsText: "{}",
     };
-    const failed = render({ ...base, result: "Command failed", isError: true });
-    assert.match(failed, /Failed tool/);
+    const failed = render({ ...base, args: { command: "npm test" }, result: "Tests failed", isError: true });
+    assert.match(failed, /Command failed/);
+    assert.match(failed, /Tests failed/);
     assert.doesNotMatch(failed, /lucide-check/);
-    const complete = render({ ...base, result: "Finished", isError: false });
-    assert.match(complete, /Used tool/);
+    const complete = render({ ...base, args: { command: "/bin/zsh -lc 'npm test'" }, result: "Finished", isError: false });
+    assert.match(complete, />Ran</);
+    assert.match(complete, /npm test/);
+    assert.doesNotMatch(complete, /zsh -lc/);
     assert.match(complete, /lucide-check/);
     const running = render({ ...base, artifact: { output: "Still working" } });
     assert.match(running, /Still working/);
@@ -79,8 +82,8 @@ test("tool renderer distinguishes failure, interruption, live output, and succes
       isError: true,
       providerMetadata: { canvasdoc: { lifecycle: "interrupted" } },
     });
-    assert.match(interrupted, /Cancelled tool/);
-    assert.doesNotMatch(interrupted, /Failed tool/);
+    assert.match(interrupted, /lucide-circle-alert/);
+    assert.doesNotMatch(interrupted, /Command failed/);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

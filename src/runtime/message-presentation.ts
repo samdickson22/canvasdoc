@@ -52,7 +52,7 @@ export function presentMessage(message: SavedMessage): ThreadMessageLike {
     ...(message.role === "user" && message.quote ? { metadata: { custom: { quote: message.quote } } } : {}),
     ...(message.role === "assistant"
       ? {
-          metadata: { custom: { run: message.run } },
+          metadata: { custom: { run: message.run, files: message.files, artifacts: message.artifacts } },
           ...(status === "error"
             ? {
                 status: {

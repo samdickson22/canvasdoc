@@ -45,6 +45,7 @@ const build = await context({
           await mkdir(`${output}/pdf`, { recursive: true });
           await bundle({entryPoints:["src/pdf-viewer.ts"],outfile:`${output}/pdf/viewer.js`,bundle:true,format:"iife",target:"chrome120",minify:true});
           await copyFile("extension/pdf-viewer.html", `${output}/pdf/viewer.html`);
+          await bundle({entryPoints:["src/mermaid-entry.ts"],outfile:`${output}/mermaid.js`,bundle:true,format:"esm",target:"chrome120",minify:true});
           await copyFile("node_modules/pdfjs-dist/build/pdf.worker.mjs", `${output}/pdf/pdf.worker.js`);
           await copyFile("node_modules/pdfjs-dist/LICENSE", `${output}/pdf/LICENSE`);
           for (const directory of ["cmaps", "standard_fonts", "wasm"])
@@ -78,7 +79,7 @@ const build = await context({
           );
           if (existsSync(resolve("dev/canvas-lms/public"))) {
             await mkdir(devOutput, { recursive: true });
-            for (const file of ["bootstrap.js", "bootstrap.css", "canvasdoc.js", "version.json"]) {
+            for (const file of ["bootstrap.js", "bootstrap.css", "canvasdoc.js", "mermaid.js", "version.json"]) {
               await copyFile(`${output}/${file}`, `${devOutput}/${file}`);
             }
             await rm(`${devOutput}/pdf`, { recursive:true, force:true });

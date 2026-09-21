@@ -26,7 +26,7 @@ The companion exposes files within the chosen root without requiring an inferenc
 
 The browser reads the same files that Codex and external editors use. A download creates a separate copy. Do not introduce a second bidirectional filesystem-sync system or treat browser-private storage as the working filesystem.
 
-The inspector supports text/Markdown, images, PDF, and sandboxed HTML previews; other formats can be downloaded. HTML previews must not gain access to Canvas, connector credentials, or the parent page. Preview/download is limited to 25 MiB per file, and text rendering is capped at 256 KiB while downloads retain the full bytes. Larger files remain available directly in the workspace folder.
+The inspector supports text/Markdown (including Mermaid fences rendered as diagrams), images, PDF, and sandboxed HTML previews; other formats can be downloaded. HTML previews must not gain access to Canvas, connector credentials, or the parent page. Preview/download is limited to 25 MiB per file, and text rendering is capped at 256 KiB while downloads retain the full bytes. Larger files remain available directly in the workspace folder.
 
 ## Two layouts, one conversation
 

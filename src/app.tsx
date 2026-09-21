@@ -227,7 +227,7 @@ export function App({
           >
             <header className="sidebar-header">
               <strong>{context.kind === "home" ? "To-do" : "Canvasdoc"}</strong>
-              {context.kind !== "home" && <button className="connection-status" data-status={connection.status} onClick={onConnect} title={connectionLabel} aria-label={connectionLabel}><i /></button>}
+              {context.kind !== "home" && <button className="connection-status" data-status={connection.status} onClick={onConnect} title={connectionLabel} aria-label={connectionLabel}><i />{connection.status === "connected" ? "Connected" : connection.status === "connecting" ? "Connecting" : "Connect"}</button>}
               <div className="header-actions">
                 {context.kind === "home" && (
                   <button

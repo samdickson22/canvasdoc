@@ -35,6 +35,9 @@ import { attachmentWorkspaceHref, type AttachmentUploadState } from "../../../..
 import { WorkspaceLink } from "../../../../workspace-link";
 import { SelectionQuote, ComposerQuote, AttachmentPreview, QueuedMessages, type QueuedMessage } from "./chat-extras";
 import { finalAnswerText } from "../../../../runtime/message-presentation";
+import { EmptyState as EmptyStateRoot, EmptyStateGreeting, EmptyStateSuggestion, EmptyStateSuggestions } from "./empty-state";
+import { ArtifactCard } from "./artifact-card";
+import type { ArtifactEvidence } from "../../../../workspace-files";
 
 type WorkOptions = {
   preparing?: boolean;
@@ -43,11 +46,13 @@ type WorkOptions = {
   queuedMessages?: readonly QueuedMessage[];
   onCancelQueued?: (id: string) => Promise<void>;
   uploadStates?: Readonly<Record<string, AttachmentUploadState>>;
-  composerPlaceholder?: string;
   composerFooter?: ReactNode;
   workMode?: boolean;
   connected?: boolean;
   onConnect?: () => void;
+  suggestions?: readonly string[];
+  /** Approvals, reconnect prompts, and connection notices, kept beside the composer. */
+  footerSlot?: ReactNode;
 };
 const WorkContext = createContext<WorkOptions>({});
 export const ChatGPT: FC<WorkOptions> = (options) => {
@@ -74,8 +79,9 @@ export const ChatGPT: FC<WorkOptions> = (options) => {
 
             <ThreadPrimitive.ViewportFooter className="sticky bottom-0 mx-auto mt-auto flex w-full max-w-3xl flex-col gap-2 overflow-visible rounded-t-3xl bg-white pb-2 dark:bg-black">
               <ThreadScrollToBottom />
+              {options.footerSlot}
               {options.queuedMessages && options.onCancelQueued && <QueuedMessages items={options.queuedMessages} onCancel={options.onCancelQueued} />}
-              <Composer placeholder="Ask anything" />
+              <Composer placeholder="Ask Canvasdoc…" />
               {options.composerFooter}
               <p className="text-center text-xs text-[#5d5d5d] dark:text-[#afafaf]">
                 Canvasdoc can make mistakes. Check important info.
@@ -90,18 +96,26 @@ export const ChatGPT: FC<WorkOptions> = (options) => {
 };
 
 const EmptyState: FC = () => {
-  const { workMode, composerFooter } = useContext(WorkContext);
+  const { composerFooter, suggestions, footerSlot } = useContext(WorkContext);
   return (
     <div className="aui-chatgpt-empty flex grow flex-col items-center justify-center px-4 pb-[16vh]">
-      <div className="mx-auto flex w-full max-w-3xl flex-col items-stretch gap-6">
-        <h1 className="text-center text-2xl leading-7 font-normal text-[#0d0d0d] dark:text-[#ececec]">
-          {workMode ? "What should we work on?" : "Where should we begin?"}
-        </h1>
+      <EmptyStateRoot className="mx-auto max-w-3xl text-[#0d0d0d] dark:text-[#ececec]">
+        <EmptyStateGreeting>What should we work on?</EmptyStateGreeting>
+        {footerSlot}
         <div className="flex flex-col gap-3">
-          <Composer placeholder="Ask anything" />
+          <Composer placeholder="Ask Canvasdoc…" />
           {composerFooter}
         </div>
-      </div>
+        {!!suggestions?.length && (
+          <EmptyStateSuggestions>
+            {suggestions.map((prompt, index) => (
+              <ThreadPrimitive.Suggestion key={prompt} prompt={prompt} send asChild>
+                <EmptyStateSuggestion index={index}>{prompt}</EmptyStateSuggestion>
+              </ThreadPrimitive.Suggestion>
+            ))}
+          </EmptyStateSuggestions>
+        )}
+      </EmptyStateRoot>
     </div>
   );
 };
@@ -170,7 +184,7 @@ const ComposerDropzone: FC<PropsWithChildren> = ({ children }) => {
 };
 
 const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
-  const { workMode, composerPlaceholder, compact } = useContext(WorkContext);
+  const { workMode, compact } = useContext(WorkContext);
   if (workMode && !compact)
     return (
       <ComposerDropzone>
@@ -182,7 +196,7 @@ const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
             />
           </div>
           <ComposerPrimitive.Input
-            placeholder={composerPlaceholder ?? "Describe what you want to work on…"}
+            placeholder="Ask Canvasdoc…"
             aria-label="Work with Canvasdoc"
             rows={2}
             className="work-prompt"
@@ -330,7 +344,7 @@ const UserMessage: FC = () => {
         />
       </div>
 
-      <div className="work-user-bubble max-w-[70%] rounded-[22px] bg-[#0d0d0d] px-4 py-2.5 leading-6 text-white dark:bg-[#ececec] dark:text-[#0d0d0d]">
+      <div className="work-user-bubble max-w-[70%] rounded-[14px] bg-[#f0f1ec] px-4 py-2.5 leading-6 text-[#30372d] dark:bg-[#2a2a2a] dark:text-[#ececec]">
         <MessagePrimitive.Parts />
       </div>
 
@@ -388,6 +402,7 @@ const AssistantMessage: FC = () => {
           }}
         </MessagePrimitive.GroupedParts>
         <RunOutcome />
+        <MessageArtifacts />
       </div>
 
       <div className="chat-message-actions -ml-2 flex items-center pt-1">
@@ -437,6 +452,24 @@ const AssistantMessage: FC = () => {
         </ActionBarPrimitive.Root>
       </div>
     </MessagePrimitive.Root>
+  );
+};
+
+/** Files the agent delivered for this reply, as cards that open in Workspace. */
+const MessageArtifacts: FC = () => {
+  const custom = useAuiState(s => s.message.metadata.custom) as { files?: string[]; artifacts?: ArtifactEvidence[] };
+  const running = useAuiState(s => s.message.status?.type === "running");
+  const items = custom.artifacts?.length ? custom.artifacts : (custom.files ?? []).map(path => ({ path, status: "available" as const }));
+  if (running || !items.length) return null;
+  return (
+    <div className="chat-artifacts flex flex-wrap gap-2 pt-3">
+      {items.map(item => {
+        const parts = item.path.split("/");
+        const size = "size" in item && typeof item.size === "number" ? ` · ${item.size < 1024 ? `${item.size} B` : item.size < 1048576 ? `${Math.round(item.size / 1024)} KB` : `${(item.size / 1048576).toFixed(1)} MB`}` : "";
+        return <ArtifactCard key={item.path} href={item.path} title={parts.at(-1) ?? item.path} unavailable={item.status !== "available"}
+          meta={item.status === "available" ? `${parts.slice(0, -1).join("/") || "workspace"}${size}` : "Not found in the workspace"} />;
+      })}
+    </div>
   );
 };
 

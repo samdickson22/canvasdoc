@@ -471,32 +471,13 @@ select {
   width: 100%;
 }
 
-.approval-card button {
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 5px 10px;
-  background: var(--paper);
-}
-.approval-card {
-  flex-shrink: 0;
-  max-height: 40vh;
-  overflow: auto;
-  margin: 10px 20px;
-  padding: 14px;
-  background: var(--tint);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  font-size: 12px;
-}
-.approval-card p {
-  overflow-wrap: anywhere;
-  margin: 10px 0;
-}
-.approval-card button {
-  margin-right: 8px;
-}
-.approval-card pre { white-space: pre-wrap; overflow-wrap: anywhere; }
-.approval-card input { display: block; width: 100%; margin: 8px 0; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); }
+/* Question forms inside the approval card (assistant-ui element). */
+.approval-questions label { display: block; font-size: 12px; }
+.approval-questions p { margin: 0 0 6px; overflow-wrap: anywhere; }
+.approval-questions button { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; margin: 0 6px 6px 0; background: var(--paper); font-size: 12px; }
+.approval-questions button[aria-pressed="true"] { border-color: var(--green); color: var(--green); }
+.approval-questions input { display: block; width: 100%; margin: 6px 0 10px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+.approval-questions button[type="submit"] { background: var(--green); color: #fff; border-color: var(--green); }
 
 /* Home keeps coursework visible while its single conversation opens on demand. */
 .home-agent { margin:0 auto; }

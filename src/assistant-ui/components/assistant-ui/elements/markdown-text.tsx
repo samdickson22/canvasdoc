@@ -1,6 +1,9 @@
 "use client";
 import { MarkdownLink, MarkdownImage, MarkdownStyles, markdownPlugins, markdownRehypePlugins, preprocessMarkdown } from "../../../../markdown-rendering";
 import { AssistantMarkdownHighlighter } from "../../../../markdown-highlighter";
+import { MermaidDiagram } from "./mermaid-diagram";
+import { useAuiState } from "@assistant-ui/react";
+import type { SyntaxHighlighterProps } from "@assistant-ui/react-markdown";
 
 import {
   type CodeHeaderProps,
@@ -25,6 +28,7 @@ const MarkdownTextImpl = () => {
       preprocess={preprocessMarkdown}
       className="aui-md"
       components={defaultComponents}
+      componentsByLanguage={componentsByLanguage}
       smooth={{ drainMs: 120, maxCharIntervalMs: 2, minCommitMs: 16 }}
       defer
     />
@@ -33,6 +37,12 @@ const MarkdownTextImpl = () => {
 };
 
 export const MarkdownText = memo(MarkdownTextImpl);
+
+function MermaidFence({ code }: SyntaxHighlighterProps) {
+  const running = useAuiState((s) => s.optional.part?.status.type === "running");
+  return <MermaidDiagram code={code} streaming={running} className="mt-3" />;
+}
+const componentsByLanguage = { mermaid: { SyntaxHighlighter: MermaidFence } };
 
 const CodeHeader: FC<CodeHeaderProps> = ({ language, code }) => {
   const { isCopied, copyToClipboard } = useCopyToClipboard();

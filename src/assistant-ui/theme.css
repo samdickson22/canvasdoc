@@ -39,8 +39,9 @@
   .aui-root { min-height: 0; font-size: 14px; }
   .aui-root textarea { border: 0; box-shadow: none; font-family: inherit; }
 }
-/* @property initial values do not cross into Canvas's shadow root. */
-.conversation { --shimmer-angle: 15deg; --shimmer-track-height: 200px; }
+/* @property initial values do not cross into Canvas's shadow root. Border utilities
+   read --tw-border-style, so without it every `border` class draws nothing. */
+.conversation, .workspace-markdown { --shimmer-angle: 15deg; --shimmer-track-height: 200px; --tw-border-style: solid; }
 /* The dashboard positions the welcome group; avoid the demo's extra bottom offset. */
 .conversation-home .aui-chatgpt-empty { padding-bottom: 0; }
 /* Work surfaces keep assistant-ui behavior and give files/context a visible home. */
@@ -54,7 +55,6 @@
 .work-folder { display:flex; align-items:center; gap:6px; font-size:11px; color:#707a68; padding:4px 6px; border-radius:5px; }.work-folder:hover { background:#eceee7; }
 .work-provider { margin-left:auto; font-size:11px; color:#838b7b; }
 .work-attachments { display:flex; gap:8px; padding:12px 14px 0; }.work-attachments:empty { display:none; }
-[data-work-mode] .work-user-bubble { background:#f0f1ec; color:#30372d; border-radius:14px; }
 .work-user-bubble { min-width:0; overflow-wrap:anywhere; }
 [data-work-mode] .aui-md { font-size:14px; line-height:1.8; }
 .work-model-selector { margin-left:auto; }
@@ -102,7 +102,9 @@
 
 /* Reserve action-row geometry even when the primitive hides during a run.
    Keep user actions mounted so Tab can reveal them without moving messages. */
-.chat-message-actions { min-height: 36px; flex-shrink: 0; }
+.chat-message-actions { min-height: 32px; flex-shrink: 0; }
+.chat-user-message .chat-message-actions { min-height: 0; height: 0; overflow: visible; }
+.chat-user-message .chat-user-actions { position: relative; top: 2px; }
 .chat-user-actions { opacity: 0; pointer-events: none; transition: opacity 120ms ease; }
 .chat-user-message:hover .chat-user-actions,
 .chat-user-message:focus-within .chat-user-actions {
@@ -121,12 +123,11 @@
   .conversation .shimmer { background: none; -webkit-text-fill-color: currentColor; }
 }
 
-.chat-work-history { margin-block: 4px 14px; }
+.chat-work-history { margin-block: 0 12px; }
 .chat-run-heading, .chat-run-note { color: #788176; font-size: 12px; line-height: 1.5; margin-block: 6px 12px; }
 .chat-work-content { padding: 0; }
-.chat-work-content > * + * { margin-top: 12px; }
+.chat-work-content > * + * { margin-top: 4px; }
 .chat-work-history > [data-slot="tool-group-trigger"] [data-slot="tool-group-trigger-label"] { font-size: 12px; line-height: 1.5; }
-.chat-live-output { max-height: 180px; overflow: auto; white-space: pre-wrap; font: 12px/1.5 ui-monospace, monospace; background: #f6f7f4; border-radius: 6px; padding: 10px; }
 .chat-run-plan { border-left: 2px solid #c6d0c0; padding-left: 12px; color: #687164; font-size: 12px; margin-block: 10px; }
 .chat-run-plan ol { list-style: none; padding: 0; margin: 6px 0; }
 .chat-run-plan li { display: flex; gap: 6px; padding-block: 3px; }

@@ -463,7 +463,7 @@ export function answerApproval(id: string, decision: "accept" | "decline") {
   return replyToApproval(id, { decision });
 }
 export function useConnection() {
-  return useSyncExternalStore(subscribeConnection, connectionState);
+  return useSyncExternalStore(subscribeConnection, connectionState, connectionState);
 }
 
 export function reconnectAgent() {

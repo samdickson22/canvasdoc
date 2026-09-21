@@ -9,6 +9,7 @@ import {
 import { MaterialStatus } from "./material-status";
 import ReactMarkdown from "react-markdown";
 import { MarkdownDocument, MarkdownImage, MarkdownLink, MarkdownStyles, markdownPlugins, markdownRehypePlugins, preprocessMarkdown } from "./markdown-rendering";
+import { MermaidDiagram } from "./assistant-ui/components/assistant-ui/elements/mermaid-diagram";
 import { useCallback, useEffect, useReducer, useState } from "react";
 import {
   Download,
@@ -750,7 +751,7 @@ function FilePreview({ file, actions, openFile }: { file: Preview; actions: HTML
         <div className="workspace-markdown">
           <MarkdownDocument.Provider value={{path: file.path, open: openFile}}>
             <MarkdownStyles />
-            <ReactMarkdown remarkPlugins={markdownPlugins} rehypePlugins={markdownRehypePlugins} components={{a: MarkdownLink, img: MarkdownImage}}>{preprocessMarkdown(text)}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={markdownPlugins} rehypePlugins={markdownRehypePlugins} components={{a: MarkdownLink, img: MarkdownImage, code: MarkdownCode}}>{preprocessMarkdown(text)}</ReactMarkdown>
           </MarkdownDocument.Provider>
         </div>
       ) : (
@@ -766,4 +767,11 @@ function FilePreview({ file, actions, openFile }: { file: Preview; actions: HTML
         )}
     </>
   );
+}
+
+// Mermaid fences render as diagrams in the file preview; other code keeps its plain block.
+function MarkdownCode({ className, children, node: _node, ...props }: import("react").ComponentProps<"code"> & { node?: unknown }) {
+  if (/\blanguage-mermaid\b/.test(className ?? ""))
+    return <MermaidDiagram code={String(children ?? "")} className="my-3" />;
+  return <code className={className} {...props}>{children}</code>;
 }

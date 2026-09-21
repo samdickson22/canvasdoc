@@ -12,6 +12,9 @@ import {
 } from "@assistant-ui/react";
 import { useConnection, sendMessage, regenerateMessage, stopRun, reconnectAgent, answerApproval, answerQuestions, uploadFile, type Approval } from "./runtime/client";
 import { ChatGPT } from "./assistant-ui/components/assistant-ui/elements/chatgpt";
+import { ApprovalCard } from "./assistant-ui/components/assistant-ui/elements/approval-card";
+import { ConnectionState } from "./assistant-ui/components/assistant-ui/elements/connection-state";
+import { FilePenLineIcon, MessageSquareIcon, PlugIcon, RefreshCwIcon } from "lucide-react";
 import { PortalContainerContext } from "./assistant-ui/lib/portal-container";
 import { createAttachmentAdapter, type AttachmentUploadState } from "./runtime/attachments";
 import { isVisibleHomeRequest, rememberHomeRequest, visibleHomeMessages } from "./runtime/home-view";
@@ -22,6 +25,12 @@ import { store, useData } from "./store";
 import type { PageContext } from "./types";
 
 const catchUpPrompt = "Catch me up on what's changed in Canvas and what needs my attention.";
+const suggestionsFor = (kind: PageContext["kind"]): readonly string[] => ({
+  home: ["What should I work on next?", catchUpPrompt, "Summarize what's due this week"],
+  assignment: ["Explain what this assignment is asking for", "Plan how to approach this", "Review my draft against the requirements"],
+  personal: ["Break this task into steps", "Help me get started", "Draft a first version"],
+  page: ["Summarize this page", "Explain the key ideas here", "Make study notes from this"],
+} as const)[kind];
 
 export function Conversation({
   context,
@@ -226,19 +235,24 @@ export function Conversation({
       >
         <PortalContainerContext.Provider value={portalContainer}>
           {(sendError || (failedRun?.error && !saved?.messages.some(m => m.id === `assistant:${failedRun.command.requestId}` && m.run?.error))) && <p className="error" role="alert">{sendError || failedRun?.error}</p>}
-          {connection.approvals.filter(approval => approval.requestId && approval.requestId === active?.command.requestId).map(approval => (
-            <RuntimeApproval key={approval.id} approval={approval} connected={connection.status === "connected"} />
-          ))}
-          {(connection.canReconnectAgent || Object.values(connection.runs).some((run: any) => run.command.sourceThreadId === context.threadId && ["uncertain", "recovering"].includes(run.status))) &&
-            <div className="approval-card"><p>The agent's last result needs to be checked before continuing.</p><button type="button" onClick={() => { try { reconnectAgent(); } catch (error) { setSendError((error as Error).message); } }}>Reconnect agent</button></div>}
           <ChatGPT
+            footerSlot={!compact && <>
+              {connection.approvals.filter(approval => approval.requestId && approval.requestId === active?.command.requestId).map(approval => (
+                <RuntimeApproval key={approval.id} approval={approval} connected={connection.status === "connected"} />
+              ))}
+              {(connection.canReconnectAgent || Object.values(connection.runs).some((run: any) => run.command.sourceThreadId === context.threadId && ["uncertain", "recovering"].includes(run.status))) &&
+                <ApprovalCard state="request" icon={<RefreshCwIcon className="size-4" />} title="Check the agent's last result"
+                  subtitle="Reconnect to reconcile what the agent did before continuing." allowLabel="Reconnect agent"
+                  onAllow={() => { try { reconnectAgent(); } catch (error) { setSendError((error as Error).message); } }} />}
+              <ConnectionState phase={connection.status === "connected" ? "online" : connection.status === "connecting" ? "reconnecting" : "dropped"} onRetry={onConnect} />
+            </>}
+            suggestions={suggestionsFor(context.kind)}
             preparing={preparing}
             compact={compact}
             onReadAloud={speechAdapter ? text => { speechText.current = text; } : undefined}
             queuedMessages={queuedMessages}
             onCancelQueued={stopRun}
             composerFooter={home && !!saved?.messages.length && <button type="button" className="home-history-toggle" aria-pressed={showHistory} onClick={() => setShowHistory(value => !value)}>{showHistory ? "Hide previous conversation" : "Show previous conversation"}</button>}
-            composerPlaceholder={home ? "Ask about your courses…" : undefined}
             workMode={home || workMode}
             uploadStates={uploadStates}
             connected={connection.status === "connected"}
@@ -255,9 +269,11 @@ function RuntimeApproval({ approval, connected }: { approval: Approval; connecte
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
-  const questions = approval.method === "item/tool/requestUserInput" ? approval.params.questions ?? [] : [];
+  const questions: { id: string; question: string; isSecret?: boolean; options?: { label: string; description: string }[] }[] =
+    approval.method === "item/tool/requestUserInput" ? approval.params.questions ?? [] : [];
   const mcpConfirmation = isMcpConfirmation(approval.method, approval.params);
-  const canApprove = mcpConfirmation || ["item/commandExecution/requestApproval", "item/fileChange/requestApproval"].includes(approval.method);
+  const fileChange = approval.method === "item/fileChange/requestApproval";
+  const canApprove = mcpConfirmation || fileChange || approval.method === "item/commandExecution/requestApproval";
   const respond = async (decision: "accept" | "decline") => {
     setError("");
     setSending(true);
@@ -265,16 +281,25 @@ function RuntimeApproval({ approval, connected }: { approval: Approval; connecte
     catch (error) { setError((error as Error).message); }
     finally { setSending(false); }
   };
+  const subtitle = [
+    mcpConfirmation && approval.params.message,
+    mcpConfirmation && `Requested by ${approval.params.serverName}. Applies to this request only.`,
+    approval.params.reason,
+    approval.params.grantRoot && `Folder: ${approval.params.grantRoot}`,
+  ].filter(Boolean).join(" ");
   return (
-    <section className="approval-card" aria-label={questions.length ? "Agent questions" : "Agent approval"}>
-      <strong>{questions.length ? "The agent needs your answer" : canApprove ? "Permission needed" : "The agent needs input"}</strong>
-      {mcpConfirmation && <p>{approval.params.message}</p>}
-      {mcpConfirmation && <p>Requested by {approval.params.serverName}. Applies to this request only.</p>}
-      {approval.params.reason && <p>{approval.params.reason}</p>}
-      {approval.params.command && <pre>{approval.params.command}</pre>}
-      {approval.params.grantRoot && <p>Folder: {approval.params.grantRoot}</p>}
+    <ApprovalCard
+      aria-label={questions.length ? "Agent questions" : "Agent approval"}
+      state={sending ? "running" : "request"}
+      disabled={!connected}
+      icon={questions.length ? <MessageSquareIcon className="size-4" /> : fileChange ? <FilePenLineIcon className="size-4" /> : mcpConfirmation ? <PlugIcon className="size-4" /> : undefined}
+      title={questions.length ? "The agent needs your answer" : canApprove ? (fileChange ? "Allow this file change?" : mcpConfirmation ? "Allow this connector action?" : "Run this command?") : "The agent needs input"}
+      subtitle={subtitle || (canApprove ? "Applies to this request only." : undefined)}
+      command={typeof approval.params.command === "string" ? approval.params.command : undefined}
+      {...(questions.length || !canApprove ? {} : { onDeny: () => void respond("decline"), onAllow: () => void respond("accept") })}
+    >
       {questions.length > 0 ? (
-        <form onSubmit={async event => {
+        <form className="approval-questions" onSubmit={async event => {
           event.preventDefault();
           setError("");
           setSending(true);
@@ -282,21 +307,19 @@ function RuntimeApproval({ approval, connected }: { approval: Approval; connecte
           catch (error) { setError((error as Error).message); }
           finally { setSending(false); }
         }}>
-          {questions.map((question: { id: string; question: string; isSecret?: boolean; options?: { label: string; description: string }[] }) => (
+          {questions.map(question => (
             <label key={question.id}>
               <p>{question.question}</p>
               {question.options?.map(option => (
-                <button type="button" key={option.label} disabled={!connected || sending} onClick={() => setAnswers(previous => ({ ...previous, [question.id]: option.label }))} title={option.description}>{option.label}</button>
+                <button type="button" key={option.label} disabled={!connected || sending} aria-pressed={answers[question.id] === option.label} onClick={() => setAnswers(previous => ({ ...previous, [question.id]: option.label }))} title={option.description}>{option.label}</button>
               ))}
               <input aria-label={question.question} type={question.isSecret ? "password" : "text"} required maxLength={10000} disabled={!connected} value={answers[question.id] ?? ""} onChange={event => setAnswers(previous => ({ ...previous, [question.id]: event.target.value }))} />
             </label>
           ))}
           <button type="submit" disabled={!connected || sending}>{sending ? "Sending…" : "Send answers"}</button>
         </form>
-      ) : canApprove ? (
-        <><button type="button" disabled={!connected || sending} onClick={() => void respond("decline")}>Decline</button><button type="button" disabled={!connected || sending} onClick={() => void respond("accept")}>{sending ? "Sending…" : "Allow"}</button></>
-      ) : <p>This request type is not supported yet. Stop this turn to continue.</p>}
-      {error && <p role="alert">{error}</p>}
-    </section>
+      ) : !canApprove ? <p className="text-foreground/60 m-0 text-xs">This request type is not supported yet. Stop this turn to continue.</p> : null}
+      {error && <p role="alert" className="m-0 text-xs text-red-700">{error}</p>}
+    </ApprovalCard>
   );
 }
