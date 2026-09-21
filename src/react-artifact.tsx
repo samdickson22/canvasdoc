@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { PencilLineIcon, RefreshCwIcon } from "lucide-react";
 import { sandboxedReact } from "./html-preview";
-import { workspaceRequest } from "./runtime/client";
+import { useConnection, workspaceRequest } from "./runtime/client";
 import type { ArtifactBundle } from "../companion/artifacts";
 
 const fileLink = (path: string) => `[${path.split("/").pop()}](${encodeURI(path).replace(/#/g, "%23")})`;
@@ -15,14 +15,16 @@ export function ReactArtifactPreview({ path, modified, threadId }: { path: strin
   const [runtimeError, setRuntimeError] = useState("");
   const [version, setVersion] = useState(0);
   const frame = useRef<HTMLIFrameElement>(null);
+  const { artifacts: supported } = useConnection();
   useEffect(() => {
     let cancelled = false;
     setBundle(null); setError(""); setRuntimeError("");
+    if (!supported) { setError("Update canvasdoc-cli to preview React artifacts. Run npx canvasdoc-cli@latest, then reconnect."); return; }
     workspaceRequest<ArtifactBundle>("files-bundle", path)
       .then(result => { if (!cancelled) setBundle(result); })
       .catch(e => { if (!cancelled) setError((e as Error).message); });
     return () => { cancelled = true; };
-  }, [path, modified, version]);
+  }, [path, modified, version, supported]);
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.source !== frame.current?.contentWindow || event.data?.type !== "canvasdoc:artifact-error") return;

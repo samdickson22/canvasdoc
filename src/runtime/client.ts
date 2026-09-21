@@ -11,6 +11,7 @@ export type Approval = {
 };
 type State = {
   materials?: boolean;
+  artifacts?: boolean;
   canReconnectAgent?: boolean;
   workspaceId?: string;
   models?: { id: string; name: string; description: string; efforts: string[]; defaultEffort: string }[];
@@ -265,6 +266,7 @@ function receive(event: { data: string }) {
     update({
       status: m.runtimeAvailable === false ? "disconnected" : "connected",
       materials: !!m.capabilities?.materials,
+      artifacts: !!m.capabilities?.artifacts,
       workspaceId: m.workspace.workspaceId,
       models: m.models || [],
       currentModel: m.currentModel,

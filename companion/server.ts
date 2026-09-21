@@ -223,7 +223,7 @@ wss.on("connection", (socket, request) => {
               type: "connected",
               account,
               runtimeAvailable,
-              capabilities: { materials: true },
+              capabilities: { materials: true, artifacts: true },
               workspace: {
                 workspaceId: config.workspaceId,
                 root: config.root,
