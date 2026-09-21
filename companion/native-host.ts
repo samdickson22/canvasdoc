@@ -45,15 +45,26 @@ socket.on("close", (code, reason) => {
   if (!reportedError) send({type:"error", message: code === 1008 ? `Connector rejected the connection: ${reason.toString()}` : `Local connector closed (${code}). Restart Canvasdoc and reconnect.`});
   process.stdout.write("", () => process.exit(0));
 });
+// Browser history backups ride this pipe whole; the connector accepts the same size.
+const messageLimit = 64 * 1024 * 1024;
 let buffer = Buffer.alloc(0);
+let skipping = 0;
 process.stdin.on("data", (chunk: Buffer) => {
   buffer = Buffer.concat([buffer, chunk]);
-  while (buffer.length >= 4) {
+  while (buffer.length >= 4 || skipping) {
+    if (skipping) {
+      // Discard an oversized message without dropping the connection.
+      const drop = Math.min(skipping, buffer.length);
+      buffer = buffer.subarray(drop);
+      skipping -= drop;
+      if (skipping || buffer.length < 4) return;
+    }
     const length = buffer.readUInt32LE(0);
-    if (length > 8 * 1024 * 1024) {
-      process.exitCode = 1;
-      socket.close();
-      return;
+    if (length > messageLimit) {
+      skipping = length;
+      buffer = buffer.subarray(4);
+      send({ type: "error", code: "MESSAGE_TOO_LARGE", message: `A message of ${Math.round(length / 1048576)} MB exceeds the connector limit and was skipped.` });
+      continue;
     }
     if (buffer.length < length + 4) return;
     const value = JSON.parse(buffer.subarray(4, 4 + length).toString());

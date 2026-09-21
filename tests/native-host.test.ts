@@ -82,3 +82,33 @@ test('native host keeps the account rejection instead of replacing it on socket 
   await exited;assert.deepEqual(frames,[rejection]);
  }finally{child?.kill();for(const socket of server.clients)socket.terminate();server.close();await rm(temp,{recursive:true,force:true})}
 });
+
+test('native host forwards a 9 MB backup and skips an oversized message without dropping the connection',{timeout:30000},async()=>{
+ const temp=await mkdtemp(path.join(os.tmpdir(),'canvasdoc-native-inbound-'));
+ const server=new WebSocketServer({host:'127.0.0.1',port:0,maxPayload:64*1024*1024});await new Promise<void>(r=>server.on('listening',r));
+ const port=(server.address() as {port:number}).port;
+ const received:number[]=[];
+ server.on('connection',socket=>socket.on('message',bytes=>{const m=JSON.parse(bytes.toString());if(m.type==='connect')socket.send(JSON.stringify({type:'connected'}));else received.push(bytes.length)}));
+ let child:ReturnType<typeof spawn>|undefined;
+ try{
+  await build({entryPoints:['companion/native-host.ts'],outfile:path.join(temp,'host.mjs'),bundle:true,platform:'node',format:'esm',banner:{js:'import {createRequire} from "node:module";const require=createRequire(import.meta.url);'}});
+  await writeFile(path.join(temp,'connection.json'),JSON.stringify({origin:'http://localhost:3210',port,token:'synthetic'}));
+  child=spawn(process.execPath,[path.join(temp,'host.mjs'),'--connection-config',path.join(temp,'connection.json')],{stdio:['pipe','pipe','pipe']});
+  const frames:any[]=[];let buffer=Buffer.alloc(0);
+  child.stdout!.on('data',data=>{buffer=Buffer.concat([buffer,data]);while(buffer.length>=4&&buffer.length>=4+buffer.readUInt32LE(0)){const n=buffer.readUInt32LE(0);frames.push(JSON.parse(buffer.subarray(4,4+n).toString()));buffer=buffer.subarray(4+n)}});
+  const write=(body:Buffer)=>new Promise<void>(resolve=>{const header=Buffer.alloc(4);header.writeUInt32LE(body.length);child!.stdin!.write(Buffer.concat([header,body]),()=>resolve())});
+  const until=async(check:()=>boolean,label:string)=>{const end=Date.now()+15000;while(!check()){if(Date.now()>end)throw new Error(label);await new Promise(r=>setTimeout(r,50))}};
+  await write(Buffer.from(JSON.stringify({type:'connect',account:'canvasdoc:v1:http://localhost:3210:synthetic'})));
+  await until(()=>frames.some(f=>f.type==='connected'),'no handshake');
+  const backup=Buffer.from(JSON.stringify({type:'backup',data:'x'.repeat(9*1024*1024)}));
+  await write(backup);
+  await until(()=>received.includes(backup.length),'9 MB backup was not forwarded');
+  const huge=Buffer.alloc(65*1024*1024+1,32);
+  await write(huge);
+  await until(()=>frames.some(f=>f.code==='MESSAGE_TOO_LARGE'),'oversized message was not reported');
+  const small=Buffer.from(JSON.stringify({type:'ping',after:'skip'}));
+  await write(small);
+  await until(()=>received.includes(small.length),'connection did not survive the oversized message');
+  assert.equal(child.exitCode,null);
+ }finally{child?.kill();for(const socket of server.clients)socket.terminate();server.close();await rm(temp,{recursive:true,force:true})}
+});

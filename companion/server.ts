@@ -185,7 +185,8 @@ const server = createServer((_req, res) => {
   res.writeHead(404);
   res.end();
 });
-const wss = new WebSocketServer({ server, maxPayload: 8 * 1024 * 1024 });
+// Matches the native host's inbound limit; history backups arrive as one message.
+const wss = new WebSocketServer({ server, maxPayload: 64 * 1024 * 1024 });
 let commandQueue = Promise.resolve();
 wss.on("connection", (socket, request) => {
   if (request.headers.origin !== origin) {
