@@ -36,7 +36,7 @@ Internal React components and helper functions are not public APIs. Future forma
 
 ## Store configuration and verification
 
-- Supply the store-issued extension ID to `canvasdoc-cli --extension-id <store-id> --origin https://canvas.calpoly.edu`. The development build's ID is not interchangeable with the published ID.
+- The store extension ID (`pbibigofgbljlhhaadjgiikdkjiahhap`) is the CLI's default on macOS. `start.sh` adds the unpacked build's ID alongside it, so one native host serves both. If the store item is ever re-created under a new ID, update `STORE_EXTENSION_ID` in `cli/canvasdoc.mjs`.
 - Enter https://canvasdoc-public.vercel.app/privacy/ in the developer dashboard's privacy field and https://canvasdoc-public.vercel.app/support/ as the support URL. The public support/privacy contact is sjedickson+canvasdoc@gmail.com. Keep the [policy source](privacy.md) and [public site](public-site.md) current and verify both URLs without authentication before submission.
 - Capture actual, current product screenshots for the listing. Do not submit mockups as product screenshots.
 - Suggested description: “A local coursework agent inside Canvas, with assignment conversations, course materials, and a persistent workspace on your computer.” State clearly that a local companion and Codex account are required and current support is Cal Poly only.

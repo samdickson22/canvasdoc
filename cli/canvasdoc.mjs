@@ -12,8 +12,10 @@ import { canvasOrigin, readSettings, selectRoot, saveSettings } from './setup.mj
 import { prepareCodexHome } from '../companion/codex-home.ts';
 
 const args = process.argv.slice(2);
+// The Chrome Web Store build. An unpacked development build has its own ID and is passed with --extension-id.
+const STORE_EXTENSION_ID = 'pbibigofgbljlhhaadjgiikdkjiahhap';
 const help = `Canvasdoc\n\nUsage: npx canvasdoc-cli [--folder PATH] [--origin URL] [--no-open] [--relocate]\n\nFirst run chooses a folder and Canvas URL. Later runs resume the same agent.\nKeep this terminal open while using Canvasdoc. Chat attachments support files up to 5 MB. Node.js 22.13 or later is required.\nThe Canvasdoc browser extension or development UI must already be installed.
-Update this connector to use the chat model and reasoning-effort selector.\n\n--folder PATH  Select or create a Canvasdoc folder\n--extension-id ID  Register the Chrome extension on this Mac\n--origin URL   Canvas site allowed to connect\n--relocate     Resume an existing agent from its moved folder (requires --folder)
+Update this connector to use the chat model and reasoning-effort selector.\n\n--folder PATH  Select or create a Canvasdoc folder\n--extension-id ID  Also register an unpacked extension ID (the store build is registered by default on macOS)\n--no-extension  Skip Chrome registration and pair the development UI with a token\n--origin URL   Canvas site allowed to connect\n--relocate     Resume an existing agent from its moved folder (requires --folder)
 --setup-browser  Configure Chrome tab control and native Mac app tools, then exit\n--setup-computer-use  Configure native Mac app tools for this workspace and exit\n--no-open      Start without opening a browser\n--help         Show this help\n--version      Show version`;
 
 async function main() {
@@ -27,6 +29,7 @@ async function main() {
     if (args[i] === '--setup-browser') options.setupBrowser = true;
     else if (args[i] === '--setup-computer-use') options.setupComputerUse = true;
     else if (args[i] === '--no-open') options.noOpen = true;
+    else if (args[i] === '--no-extension') options.noExtension = true;
     else if (args[i] === '--relocate') options.relocate = true;
     else if (['--folder', '--origin', '--extension-id'].includes(args[i]) && args[i + 1] && !args[i + 1].startsWith('--')) options[args[i].slice(2)] = args[++i];
     else throw new Error(`Unknown or incomplete option: ${args[i]}\n${help}`);
@@ -82,6 +85,7 @@ async function main() {
     const port = Number(process.env.CANVASDOC_CONNECTOR_PORT || 3218);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid connector port.');
   const extensionId = options['extension-id'] || saved?.extensionId;
+  const extensionIds = options.noExtension ? [] : [...new Set([extensionId, process.platform === 'darwin' ? STORE_EXTENSION_ID : undefined].filter(Boolean))];
   const child = spawn(process.execPath, [fileURLToPath(new URL('./connector.mjs', import.meta.url)), root], {
     cwd: root,
     env: { ...codexHome.env, CANVASDOC_DEV_ORIGIN: origin, CANVASDOC_CODEX_BIN: bin, CANVASDOC_CODEX_PREFIX: JSON.stringify(prefix), CANVASDOC_RELOCATE: options.relocate ? '1' : '' },
@@ -97,8 +101,8 @@ async function main() {
       let message; try { message = JSON.parse(line); } catch { continue; }
       if (!message.ready || ready) continue;
       ready = true;
-      if(extensionId) {
-        try { await registerNative(root, extensionId, origin, port); }
+      if(extensionIds.length) {
+        try { await registerNative(root, extensionIds, origin, port); }
         catch(error) { console.error(`Chrome connection setup failed: ${error.message}`); child.kill(); return; }
       }
       try { await saveSettings(settingsFile, { version: 1, root, origin, ...(extensionId ? {extensionId} : {}) }); }
@@ -107,7 +111,7 @@ async function main() {
       if (!options.noOpen) {
         try {
           const url = new URL(origin);
-          if(!extensionId) {
+          if(!extensionIds.length) {
             const token = (await readFile(message.tokenFile, 'utf8')).trim();
             url.hash = new URLSearchParams({ canvasdoc_connect: `ws://127.0.0.1:${port}`, canvasdoc_token: token }).toString();
           }

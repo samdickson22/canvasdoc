@@ -50,13 +50,13 @@ To install the Canvasdoc development UI after Canvas is running, use `npm ci`, `
 
 Synthetic login names are `student@canvasdoc.invalid`, `teacher@canvasdoc.invalid`, and `admin@canvasdoc.invalid`. Generated passwords are in the mode-0600 `dev/.env` file. Never reuse real credentials. Outgoing mail is disabled.
 
-For a separate local development companion, run the following in another terminal. Packaging directly avoids registering a development workspace as the installed Chrome extension's native host.
+For a separate local development companion, run the following in another terminal. `--no-extension` keeps a development workspace from being registered as the installed Chrome extension's native host.
 
 ```sh
 node scripts/package-cli.mjs --no-pack
 CANVASDOC_CONNECTOR_PORT=3228 CANVASDOC_CONFIG_DIR="$PWD/dev/.state/cli" \
   node release/canvasdoc/canvasdoc.mjs \
-  --folder "$PWD/dev/.state/workspace" --origin http://localhost:3210 --no-open
+  --folder "$PWD/dev/.state/workspace" --origin http://localhost:3210 --no-open --no-extension
 ```
 
 The first run opens Codex sign-in for this workspace's private home. Sign in independently on each machine; do not copy credentials or sessions from the desktop app or the other Mac. The development CLI settings and synthetic workspace stay under ignored `dev/.state/`. Port 3228 keeps this connector separate from the usual port 3218. Pair the development page with `ws://127.0.0.1:3228` and the token in `dev/.state/workspace/.canvasdoc/dev-connection-token`. For a worktree preview, use that preview's origin instead.

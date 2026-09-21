@@ -4,7 +4,7 @@ Run `npx canvasdoc-cli` to choose a Canvasdoc folder and Canvas URL, sign in to 
 
 Requires Node.js 22.13 or later. Uses an existing Codex CLI when available and includes Codex as a fallback. Sign-in runs only when the folder's private Codex home has no active login.
 
-Canvasdoc is in early development. The Canvasdoc browser UI must already be installed on your Canvas site. This package does not install a browser extension or modify your school's Canvas deployment. Automatic browser pairing supports the development UI on macOS and Linux. On macOS, pass `--extension-id <id>` to register the installed extension with the native host.
+Canvasdoc is in early development. The Canvasdoc browser UI must already be installed on your Canvas site. This package does not install a browser extension or modify your school's Canvas deployment. On macOS, the launcher registers the Chrome Web Store extension with Chrome's native host automatically. Pass `--extension-id <id>` to also register an unpacked development build, or `--no-extension` to skip registration and pair the development UI with a token, which is the only mode on Linux.
 
 ```sh
 npx canvasdoc-cli

@@ -80,7 +80,7 @@ else if (args.includes('login')) {
   }
   t.after(async () => { await stop(); await rm(temp, { recursive: true, force: true }); });
   async function start() {
-    child = spawn(process.execPath, [path.resolve("release/canvasdoc/canvasdoc.mjs"), "--folder", root, "--origin", "http://localhost:3210", "--no-open"], {
+    child = spawn(process.execPath, [path.resolve("release/canvasdoc/canvasdoc.mjs"), "--folder", root, "--origin", "http://localhost:3210", "--no-open", "--no-extension"], {
       env: { ...process.env, CODEX_HOME: external, CODEX_SQLITE_HOME: external,
         CANVASDOC_CODEX_BIN: bin, CANVASDOC_CONFIG_DIR: path.join(temp, "settings"),
         CANVASDOC_CONNECTOR_PORT: String(port) },
