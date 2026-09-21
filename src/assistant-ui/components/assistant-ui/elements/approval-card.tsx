@@ -18,7 +18,7 @@ export function ApprovalCard({ state, command, title, subtitle, icon, children, 
   disabled?: boolean;
 }) {
   return (
-    <section data-slot="approval-card" className={cn(paper, "flex w-full flex-col gap-3 rounded-[20px] p-4", className)} {...props}>
+    <section data-slot="approval-card" className={cn("approval-card", paper, "flex w-full flex-col gap-3 rounded-[20px] p-4", className)} {...props}>
       <div className="flex items-center gap-3">
         <span className="bg-foreground/[0.05] text-foreground/45 flex size-9 shrink-0 items-center justify-center rounded-xl">{icon ?? <TerminalIcon className="size-4" />}</span>
         <div className="flex min-w-0 flex-col">
