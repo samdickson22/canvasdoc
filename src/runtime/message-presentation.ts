@@ -125,6 +125,9 @@ const toolCategory = (part: Extract<DisplayPart, { type: "tool-call" }>) => {
     )[part.toolName] || "tool"
   );
 };
+/** Strips the `zsh -lc '…'` wrapper Codex puts around commands so labels name the real program. */
+const unwrapShell = (command: string) =>
+  command.match(/^(?:\/\w+\/)*(?:zsh|bash|sh)\s+-lc\s+'([\s\S]*)'$/)?.[1]?.replace(/'\\''/g, "'") ?? command;
 export function summarizeActivity(
   parts: readonly DisplayPart[],
   running = false,
@@ -143,8 +146,8 @@ export function summarizeActivity(
   }
   if (running && latestActivity?.type === "tool-call") {
     const tool = active.at(-1) ?? latestActivity;
-    const command = typeof tool.args.command === "string" ? tool.args.command.trim() : "";
-    const program = command.match(/^(?:\S*\/)?([\w.+-]+)/)?.[1];
+    const command = unwrapShell(typeof tool.args.command === "string" ? tool.args.command.trim() : "");
+    const program = command.match(/^(?:\w+=\S*\s+)*(?:\S*\/)?([\w.+-]+)/)?.[1];
     const label = (
       {
         command: program ? `Running ${program}` : "Running command",

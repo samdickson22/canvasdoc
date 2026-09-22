@@ -98,7 +98,7 @@ export function displayParts(
             ? { result: "Tool interrupted before a result was received." }
             : complete
               ? { result: output ?? null }
-              : output !== undefined
+              : output != null
                 ? {
                     artifact: {
                       output:
