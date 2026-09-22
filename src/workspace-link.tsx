@@ -14,9 +14,12 @@ export function WorkspaceLink({
   const threadId = useContext(FileLinkThread);
   const { root, status } = useConnection();
   const path = href ? localFilePath(href, root) : null;
+  // External links leave the Canvas page in place; local files open in Workspace or download.
+  const external = !!href && !isLocalFileLink(href) && !href.startsWith("#");
   return (
     <>
     <a
+      {...(external ? { target: "_blank", rel: "noreferrer" } : {})}
       {...props}
       href={href}
       aria-busy={loading || undefined}
