@@ -1,12 +1,12 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
+import type { PageContext, SavedMessage } from "../src/types.ts";
 import {
   belongsToAssignment,
+  isSyncedSource,
   localFilePath,
   threadFileReferences,
-  isSyncedSource,
 } from "../src/workspace-files.ts";
-import type { SavedMessage, PageContext } from "../src/types.ts";
 const context: PageContext = {
   kind: "assignment",
   courseId: 3,

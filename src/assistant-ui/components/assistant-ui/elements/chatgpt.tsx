@@ -13,13 +13,20 @@ import {
   useAui,
   groupPartByType,
 } from "@assistant-ui/react";
-import { type FC, type PropsWithChildren, useContext, createContext, useEffect, useRef, useState } from "react";
+import {
+  type FC,
+  type PropsWithChildren,
+  useContext,
+  createContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { PortalContainerContext } from "../../../lib/portal-container";
 import { TooltipIconButton } from "./tooltip-icon-button";
 import { useAttachmentSrc } from "../../../hooks/use-attachment-src";
 import {
   ArrowUpIcon,
-  AudioLines,
   CheckIcon,
   ChevronDownIcon,
   ChevronLeftIcon,
@@ -31,19 +38,31 @@ import {
   PencilIcon,
   PlusIcon,
   RefreshCwIcon,
-  Share,
   ThumbsDown,
   ThumbsUp,
   Volume2,
   XIcon,
 } from "lucide-react";
 import { MarkdownText } from "./markdown-text";
-import { hasFileDrop, readDroppedFiles } from "../../../../runtime/dropped-files";
+import {
+  hasFileDrop,
+  readDroppedFiles,
+} from "../../../../runtime/dropped-files";
 import { CodexModelSelector } from "../../../../model-selector";
 import { ToolFallback } from "./tool-fallback.aui";
 
-import { ToolGroupRoot, ToolGroupTrigger, ToolGroupContent } from "./tool-group.aui";
-import { Reasoning, ReasoningRoot, ReasoningTrigger, ReasoningContent, ReasoningText } from "./reasoning.aui";
+import {
+  ToolGroupRoot,
+  ToolGroupTrigger,
+  ToolGroupContent,
+} from "./tool-group.aui";
+import {
+  Reasoning,
+  ReasoningRoot,
+  ReasoningTrigger,
+  ReasoningContent,
+  ReasoningText,
+} from "./reasoning.aui";
 
 type WorkOptions = {
   workMode?: boolean;
@@ -72,8 +91,12 @@ export const ChatGPT: FC<WorkOptions> = (options) => {
               }}
             </ThreadPrimitive.Messages>
             <AuiIf condition={(s) => s.thread.isRunning}>
-              <div role="status" className="chat-thinking mx-auto flex w-full max-w-3xl items-center gap-2 text-sm text-neutral-500">
-                <span className="chat-thinking-dot" aria-hidden="true" /> Thinking…
+              <div
+                role="status"
+                className="chat-thinking mx-auto flex w-full max-w-3xl items-center gap-2 text-sm text-neutral-500"
+              >
+                <span className="chat-thinking-dot" aria-hidden="true" />{" "}
+                Thinking…
               </div>
             </AuiIf>
 
@@ -112,7 +135,9 @@ const ComposerDropzone: FC<PropsWithChildren> = ({ children }) => {
   const ref = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
   const [dropError, setDropError] = useState("");
-  const addAttachment = useRef((file: File) => aui.composer.addAttachment(file));
+  const addAttachment = useRef((file: File) =>
+    aui.composer.addAttachment(file),
+  );
   addAttachment.current = (file: File) => aui.composer.addAttachment(file);
   useEffect(() => {
     const node = ref.current!;
@@ -130,23 +155,47 @@ const ComposerDropzone: FC<PropsWithChildren> = ({ children }) => {
     };
     const leave = (event: DragEvent) => {
       if (!inside(event)) return;
-      if (event.relatedTarget instanceof Node && node.contains(event.relatedTarget)) return;
+      if (
+        event.relatedTarget instanceof Node &&
+        node.contains(event.relatedTarget)
+      )
+        return;
       setDragging(false);
     };
-    const reset = () => { fileDrag = false; setDragging(false); };
+    const reset = () => {
+      fileDrag = false;
+      setDragging(false);
+    };
     const drop = (event: DragEvent) => {
-      const accepted = inside(event) && (fileDrag || hasFileDrop(event.dataTransfer));
+      const accepted =
+        inside(event) && (fileDrag || hasFileDrop(event.dataTransfer));
       reset();
       if (!accepted || !event.dataTransfer) return;
       event.preventDefault();
       event.stopPropagation();
       setDropError("");
-      void readDroppedFiles(event.dataTransfer).then(async files => {
-        if (!files.length) throw new Error("The browser did not provide a readable file. Save the screenshot, then drop the saved file here.");
-        const results = await Promise.allSettled(files.map(file => addAttachment.current(file)));
-        const errors = results.filter(result => result.status === "rejected");
-        if (errors.length) setDropError(errors.map(result => String(result.reason?.message ?? result.reason)).join(" · "));
-      }).catch(error => setDropError(error.message));
+      void readDroppedFiles(event.dataTransfer)
+        .then(async (files) => {
+          if (!files.length)
+            throw new Error(
+              "The browser did not provide a readable file. Save the screenshot, then drop the saved file here.",
+            );
+          const results = await Promise.allSettled(
+            files.map((file) => addAttachment.current(file)),
+          );
+          const errors = results.filter(
+            (result) => result.status === "rejected",
+          );
+          if (errors.length)
+            setDropError(
+              errors
+                .map((result) =>
+                  String(result.reason?.message ?? result.reason),
+                )
+                .join(" · "),
+            );
+        })
+        .catch((error) => setDropError(error.message));
     };
     // Capture before Canvas/page handlers; only claim events whose composed path
     // includes this composer, including through nested shadow roots.
@@ -165,7 +214,20 @@ const ComposerDropzone: FC<PropsWithChildren> = ({ children }) => {
       window.removeEventListener("blur", reset);
     };
   }, []);
-  return <div ref={ref} className="chat-dropzone" data-dragging={dragging || undefined}>{children}{dropError && <p role="alert" className="px-3 py-2 text-sm text-red-700">{dropError}</p>}</div>;
+  return (
+    <div
+      ref={ref}
+      className="chat-dropzone"
+      data-dragging={dragging || undefined}
+    >
+      {children}
+      {dropError && (
+        <p role="alert" className="px-3 py-2 text-sm text-red-700">
+          {dropError}
+        </p>
+      )}
+    </div>
+  );
 };
 
 const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
@@ -173,8 +235,7 @@ const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
   if (workMode)
     return (
       <ComposerDropzone>
-      <ComposerPrimitive.Root className="work-composer">
-
+        <ComposerPrimitive.Root className="work-composer">
           <div className="work-attachments">
             <ComposerPrimitive.Attachments
               components={{ Attachment: ChatGPTAttachmentUI }}
@@ -195,50 +256,53 @@ const Composer: FC<{ placeholder: string }> = ({ placeholder }) => {
                 <PlusIcon size={19} />
               </TooltipIconButton>
             </ComposerPrimitive.AddAttachment>
-            <div className="work-model-selector"><CodexModelSelector /></div>
+            <div className="work-model-selector">
+              <CodexModelSelector />
+            </div>
             <ComposerPrimaryAction />
           </div>
-
-      </ComposerPrimitive.Root>
+        </ComposerPrimitive.Root>
       </ComposerDropzone>
     );
   return (
     <ComposerDropzone>
-    <ComposerPrimitive.Root className="group/composer flex w-full flex-col rounded-[28px] border border-[#e5e5e5] bg-white px-2 py-2 focus-within:border-[#d0d0d0] dark:border-transparent dark:bg-[#212121] dark:focus-within:border-transparent">
-      <AuiIf condition={(s) => s.composer.attachments.length > 0}>
-        <div className="flex flex-row flex-wrap gap-2 px-1 pt-1 pb-2">
-          <ComposerPrimitive.Attachments
-            components={{ Attachment: ChatGPTAttachmentUI }}
+      <ComposerPrimitive.Root className="group/composer flex w-full flex-col rounded-[28px] border border-[#e5e5e5] bg-white px-2 py-2 focus-within:border-[#d0d0d0] dark:border-transparent dark:bg-[#212121] dark:focus-within:border-transparent">
+        <AuiIf condition={(s) => s.composer.attachments.length > 0}>
+          <div className="flex flex-row flex-wrap gap-2 px-1 pt-1 pb-2">
+            <ComposerPrimitive.Attachments
+              components={{ Attachment: ChatGPTAttachmentUI }}
+            />
+          </div>
+        </AuiIf>
+
+        <div className="flex items-end gap-1">
+          <ComposerPrimitive.AddAttachment asChild>
+            <TooltipIconButton
+              type="button"
+              tooltip="Add photos & files"
+              side="top"
+              aria-label="Add attachment"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full text-[#5d5d5d] transition-colors hover:bg-black/[0.07] hover:text-[#5d5d5d] dark:text-[#cdcdcd] dark:hover:bg-white/15 dark:hover:text-[#cdcdcd]"
+            >
+              <PlusIcon size={20} />
+            </TooltipIconButton>
+          </ComposerPrimitive.AddAttachment>
+
+          <ComposerPrimitive.Input
+            autoFocus
+            placeholder={placeholder}
+            rows={1}
+            className="max-h-52 min-h-9 flex-1 resize-none bg-transparent py-1.5 pr-2 pl-1 text-base text-[#0d0d0d] outline-none placeholder:text-[#8e8e8e] dark:text-[#ececec] dark:placeholder:text-[#8e8e8e]"
           />
+
+          <div className="flex shrink-0 items-center gap-1">
+            <ComposerPrimaryAction />
+          </div>
         </div>
-      </AuiIf>
-
-      <div className="flex items-end gap-1">
-        <ComposerPrimitive.AddAttachment asChild>
-          <TooltipIconButton
-            type="button"
-            tooltip="Add photos & files"
-            side="top"
-            aria-label="Add attachment"
-            className="flex size-9 shrink-0 items-center justify-center rounded-full text-[#5d5d5d] transition-colors hover:bg-black/[0.07] hover:text-[#5d5d5d] dark:text-[#cdcdcd] dark:hover:bg-white/15 dark:hover:text-[#cdcdcd]"
-          >
-            <PlusIcon size={20} />
-          </TooltipIconButton>
-        </ComposerPrimitive.AddAttachment>
-
-        <ComposerPrimitive.Input
-          autoFocus
-          placeholder={placeholder}
-          rows={1}
-          className="max-h-52 min-h-9 flex-1 resize-none bg-transparent py-1.5 pr-2 pl-1 text-base text-[#0d0d0d] outline-none placeholder:text-[#8e8e8e] dark:text-[#ececec] dark:placeholder:text-[#8e8e8e]"
-        />
-
-        <div className="flex shrink-0 items-center gap-1">
-          <ComposerPrimaryAction />
+        <div className="flex justify-end px-2 pt-1">
+          <CodexModelSelector />
         </div>
-      </div>
-      <div className="flex justify-end px-2 pt-1"><CodexModelSelector /></div>
-    </ComposerPrimitive.Root>
+      </ComposerPrimitive.Root>
     </ComposerDropzone>
   );
 };
@@ -398,29 +462,46 @@ const AssistantMessage: FC = () => {
   return (
     <MessagePrimitive.Root className="relative mx-auto flex w-full max-w-3xl flex-col">
       <div className="text-[#0d0d0d] dark:text-[#ececec]">
-        <MessagePrimitive.GroupedParts groupBy={groupPartByType({
-          reasoning: ["group-thought", "group-reasoning"],
-          "tool-call": ["group-thought", "group-tool"],
-          "standalone-tool-call": [],
-        })}>
+        <MessagePrimitive.GroupedParts
+          groupBy={groupPartByType({
+            reasoning: ["group-thought", "group-reasoning"],
+            "tool-call": ["group-thought", "group-tool"],
+            "standalone-tool-call": [],
+          })}
+        >
           {({ part, children }) => {
             switch (part.type) {
-              case "group-thought": return <div className="chat-run-activity">{children}</div>;
-              case "group-tool": return <ToolGroupRoot variant="ghost">
-                <ToolGroupTrigger count={part.indices.length} active={part.status.type === "running"} />
-                <ToolGroupContent>{children}</ToolGroupContent>
-              </ToolGroupRoot>;
+              case "group-thought":
+                return <div className="chat-run-activity">{children}</div>;
+              case "group-tool":
+                return (
+                  <ToolGroupRoot variant="ghost">
+                    <ToolGroupTrigger
+                      count={part.indices.length}
+                      active={part.status.type === "running"}
+                    />
+                    <ToolGroupContent>{children}</ToolGroupContent>
+                  </ToolGroupRoot>
+                );
               case "group-reasoning": {
                 const running = part.status.type === "running";
-                return <ReasoningRoot streaming={running}>
-                  <ReasoningTrigger active={running} />
-                  <ReasoningContent aria-busy={running}><ReasoningText>{children}</ReasoningText></ReasoningContent>
-                </ReasoningRoot>;
+                return (
+                  <ReasoningRoot streaming={running}>
+                    <ReasoningTrigger active={running} />
+                    <ReasoningContent aria-busy={running}>
+                      <ReasoningText>{children}</ReasoningText>
+                    </ReasoningContent>
+                  </ReasoningRoot>
+                );
               }
-              case "text": return <MarkdownText />;
-              case "reasoning": return <Reasoning {...part} />;
-              case "tool-call": return part.toolUI ?? <ToolFallback {...part} />;
-              default: return null;
+              case "text":
+                return <MarkdownText />;
+              case "reasoning":
+                return <Reasoning {...part} />;
+              case "tool-call":
+                return part.toolUI ?? <ToolFallback {...part} />;
+              default:
+                return null;
             }
           }}
         </MessagePrimitive.GroupedParts>
@@ -564,10 +645,15 @@ const ChatGPTAttachmentUI: FC = () => {
             <AttachmentPrimitive.unstable_Thumb className="text-xs" />
           </div>
         </AuiIf>
-        <span className="max-w-48 truncate py-3 pr-4 text-sm"><AttachmentPrimitive.Name /></span>
+        <span className="max-w-48 truncate py-3 pr-4 text-sm">
+          <AttachmentPrimitive.Name />
+        </span>
       </div>
       {isComposer && (
-        <AttachmentPrimitive.Remove aria-label="Remove attachment" className="absolute -top-1.5 -right-1.5 flex size-7 items-center justify-center rounded-full border border-[#e5e5e5] bg-white text-[#6b6b6b] transition-all hover:bg-[#f5f5f5] hover:text-[#0d0d0d] dark:border-[#3a3a3a] dark:bg-[#1a1a1a] dark:text-[#9a9a9a] dark:hover:bg-[#252525] dark:hover:text-white">
+        <AttachmentPrimitive.Remove
+          aria-label="Remove attachment"
+          className="absolute -top-1.5 -right-1.5 flex size-7 items-center justify-center rounded-full border border-[#e5e5e5] bg-white text-[#6b6b6b] transition-all hover:bg-[#f5f5f5] hover:text-[#0d0d0d] dark:border-[#3a3a3a] dark:bg-[#1a1a1a] dark:text-[#9a9a9a] dark:hover:bg-[#252525] dark:hover:text-white"
+        >
           <XIcon className="size-5" />
         </AttachmentPrimitive.Remove>
       )}

@@ -1,8 +1,12 @@
-import type { PersonalTask, ThreadRecord } from "../types.ts";
 import type { UserCommand } from "../runtime/protocol.ts";
+import type { PersonalTask, ThreadRecord } from "../types.ts";
 export type Data = {
   materialCatalog?: import("../material-types.ts").MaterialCatalog;
-  canvasCache?: { courses: import('../types.ts').Course[]; todos: import('../types.ts').Todo[]; fetchedAt: string };
+  canvasCache?: {
+    courses: import("../types.ts").Course[];
+    todos: import("../types.ts").Todo[];
+    fetchedAt: string;
+  };
   model?: { id: string; effort?: string };
   version: 1;
   revision?: number;
@@ -10,7 +14,9 @@ export type Data = {
   tasks: PersonalTask[];
   threads: Record<string, ThreadRecord>;
 };
-export const empty = (): Data => ({ version: 1, tasks: [], threads: {} });
+export function empty(): Data {
+  return { version: 1, tasks: [], threads: {} };
+}
 export function parseSavedData(value: string | null): Data {
   if (!value) return empty();
   const parsed = JSON.parse(value);
@@ -25,7 +31,13 @@ export function parseSavedData(value: string | null): Data {
     throw new Error("Unsupported saved data.");
   const validDate = (value: unknown) =>
     typeof value === "string" && Number.isFinite(new Date(value).getTime());
-  if (parsed.canvasCache && (!Array.isArray(parsed.canvasCache.courses) || !Array.isArray(parsed.canvasCache.todos) || !validDate(parsed.canvasCache.fetchedAt))) delete parsed.canvasCache;
+  if (
+    parsed.canvasCache &&
+    (!Array.isArray(parsed.canvasCache.courses) ||
+      !Array.isArray(parsed.canvasCache.todos) ||
+      !validDate(parsed.canvasCache.fetchedAt))
+  )
+    delete parsed.canvasCache;
   for (const task of parsed.tasks) {
     if (
       !task ||
@@ -69,7 +81,7 @@ export function parseSavedData(value: string | null): Data {
 
 export type Mutation =
   | { type: "material-catalog"; catalog: NonNullable<Data["materialCatalog"]> }
-  | { type: "canvas-cache"; cache: NonNullable<Data['canvasCache']> }
+  | { type: "canvas-cache"; cache: NonNullable<Data["canvasCache"]> }
   | { type: "model"; model: { id: string; effort?: string } }
   | { type: "thread"; thread: ThreadRecord }
   | { type: "task"; task: PersonalTask }
@@ -78,59 +90,86 @@ export type Mutation =
   | { type: "ack"; requestId: string };
 export function mutate(current: Data, op: Mutation): Data {
   const next = { ...current, revision: (current.revision ?? 0) + 1 };
-  if (op.type === "material-catalog") next.materialCatalog = op.catalog;
-  else if (op.type === "canvas-cache") {
-    if (!Array.isArray(op.cache?.courses) || !Array.isArray(op.cache?.todos)) throw new Error("Invalid Canvas cache.");
-    next.canvasCache = op.cache;
-  } else if (op.type === "model") {
-    if (!op.model || typeof op.model.id !== "string" || (op.model.effort !== undefined && typeof op.model.effort !== "string")) throw new Error("Invalid model preference.");
-    next.model = op.model;
-  } else if (op.type === "thread") {
-    const prior = current.threads[op.thread.id];
-    const messages = new Map((prior?.messages ?? []).map((m) => [m.id, m]));
-    for (const message of op.thread.messages) messages.set(message.id, message);
-    next.threads = {
-      ...current.threads,
-      [op.thread.id]: { ...op.thread, messages: [...messages.values()] },
-    };
-  } else if (op.type === "task")
-    next.tasks = current.tasks.some((t) => t.id === op.task.id)
-      ? current.tasks
-      : [...current.tasks, op.task];
-  else if (op.type === "toggle-task")
-    next.tasks = current.tasks.map((t) =>
-      t.id === op.id ? { ...t, completed: !t.completed } : t,
-    );
-  else if (op.type === "enqueue") {
-    const c = op.command;
-    const prior = current.threads[c.sourceThreadId];
-    const messages = prior?.messages ?? [];
-    next.threads = {
-      ...current.threads,
-      [c.sourceThreadId]: {
-        id: c.sourceThreadId,
-        title: c.title,
-        href: c.href,
-        draft: "",
-        messages: messages.some((m) => m.id === c.requestId)
-          ? messages
-          : [
-              ...messages,
-              {
-                id: c.requestId,
-                role: "user",
-                text: c.text,
-                attachments: c.attachments,
-                createdAt: op.createdAt,
-              },
-            ],
-        updatedAt: op.createdAt,
-      },
-    };
-    next.outbox = { ...current.outbox, [c.requestId]: c };
-  } else if (op.type === "ack") {
-    next.outbox = { ...current.outbox };
-    delete next.outbox[op.requestId];
-  } else throw new Error("Invalid browser mutation");
+  switch (op.type) {
+    case "material-catalog": {
+      next.materialCatalog = op.catalog;
+      break;
+    }
+    case "canvas-cache": {
+      if (!Array.isArray(op.cache?.courses) || !Array.isArray(op.cache?.todos))
+        throw new Error("Invalid Canvas cache.");
+      next.canvasCache = op.cache;
+      break;
+    }
+    case "model": {
+      if (
+        !op.model ||
+        typeof op.model.id !== "string" ||
+        (op.model.effort !== undefined && typeof op.model.effort !== "string")
+      )
+        throw new Error("Invalid model preference.");
+      next.model = op.model;
+      break;
+    }
+    case "thread": {
+      const prior = current.threads[op.thread.id];
+      const messages = new Map((prior?.messages ?? []).map((m) => [m.id, m]));
+      for (const message of op.thread.messages)
+        messages.set(message.id, message);
+      next.threads = {
+        ...current.threads,
+        [op.thread.id]: { ...op.thread, messages: [...messages.values()] },
+      };
+      break;
+    }
+    case "task": {
+      next.tasks = current.tasks.some((t) => t.id === op.task.id)
+        ? current.tasks
+        : [...current.tasks, op.task];
+      break;
+    }
+    case "toggle-task": {
+      next.tasks = current.tasks.map((t) =>
+        t.id === op.id ? { ...t, completed: !t.completed } : t,
+      );
+      break;
+    }
+    case "enqueue": {
+      const command = op.command;
+      const prior = current.threads[command.sourceThreadId];
+      const messages = prior?.messages ?? [];
+      next.threads = {
+        ...current.threads,
+        [command.sourceThreadId]: {
+          id: command.sourceThreadId,
+          title: command.title,
+          href: command.href,
+          draft: "",
+          messages: messages.some((m) => m.id === command.requestId)
+            ? messages
+            : [
+                ...messages,
+                {
+                  id: command.requestId,
+                  role: "user",
+                  text: command.text,
+                  attachments: command.attachments,
+                  createdAt: op.createdAt,
+                },
+              ],
+          updatedAt: op.createdAt,
+        },
+      };
+      next.outbox = { ...current.outbox, [command.requestId]: command };
+      break;
+    }
+    case "ack": {
+      next.outbox = { ...current.outbox };
+      delete next.outbox[op.requestId];
+      break;
+    }
+    default:
+      throw new Error("Invalid browser mutation");
+  }
   return next;
 }

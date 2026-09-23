@@ -1,18 +1,18 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
-  mkdtemp,
   mkdir,
-  writeFile,
+  mkdtemp,
   readFile,
   readdir,
-  stat,
   rm,
+  stat,
   symlink,
+  writeFile,
 } from "node:fs/promises";
-import path from "node:path";
 import os from "node:os";
-import { createHash } from "node:crypto";
+import path from "node:path";
+import test from "node:test";
 import { DocumentExtractor } from "../companion/extraction.ts";
 import { MaterialMirror } from "../companion/materials.ts";
 import { pdfFixture, pptxFixture } from "./fixtures/documents.ts";

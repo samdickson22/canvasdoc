@@ -1,4 +1,4 @@
-import { zipSync, strToU8 } from "fflate";
+import { strToU8, zipSync } from "fflate";
 export function pdfFixture(pages: string[]) {
   const objects: string[] = [
     "<< /Type /Catalog /Pages 2 0 R >>",

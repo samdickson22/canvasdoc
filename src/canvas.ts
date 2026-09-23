@@ -1,5 +1,5 @@
 import { canvasResponseError } from "./canvas-error.ts";
-import type { Assignment, Course, Todo, PlannerOverride } from "./types";
+import type { Assignment, Course, PlannerOverride, Todo } from "./types.ts";
 
 export async function canvasRead<T>(
   path: string,
@@ -38,8 +38,7 @@ export async function canvasPages<T>(
       signal,
       headers: { Accept: "application/json" },
     });
-    if (!response.ok)
-      throw await canvasResponseError(response);
+    if (!response.ok) throw await canvasResponseError(response);
     result.push(...(await response.json()));
     next =
       response.headers.get("Link")?.match(/<([^>]+)>;\s*rel="next"/)?.[1] ??
@@ -48,13 +47,15 @@ export async function canvasPages<T>(
   return result;
 }
 
-export const readCourses = (signal?: AbortSignal) =>
-  canvasPages<Course>(
+export function readCourses(signal?: AbortSignal): Promise<Course[]> {
+  return canvasPages<Course>(
     "/api/v1/courses?enrollment_state=active&per_page=100",
     signal,
   );
-export const readTodos = (signal?: AbortSignal) =>
-  canvasPages<Todo>("/api/v1/users/self/todo?per_page=100", signal);
+}
+export function readTodos(signal?: AbortSignal): Promise<Todo[]> {
+  return canvasPages<Todo>("/api/v1/users/self/todo?per_page=100", signal);
+}
 export async function readDashboardWork(
   signal?: AbortSignal,
   knownCourses?: Course[],
@@ -93,12 +94,13 @@ export async function readDashboardWork(
       ) ?? null,
   }));
 }
-export const readAssignment = (
+export function readAssignment(
   course: number,
   assignment: number,
   signal?: AbortSignal,
-) =>
-  canvasRead<Assignment>(
+): Promise<Assignment> {
+  return canvasRead<Assignment>(
     `/api/v1/courses/${course}/assignments/${assignment}?include[]=submission`,
     signal,
   );
+}

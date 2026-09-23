@@ -1,33 +1,52 @@
-import { sandboxedHtml } from "./html-preview";
-import { transitionView } from "./transitions";
-import { useData } from "./store";
-import { belongsToAssignment, isSyncedSource, threadFileReferences } from "./workspace-files";
-import { MaterialStatus } from "./material-status";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { useCallback, useEffect, useState } from "react";
-import { Group, Panel, Separator } from "react-resizable-panels";
 import {
   Download,
   File,
   FileText,
   FolderOpen,
+  PanelRight,
   RefreshCw,
   Search,
-  PanelRight,
   X,
 } from "lucide-react";
-import { useConnection, workspaceRequest } from "./runtime/client";
-import type { PageContext } from "./types";
-const fileName = (file: string) =>
-  file.startsWith("uploads/")
+import { useCallback, useEffect, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import { Group, Panel, Separator } from "react-resizable-panels";
+import remarkGfm from "remark-gfm";
+import { sandboxedHtml } from "./html-preview.ts";
+import { MaterialStatus } from "./material-status.tsx";
+import { useConnection, workspaceRequest } from "./runtime/client.ts";
+import { useData } from "./store.ts";
+import { transitionView } from "./transitions.ts";
+import type { PageContext } from "./types.ts";
+import {
+  belongsToAssignment,
+  isSyncedSource,
+  threadFileReferences,
+} from "./workspace-files.ts";
+function fileName(file: string): string {
+  return file.startsWith("uploads/")
     ? file
         .split("/")
         .pop()!
         .replace(/^[a-f0-9]{64}-/, "")
     : file.split("/").pop()!;
+}
 type Entry = { path: string; size: number; modified: number };
-type Preview = Entry & { mime: string; base64: string; previewKind?: string; notice?: string };
+type Preview = Entry & {
+  mime: string;
+  base64: string;
+  previewKind?: string;
+  notice?: string;
+};
+type WorkspaceProps = {
+  context: PageContext;
+  active: boolean;
+  requestedFile?: { path: string };
+  conversationHost: HTMLElement;
+  onAssignment: () => void;
+  onConnect: () => void;
+};
+
 export function Workspace({
   context,
   conversationHost,
@@ -35,14 +54,7 @@ export function Workspace({
   onConnect,
   requestedFile,
   active,
-}: {
-  context: PageContext;
-  active: boolean;
-  requestedFile?: {path:string};
-  conversationHost: HTMLElement;
-  onAssignment: () => void;
-  onConnect: () => void;
-}) {
+}: WorkspaceProps): React.JSX.Element {
   const connection = useConnection();
   const data = useData();
   const [inspectorOpen, setInspectorOpen] = useState(false);
@@ -101,16 +113,44 @@ export function Workspace({
     },
     [conversationHost, active],
   );
-  const refs = threadFileReferences(data.threads[context.threadId]?.messages ?? [], connection.root);
-  const scoped = files.filter(f => refs.has(f.path) || (f.path.endsWith(".txt") && refs.has(f.path.slice(0,-4))) || belongsToAssignment(f.path, context));
-  const isSource = (file: {path:string}) => isSyncedSource(file.path);
-  const shown = scoped.filter(f => (tab === "sources" ? isSource(f) : !isSource(f)) && f.path.toLowerCase().includes(query.toLowerCase()));
+  const refs = threadFileReferences(
+    data.threads[context.threadId]?.messages ?? [],
+    connection.root,
+  );
+  const scoped = files.filter(
+    (f) =>
+      refs.has(f.path) ||
+      (f.path.endsWith(".txt") && refs.has(f.path.slice(0, -4))) ||
+      belongsToAssignment(f.path, context),
+  );
+  const isSource = (file: { path: string }) => isSyncedSource(file.path);
+  const shown = scoped.filter(
+    (f) =>
+      (tab === "sources" ? isSource(f) : !isSource(f)) &&
+      f.path.toLowerCase().includes(query.toLowerCase()),
+  );
   useEffect(() => {
     if (!requestedFile) return;
     setInspectorOpen(true);
     setTab(isSyncedSource(requestedFile.path) ? "sources" : "outputs");
     setSelected(requestedFile.path);
   }, [requestedFile]);
+  let emptyMessage =
+    "Attach a file or ask the agent to link a source for this assignment.";
+  if (query) emptyMessage = "No matching files.";
+  else if (tab === "outputs")
+    emptyMessage =
+      "Files created or linked in this conversation will appear here.";
+  function renderSelectedPreview(): React.JSX.Element | null {
+    if (loading) {
+      return <p className="workspace-file-hint">Loading preview…</p>;
+    }
+    if (preview && preview.path === selected) {
+      return <FilePreview file={preview} />;
+    }
+    return null;
+  }
+
   return (
     <section className="workbench" aria-label={`${context.title} workspace`}>
       <header className="workbench-header">
@@ -120,7 +160,11 @@ export function Workspace({
           <span>Workspace</span>
         </div>
         <div className="workbench-actions">
-          <button className="connection-status" data-status={connection.status} onClick={onConnect}>
+          <button
+            className="connection-status"
+            data-status={connection.status}
+            onClick={onConnect}
+          >
             <i />
             {connection.status === "connected" ? "Connected" : "Connect"}
           </button>
@@ -132,7 +176,9 @@ export function Workspace({
                 : "Show workspace sidebar"
             }
             aria-expanded={inspectorOpen}
-            onClick={() => void transitionView(() => setInspectorOpen((v) => !v))}
+            onClick={() =>
+              void transitionView(() => setInspectorOpen((v) => !v))
+            }
           >
             <PanelRight size={18} />
           </button>
@@ -160,24 +206,21 @@ export function Workspace({
                   onClick={() => void transitionView(() => setTab("outputs"))}
                 >
                   Outputs{" "}
-                  <small>
-                    {scoped.filter((f) => !isSource(f)).length}
-                  </small>
+                  <small>{scoped.filter((f) => !isSource(f)).length}</small>
                 </button>
                 <button
                   aria-pressed={tab === "sources"}
                   onClick={() => void transitionView(() => setTab("sources"))}
                 >
                   Sources{" "}
-                  <small>
-                    {scoped.filter((f) => isSource(f)).length +
-                      1}
-                  </small>
+                  <small>{scoped.filter((f) => isSource(f)).length + 1}</small>
                 </button>
               </div>
               <button
                 aria-label="Close workspace sidebar"
-                onClick={() => void transitionView(() => setInspectorOpen(false))}
+                onClick={() =>
+                  void transitionView(() => setInspectorOpen(false))
+                }
               >
                 <X size={16} />
               </button>
@@ -225,7 +268,9 @@ export function Workspace({
                       key={f.path}
                       className="workspace-file-row"
                       aria-pressed={selected === f.path}
-                      onClick={() => void transitionView(() => setSelected(f.path))}
+                      onClick={() =>
+                        void transitionView(() => setSelected(f.path))
+                      }
                     >
                       <File size={16} />
                       <span>
@@ -240,13 +285,7 @@ export function Workspace({
                     </button>
                   ))}
                   {!shown.length && (
-                    <p className="workspace-file-hint">
-                      {query
-                        ? "No matching files."
-                        : tab === "outputs"
-                          ? "Files created or linked in this conversation will appear here."
-                          : "Attach a file or ask the agent to link a source for this assignment."}
-                    </p>
+                    <p className="workspace-file-hint">{emptyMessage}</p>
                   )}
                 </div>
                 {error && (
@@ -260,16 +299,14 @@ export function Workspace({
                       <span>{fileName(selected)}</span>
                       <button
                         aria-label="Close file preview"
-                        onClick={() => void transitionView(() => setSelected(null))}
+                        onClick={() =>
+                          void transitionView(() => setSelected(null))
+                        }
                       >
                         <X size={16} />
                       </button>
                     </header>
-                    {loading ? (
-                      <p className="workspace-file-hint">Loading preview…</p>
-                    ) : preview && preview.path === selected ? (
-                      <FilePreview file={preview} />
-                    ) : null}
+                    {renderSelectedPreview()}
                   </div>
                 ) : (
                   <p className="workspace-file-hint">
@@ -284,15 +321,20 @@ export function Workspace({
     </section>
   );
 }
-function FilePreview({ file }: { file: Preview }) {
+type FilePreviewProps = { file: Preview };
+
+function FilePreview({ file }: FilePreviewProps): React.JSX.Element {
   const [htmlSource, setHtmlSource] = useState(false);
   const [url, setUrl] = useState("");
   const bytes = Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0));
-  const text = new TextDecoder().decode(bytes.subarray(0,256*1024));
-  const truncated = bytes.length > 256*1024;
+  const text = new TextDecoder().decode(bytes.subarray(0, 256 * 1024));
+  const truncated = bytes.length > 256 * 1024;
   useEffect(() => {
     setHtmlSource(false);
-    if(file.previewKind === "unavailable") {setUrl("");return;}
+    if (file.previewKind === "unavailable") {
+      setUrl("");
+      return;
+    }
     const next = URL.createObjectURL(
       new Blob([Uint8Array.from(atob(file.base64), (c) => c.charCodeAt(0))], {
         type: file.mime,
@@ -301,43 +343,88 @@ function FilePreview({ file }: { file: Preview }) {
     setUrl(next);
     return () => URL.revokeObjectURL(next);
   }, [file]);
-  return (
-    <>
-      {file.previewKind !== "unavailable" && <a
-        className="workspace-download"
-        href={url || undefined}
-        download={fileName(file.path)}
-      >
-        <Download size={14} /> Download
-      </a>}
-      {file.previewKind === "html" && <button className="workspace-download" aria-pressed={htmlSource} onClick={() => setHtmlSource(v=>!v)}>{htmlSource ? "Preview" : "View source"}</button>}
-      {file.previewKind === "unavailable" ? <p className="workspace-file-hint">{file.notice}</p>
-      : file.previewKind === "download" ? <p className="workspace-file-hint">Preview is not available for this file type. Download it to open in its application.</p>
-      : file.previewKind === "html" && !htmlSource ? <iframe className="workspace-pdf" title={file.path} sandbox="allow-scripts" referrerPolicy="no-referrer" srcDoc={sandboxedHtml(new TextDecoder().decode(bytes))} />
-      : file.mime.startsWith("image/") ? (
+  function renderPreview(): React.JSX.Element {
+    if (file.previewKind === "unavailable") {
+      return <p className="workspace-file-hint">{file.notice}</p>;
+    }
+    if (file.previewKind === "download") {
+      return (
+        <p className="workspace-file-hint">
+          Preview is not available for this file type. Download it to open in
+          its application.
+        </p>
+      );
+    }
+    if (file.previewKind === "html" && !htmlSource) {
+      return (
+        <iframe
+          className="workspace-pdf"
+          title={file.path}
+          sandbox="allow-scripts"
+          referrerPolicy="no-referrer"
+          srcDoc={sandboxedHtml(new TextDecoder().decode(bytes))}
+        />
+      );
+    }
+    if (file.mime.startsWith("image/")) {
+      return (
         <img
           className="workspace-image"
           src={url || undefined}
           alt={file.path}
         />
-      ) : file.mime === "application/pdf" ? (
+      );
+    }
+    if (file.mime === "application/pdf") {
+      return (
         <iframe
           className="workspace-pdf"
           src={url || undefined}
           title={file.path}
         />
-      ) : /\.(md|markdown)$/i.test(file.path) ? (
+      );
+    }
+    if (/\.(md|markdown)$/i.test(file.path)) {
+      return (
         <div className="workspace-markdown">
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {text}
-          </ReactMarkdown>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
         </div>
-      ) : (
-        <pre className="workspace-text">
-          <code>{text}</code>
-        </pre>
+      );
+    }
+    return (
+      <pre className="workspace-text">
+        <code>{text}</code>
+      </pre>
+    );
+  }
+
+  return (
+    <>
+      {file.previewKind !== "unavailable" && (
+        <a
+          className="workspace-download"
+          href={url || undefined}
+          download={fileName(file.path)}
+        >
+          <Download size={14} /> Download
+        </a>
       )}
-      {truncated && ["text","markdown"].includes(file.previewKind || "text") && <p className="workspace-file-hint">Showing the first 256 KB. Download for the complete file.</p>}
+      {file.previewKind === "html" && (
+        <button
+          className="workspace-download"
+          aria-pressed={htmlSource}
+          onClick={() => setHtmlSource((v) => !v)}
+        >
+          {htmlSource ? "Preview" : "View source"}
+        </button>
+      )}
+      {renderPreview()}
+      {truncated &&
+        ["text", "markdown"].includes(file.previewKind || "text") && (
+          <p className="workspace-file-hint">
+            Showing the first 256 KB. Download for the complete file.
+          </p>
+        )}
     </>
   );
 }

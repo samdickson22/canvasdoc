@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { dueGroup, newTask, pageContext, safeLink } from "../src/model.ts";
 
 test("an assignment keeps one thread across title changes and submission fragments", () => {

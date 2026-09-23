@@ -3,18 +3,46 @@ import path from "node:path";
 import { WebSocket } from "ws";
 
 // Chrome starts this small framing adapter; the independent connector owns Codex.
-const configuration = process.argv[2] === "--connection-config"
-  ? JSON.parse(await readFile(process.argv[3], "utf8"))
-  : { origin: process.argv[3], port: Number(process.argv[4] || 3218), token: (await readFile(path.join(process.argv[2], ".canvasdoc/dev-connection-token"), "utf8")).trim() };
+const configuration =
+  process.argv[2] === "--connection-config"
+    ? JSON.parse(await readFile(process.argv[3], "utf8"))
+    : {
+        origin: process.argv[3],
+        port: Number(process.argv[4] || 3218),
+        token: (
+          await readFile(
+            path.join(process.argv[2], ".canvasdoc/dev-connection-token"),
+            "utf8",
+          )
+        ).trim(),
+      };
 const { origin, port, token } = configuration;
-if (typeof origin !== "string" || !Number.isInteger(port) || port < 1 || port > 65535 || typeof token !== "string" || !token)
+if (
+  typeof origin !== "string" ||
+  !Number.isInteger(port) ||
+  port < 1 ||
+  port > 65535 ||
+  typeof token !== "string" ||
+  !token
+)
   throw new Error("Native host configuration is missing.");
-function send(value: unknown) {
+function send(value: unknown): void {
   const response = value as any;
-  if (response.type === "files-result" && response.result?.base64?.length > 600000) {
-    const {base64,...metadata}=response.result;
-    const count=Math.ceil(base64.length/600000);
-    for(let index=0;index<count;index++) send({type:"files-result-chunk",id:response.id,index,count,metadata,data:base64.slice(index*600000,(index+1)*600000)});
+  if (
+    response.type === "files-result" &&
+    response.result?.base64?.length > 600000
+  ) {
+    const { base64, ...metadata } = response.result;
+    const count = Math.ceil(base64.length / 600000);
+    for (let index = 0; index < count; index++)
+      send({
+        type: "files-result-chunk",
+        id: response.id,
+        index,
+        count,
+        metadata,
+        data: base64.slice(index * 600000, (index + 1) * 600000),
+      });
     return;
   }
   const body = Buffer.from(JSON.stringify(value));
@@ -45,7 +73,13 @@ socket.on("error", () =>
   }),
 );
 socket.on("close", (code, reason) => {
-  send({type:"error", message: code === 1008 ? `Connector rejected the connection: ${reason.toString()}` : `Local connector closed (${code}). Restart Canvasdoc and reconnect.`});
+  send({
+    type: "error",
+    message:
+      code === 1008
+        ? `Connector rejected the connection: ${reason.toString()}`
+        : `Local connector closed (${code}). Restart Canvasdoc and reconnect.`,
+  });
   process.stdout.write("", () => process.exit(0));
 });
 let buffer = Buffer.alloc(0);

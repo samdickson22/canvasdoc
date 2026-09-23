@@ -1,10 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
 import { CodexRuntime, type RpcEvent } from "./codex.ts";
 const root = path.resolve("dev/.state/runtime-smoke");
 await mkdir(root, { recursive: true });
-async function turn(runtime: CodexRuntime, text: string) {
+async function turn(runtime: CodexRuntime, text: string): Promise<string> {
   let answer = "";
   const completion = new Promise<void>((resolve, reject) => {
     const timer = setTimeout(() => {

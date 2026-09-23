@@ -65,7 +65,10 @@ export function threadFileReferences(
   }
   return paths;
 }
-export function belongsToAssignment(path: string, context: PageContext) {
+export function belongsToAssignment(
+  path: string,
+  context: PageContext,
+): boolean {
   if (context.kind !== "assignment") return false;
   const parts = path.split("/");
   return (
@@ -77,8 +80,11 @@ export function belongsToAssignment(path: string, context: PageContext) {
       parts[4]?.endsWith(`--${context.assignmentId}`))
   );
 }
-export const isSyncedSource = (path: string) =>
-  path.startsWith("uploads/") ||
-  /^courses\/[^/]+\/[^/]+\/(materials\/|assignments\/[^/]+\/sources\/)/.test(
-    path,
+export function isSyncedSource(path: string): boolean {
+  return (
+    path.startsWith("uploads/") ||
+    /^courses\/[^/]+\/[^/]+\/(materials\/|assignments\/[^/]+\/sources\/)/.test(
+      path,
+    )
   );
+}

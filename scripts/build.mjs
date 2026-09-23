@@ -1,7 +1,7 @@
-import { context, build as bundle } from "esbuild";
-import { mkdir, writeFile, copyFile } from "node:fs/promises";
+import { build as bundle, context } from "esbuild";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
+import { copyFile, mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 const watch = process.argv.includes("--watch");
@@ -23,7 +23,18 @@ const build = await context({
       name: "copy-to-dev-canvas",
       setup(build) {
         build.onStart(() => {
-          execFileSync(process.execPath, ["node_modules/@tailwindcss/cli/dist/index.mjs", "-i", "src/assistant-ui/theme.css", "-o", "dist/assistant-ui.css", "--minify"], { stdio: "pipe" });
+          execFileSync(
+            process.execPath,
+            [
+              "node_modules/@tailwindcss/cli/dist/index.mjs",
+              "-i",
+              "src/assistant-ui/theme.css",
+              "-o",
+              "dist/assistant-ui.css",
+              "--minify",
+            ],
+            { stdio: "pipe" },
+          );
         });
         build.onEnd(async (result) => {
           if (result.errors.length) return;
@@ -45,8 +56,14 @@ const build = await context({
           );
           if (existsSync(resolve("dev/canvas-lms/public"))) {
             await mkdir(devOutput, { recursive: true });
-            await copyFile(`${output}/bootstrap.js`, `${devOutput}/bootstrap.js`);
-            await copyFile(`${output}/bootstrap.css`, `${devOutput}/bootstrap.css`);
+            await copyFile(
+              `${output}/bootstrap.js`,
+              `${devOutput}/bootstrap.js`,
+            );
+            await copyFile(
+              `${output}/bootstrap.css`,
+              `${devOutput}/bootstrap.css`,
+            );
             await copyFile(
               `${output}/canvasdoc.js`,
               `${devOutput}/canvasdoc.js`,

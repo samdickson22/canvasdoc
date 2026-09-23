@@ -1,5 +1,5 @@
-import { materialDownload } from "./material-download";
 import { mutate, parseSavedData, type Mutation } from "../src/storage/data.ts";
+import { materialDownload } from "./material-download.ts";
 const queues = new Map<string, Promise<unknown>>();
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (
@@ -11,7 +11,10 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   )
     return;
   if (message.type === "canvasdoc:material-download") {
-    void materialDownload(message, sender.url).then(result=>respond({result}),error=>respond({error:error.message}));
+    void materialDownload(message, sender.url).then(
+      (result) => respond({ result }),
+      (error) => respond({ error: error.message }),
+    );
     return true;
   }
   if (
@@ -24,8 +27,9 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     .catch(() => {})
     .then(async () => {
       const result = await chrome.storage.local.get(message.key);
-      const raw=result[message.key];
-      if(raw!==undefined && typeof raw!=="string") throw new Error("Invalid extension storage data");
+      const raw = result[message.key];
+      if (raw !== undefined && typeof raw !== "string")
+        throw new Error("Invalid extension storage data");
       const current = parseSavedData(raw ?? null);
       if (message.type === "canvasdoc:storage:load") return current;
       if (message.type !== "canvasdoc:storage:commit")
@@ -67,7 +71,11 @@ chrome.runtime.onConnect.addListener((port) => {
     const error = chrome.runtime.lastError;
     const message = error?.message || "Local connector disconnected.";
     console.error("Canvasdoc native connection:", message);
-    try { port.postMessage({ type: "native-disconnected", message }); } catch { /* The Canvas tab already closed. */ }
+    try {
+      port.postMessage({ type: "native-disconnected", message });
+    } catch {
+      /* The Canvas tab already closed. */
+    }
   });
   port.onMessage.addListener((message) => native.postMessage(message));
   port.onDisconnect.addListener(() => native.disconnect());

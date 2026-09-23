@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { empty, mutate } from "../src/storage/data.ts";
 
 test("a send atomically stores the message and the identical retry command in the browser", () => {

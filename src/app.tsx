@@ -1,48 +1,45 @@
-import { transitionView } from "./transitions";
-import { localFilePath } from "./workspace-files";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import {
   ArrowLeft,
   ArrowRight,
   BookOpen,
   Check,
-  ChevronDown,
-  Circle,
   ExternalLink,
   Link,
   MessageSquare,
   Plus,
   RefreshCw,
   Settings2,
-  Sparkles,
   X,
 } from "lucide-react";
-import { observeCanvasWork } from "./material-sync";
-import { MaterialStatus } from "./material-status";
-import { Workspace } from "./workspace";
-import { Navigation } from "./navigation";
-import { TodoList } from "./todo-panel";
-import { Conversation } from "./conversation";
-import { visibleHomeMessages } from "./runtime/home-view";
-import { readAssignment, readCourses, readDashboardWork } from "./canvas";
-import { dueGroup, newTask, safeLink } from "./model";
-import { store, useData, useStorageError } from "./store";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { readAssignment, readCourses, readDashboardWork } from "./canvas.ts";
+import { Conversation } from "./conversation.tsx";
+import { MaterialStatus } from "./material-status.tsx";
+import { observeCanvasWork } from "./material-sync.ts";
+import { newTask, safeLink } from "./model.ts";
+import { Navigation } from "./navigation.tsx";
+import { preferences } from "./preferences.ts";
+import {
+  connect,
+  connectNative,
+  disconnect,
+  useConnection,
+  usesNativeConnection,
+} from "./runtime/client.ts";
+import { visibleHomeMessages } from "./runtime/home-view.ts";
+import { store, useData, useStorageError } from "./store.ts";
+import { TodoList } from "./todo-panel.tsx";
+import { transitionView } from "./transitions.ts";
 import type {
   Assignment,
   Course,
   PageContext,
   PersonalTask,
   Todo,
-} from "./types";
-import {
-  connect,
-  disconnect,
-  useConnection,
-  connectNative,
-  usesNativeConnection,
-} from "./runtime/client";
-import { preferences } from "./preferences";
+} from "./types.ts";
+import { localFilePath } from "./workspace-files.ts";
+import { Workspace } from "./workspace.tsx";
 
 export type Mounts = {
   sidebar: HTMLElement;
@@ -54,10 +51,11 @@ export type Mounts = {
   workspace: HTMLElement | null;
   original: HTMLElement[];
 };
-const colors = ["#496b54", "#687ab2", "#a378a1", "#b78c56"];
-const shortName = (name: string) => name.replace(/^\[DEV\]\s*/, "");
-const dateLabel = (value: string | null) =>
-  value
+function shortName(name: string): string {
+  return name.replace(/^\[DEV\]\s*/, "");
+}
+function dateLabel(value: string | null): string {
+  return value
     ? new Date(value).toLocaleString(undefined, {
         timeZone: preferences.timeZone,
         month: "short",
@@ -66,73 +64,103 @@ const dateLabel = (value: string | null) =>
         minute: "2-digit",
       })
     : "No due date";
+}
 
-export function App({
-  initialContext,
-  mounts,
-}: {
+type AppProps = {
   initialContext: PageContext;
   mounts: Mounts;
-}) {
+};
+
+export function App({ initialContext, mounts }: AppProps): React.JSX.Element {
   const data = useData();
   useLayoutEffect(() => {
-    document.documentElement.classList.toggle("canvasdoc-dashboard", initialContext.kind === "home");
+    document.documentElement.classList.toggle(
+      "canvasdoc-dashboard",
+      initialContext.kind === "home",
+    );
     document.documentElement.classList.remove("canvasdoc-booting");
     performance.mark("canvasdoc:ready");
     window.dispatchEvent(new Event("canvasdoc:ready"));
-    return () => document.documentElement.classList.remove("canvasdoc-dashboard");
+    return () =>
+      document.documentElement.classList.remove("canvasdoc-dashboard");
   }, [initialContext.kind]);
-  const activeDashboard = initialContext.kind === "home" && visibleHomeMessages(data.threads[initialContext.threadId]?.messages).length > 0;
+  const activeDashboard =
+    initialContext.kind === "home" &&
+    visibleHomeMessages(data.threads[initialContext.threadId]?.messages)
+      .length > 0;
   useEffect(() => {
-    document.documentElement.classList.toggle("canvasdoc-chat-active", activeDashboard);
-    return () => document.documentElement.classList.remove("canvasdoc-chat-active");
+    document.documentElement.classList.toggle(
+      "canvasdoc-chat-active",
+      activeDashboard,
+    );
+    return () =>
+      document.documentElement.classList.remove("canvasdoc-chat-active");
   }, [activeDashboard]);
   const connection = useConnection();
-  const connectionLabel =
-    connection.status === "connected"
-      ? "Computer connected"
-      : connection.status === "connecting"
-        ? "Connecting…"
-        : "Connect your computer";
+  const connectionLabels = {
+    connected: "Computer connected",
+    connecting: "Connecting…",
+    disconnected: "Connect your computer",
+  };
+  const connectionLabel = connectionLabels[connection.status];
   const storageError = useStorageError();
-  const [courses, setCourses] = useState<Course[]>(() => data.canvasCache?.courses ?? []);
-  const [todos, setTodos] = useState<Todo[]>(() => data.canvasCache?.todos ?? []);
+  const [courses, setCourses] = useState<Course[]>(
+    () => data.canvasCache?.courses ?? [],
+  );
+  const [todos, setTodos] = useState<Todo[]>(
+    () => data.canvasCache?.todos ?? [],
+  );
   const [assignment, setAssignment] = useState<Assignment | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(!data.canvasCache);
   const [refreshing, setRefreshing] = useState(false);
   const [revision, setRevision] = useState(0);
-  const [open, setOpen] = useState(() => initialContext.kind !== "page" && window.innerWidth > 1100);
+  const [open, setOpen] = useState(
+    () => initialContext.kind !== "page" && window.innerWidth > 1100,
+  );
   const [workspace, setWorkspace] = useState(false);
-  const [requestedFile, setRequestedFile] = useState<{path:string}>();
+  const [requestedFile, setRequestedFile] = useState<{ path: string }>();
   useEffect(() => {
     const openFile = (event: Event) => {
       const detail = (event as CustomEvent).detail;
-      if(detail?.threadId !== initialContext.threadId || typeof detail.path !== "string" || !mounts.workspace) return;
+      if (
+        detail?.threadId !== initialContext.threadId ||
+        typeof detail.path !== "string" ||
+        !mounts.workspace
+      )
+        return;
       const path = localFilePath(detail.path);
-      if(!path) return;
-      setRequestedFile({path});
+      if (!path) return;
+      setRequestedFile({ path });
       void transitionView(() => setWorkspace(true));
     };
-    window.addEventListener("canvasdoc:open-file",openFile);
-    return () => window.removeEventListener("canvasdoc:open-file",openFile);
+    window.addEventListener("canvasdoc:open-file", openFile);
+    return () => window.removeEventListener("canvasdoc:open-file", openFile);
   }, [initialContext.threadId, mounts.workspace]);
   const [modal, setModal] = useState<"task" | "connection" | null>(null);
   useEffect(() => {
     const narrow = window.matchMedia("(max-width: 1100px)");
-    const closeOnNarrow = () => { if(narrow.matches) setOpen(false); };
+    const closeOnNarrow = () => {
+      if (narrow.matches) setOpen(false);
+    };
     narrow.addEventListener("change", closeOnNarrow);
-    return () => narrow.removeEventListener("change",closeOnNarrow);
+    return () => narrow.removeEventListener("change", closeOnNarrow);
   }, []);
   useEffect(() => {
     const escape = (event: KeyboardEvent) => {
-      if(event.key === "Escape" && !event.defaultPrevented && !modal && open && !workspace) {
+      if (
+        event.key === "Escape" &&
+        !event.defaultPrevented &&
+        !modal &&
+        open &&
+        !workspace
+      ) {
         setOpen(false);
       }
     };
-    window.addEventListener("keydown",escape);
-    return () => window.removeEventListener("keydown",escape);
-  }, [modal,open,workspace]);
+    window.addEventListener("keydown", escape);
+    return () => window.removeEventListener("keydown", escape);
+  }, [modal, open, workspace]);
   const personal = data.tasks.find((task) => task.id === initialContext.taskId);
   const context = {
     ...initialContext,
@@ -147,7 +175,9 @@ export function App({
     Promise.all([
       coursesRequest,
       initialContext.kind === "home"
-        ? coursesRequest.then(courses => readDashboardWork(controller.signal, courses))
+        ? coursesRequest.then((courses) =>
+            readDashboardWork(controller.signal, courses),
+          )
         : Promise.resolve([]),
       initialContext.kind === "assignment"
         ? readAssignment(
@@ -161,14 +191,30 @@ export function App({
         setCourses(nextCourses);
         setTodos(nextTodos);
         setAssignment(nextAssignment);
-        if (!controller.signal.aborted) observeCanvasWork(nextCourses,initialContext.kind === "home" ? nextTodos : undefined,nextAssignment || undefined);
-        if (!controller.signal.aborted) void store.cacheCanvas({courses:nextCourses,todos:initialContext.kind === "home" ? nextTodos : store.get().canvasCache?.todos ?? [],fetchedAt:new Date().toISOString()});
+        if (!controller.signal.aborted)
+          observeCanvasWork(
+            nextCourses,
+            initialContext.kind === "home" ? nextTodos : undefined,
+            nextAssignment || undefined,
+          );
+        if (!controller.signal.aborted)
+          void store.cacheCanvas({
+            courses: nextCourses,
+            todos:
+              initialContext.kind === "home"
+                ? nextTodos
+                : (store.get().canvasCache?.todos ?? []),
+            fetchedAt: new Date().toISOString(),
+          });
       })
       .catch((err) => {
         if (!controller.signal.aborted) setError(err.message);
       })
       .finally(() => {
-        if (!controller.signal.aborted) { setLoading(false); setRefreshing(false); }
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       });
     return () => controller.abort();
   }, [
@@ -178,7 +224,10 @@ export function App({
     initialContext.assignmentId,
   ]);
   useEffect(() => {
-    document.body.classList.toggle("canvasdoc-sidebar-open", open && !workspace);
+    document.body.classList.toggle(
+      "canvasdoc-sidebar-open",
+      open && !workspace,
+    );
     return () => document.body.classList.remove("canvasdoc-sidebar-open");
   }, [open, workspace]);
   useEffect(() => {
@@ -191,15 +240,18 @@ export function App({
     };
   }, [workspace, mounts]);
   const onConnect = () => setModal("connection");
-  const course = courses.find((item) => item.id === context.courseId);
-  return (
-    <>
-      {mounts.conversation && createPortal(<Conversation key={context.threadId} context={context} workMode={workspace} onConnect={onConnect} />, mounts.conversation)}
-      {createPortal(<Navigation courses={courses} />, mounts.navigation)}
-      {createPortal(
-        workspace ? null : open ? (
-          <>
-          <button className="sidebar-backdrop" aria-label="Close Canvasdoc sidebar" onClick={() => void transitionView(() => setOpen(false))} />
+  function renderSidebar(): React.ReactNode {
+    if (workspace) {
+      return null;
+    }
+    if (open) {
+      return (
+        <>
+          <button
+            className="sidebar-backdrop"
+            aria-label="Close Canvasdoc sidebar"
+            onClick={() => void transitionView(() => setOpen(false))}
+          />
           <aside
             className="sidebar"
             aria-label={
@@ -208,14 +260,28 @@ export function App({
           >
             <header className="sidebar-header">
               <strong>{context.kind === "home" ? "To-do" : "Canvasdoc"}</strong>
-              {context.kind !== "home" && <button className="connection-status" data-status={connection.status} onClick={onConnect} title={connectionLabel} aria-label={connectionLabel}><i /></button>}
+              {context.kind !== "home" && (
+                <button
+                  className="connection-status"
+                  data-status={connection.status}
+                  onClick={onConnect}
+                  title={connectionLabel}
+                  aria-label={connectionLabel}
+                >
+                  <i />
+                </button>
+              )}
               <div className="header-actions">
                 {context.kind === "home" && (
                   <button
                     className="icon-button"
                     aria-label="Refresh Canvas to-dos"
                     aria-busy={refreshing}
-                    title={refreshing ? "Refreshing coursework from Canvas" : "Refresh coursework from Canvas"}
+                    title={
+                      refreshing
+                        ? "Refreshing coursework from Canvas"
+                        : "Refresh coursework from Canvas"
+                    }
                     onClick={() => setRevision((value) => value + 1)}
                   >
                     <RefreshCw size={16} className={refreshing ? "spin" : ""} />
@@ -257,7 +323,17 @@ export function App({
                     </button>
                   </p>
                 )}
-                <div className="conversation-slot" ref={node => { if(node && mounts.conversationHost && mounts.conversationHost.parentNode !== node) node.append(mounts.conversationHost); }} />
+                <div
+                  className="conversation-slot"
+                  ref={(node) => {
+                    if (
+                      node &&
+                      mounts.conversationHost &&
+                      mounts.conversationHost.parentNode !== node
+                    )
+                      node.append(mounts.conversationHost);
+                  }}
+                />
               </>
             )}
             {storageError && (
@@ -266,21 +342,49 @@ export function App({
               </p>
             )}
           </aside>
-          </>
-        ) : (
-          <button className="launcher" aria-label={context.kind === "home" ? "Open to-do list" : "Open Canvasdoc conversation"} onClick={() => void transitionView(() => setOpen(true))}>
-            <MessageSquare size={18} /> Canvasdoc
-          </button>
-        ),
-        mounts.sidebar,
-      )}
+        </>
+      );
+    }
+    return (
+      <button
+        className="launcher"
+        aria-label={
+          context.kind === "home"
+            ? "Open to-do list"
+            : "Open Canvasdoc conversation"
+        }
+        onClick={() => void transitionView(() => setOpen(true))}
+      >
+        <MessageSquare size={18} /> Canvasdoc
+      </button>
+    );
+  }
+
+  return (
+    <>
+      {mounts.conversation &&
+        createPortal(
+          <Conversation
+            key={context.threadId}
+            context={context}
+            workMode={workspace}
+            onConnect={onConnect}
+          />,
+          mounts.conversation,
+        )}
+      {createPortal(<Navigation courses={courses} />, mounts.navigation)}
+      {createPortal(renderSidebar(), mounts.sidebar)}
       {mounts.main &&
         createPortal(
           context.kind === "home" ? (
             <main className="dashboard">
               <header className="dashboard-header">
                 <span>Home</span>
-                <button className="connection-status" data-status={connection.status} onClick={onConnect}>
+                <button
+                  className="connection-status"
+                  data-status={connection.status}
+                  onClick={onConnect}
+                >
                   <i /> {connectionLabel}
                 </button>
               </header>
@@ -344,7 +448,14 @@ export function App({
         )}
       {mounts.workspace &&
         createPortal(
-          <Workspace active={workspace} requestedFile={requestedFile} context={context} conversationHost={mounts.conversationHost!} onAssignment={() => void transitionView(() => setWorkspace(false))} onConnect={onConnect} />,
+          <Workspace
+            active={workspace}
+            requestedFile={requestedFile}
+            context={context}
+            conversationHost={mounts.conversationHost!}
+            onAssignment={() => void transitionView(() => setWorkspace(false))}
+            onConnect={onConnect}
+          />,
           mounts.workspace,
         )}
       {modal &&
@@ -356,7 +467,10 @@ export function App({
             {modal === "task" ? (
               <TaskForm courses={courses} onClose={() => setModal(null)} />
             ) : (
-              <><ConnectionSettings /><MaterialStatus /></>
+              <>
+                <ConnectionSettings />
+                <MaterialStatus />
+              </>
             )}
           </Modal>,
           mounts.sidebar,
@@ -365,17 +479,31 @@ export function App({
   );
 }
 
-function RecentWork() {
+function RecentWork(): React.JSX.Element {
   const { threads, tasks, canvasCache } = useData();
   const details = (thread: { id: string; href: string }) => {
     const assignmentIds = thread.id.match(/^assignment:(\d+):(\d+)$/);
-    const task = tasks.find(item => thread.id === `personal:${item.id}`);
-    const courseId = assignmentIds ? Number(assignmentIds[1]) : task?.courseId ?? Number(thread.href.match(/\/courses\/(\d+)/)?.[1]);
-    const course = canvasCache?.courses.find(item => item.id === courseId);
-    const assignment = assignmentIds ? canvasCache?.todos.find(item => item.assignment?.id === Number(assignmentIds[2]) && item.assignment?.course_id === courseId)?.assignment : undefined;
-    const courseLabel = course ? shortName(course.name) : task ? "Personal task" : courseId ? "Course" : "Canvas";
+    const task = tasks.find((item) => thread.id === `personal:${item.id}`);
+    const courseId = assignmentIds
+      ? Number(assignmentIds[1])
+      : (task?.courseId ?? Number(thread.href.match(/\/courses\/(\d+)/)?.[1]));
+    const course = canvasCache?.courses.find((item) => item.id === courseId);
+    const assignment = assignmentIds
+      ? canvasCache?.todos.find(
+          (item) =>
+            item.assignment?.id === Number(assignmentIds[2]) &&
+            item.assignment?.course_id === courseId,
+        )?.assignment
+      : undefined;
+    let courseLabel = "Canvas";
+    if (course) courseLabel = shortName(course.name);
+    else if (task) courseLabel = "Personal task";
+    else if (courseId) courseLabel = "Course";
     const due = assignment?.due_at ?? task?.dueAt;
-    return [courseLabel, due ? `Due ${dateLabel(due)}` : assignment || task ? "No due date" : null].filter(Boolean).join(" · ");
+    let dueLabel = null;
+    if (due) dueLabel = `Due ${dateLabel(due)}`;
+    else if (assignment || task) dueLabel = "No due date";
+    return [courseLabel, dueLabel].filter(Boolean).join(" · ");
   };
   const recent = Object.values(threads)
     .filter(
@@ -408,8 +536,9 @@ function RecentWork() {
   );
 }
 
+type PersonalPageProps = { task?: PersonalTask };
 
-function PersonalPage({ task }: { task?: PersonalTask }) {
+function PersonalPage({ task }: PersonalPageProps): React.JSX.Element {
   return (
     <main className="personal-page">
       <a href="/" className="back-link">
@@ -451,15 +580,13 @@ function PersonalPage({ task }: { task?: PersonalTask }) {
   );
 }
 
-function Modal({
-  title,
-  onClose,
-  children,
-}: {
+type ModalProps = {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
-}) {
+};
+
+function Modal({ title, onClose, children }: ModalProps): React.JSX.Element {
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = ref.current!;
@@ -500,13 +627,12 @@ function Modal({
   );
 }
 
-function TaskForm({
-  courses,
-  onClose,
-}: {
+type TaskFormProps = {
   courses: Course[];
   onClose: () => void;
-}) {
+};
+
+function TaskForm({ courses, onClose }: TaskFormProps): React.JSX.Element {
   const [error, setError] = useState("");
   return (
     <form
@@ -600,13 +726,12 @@ function TaskForm({
   );
 }
 
-function ConnectionSettings() {
+function ConnectionSettings(): React.JSX.Element {
   const state = useConnection();
   const [error, setError] = useState("");
-  return (
-    <div className="connection-content">
-      <p>Connect the Codex runtime started from your Canvasdoc folder.</p>
-      {state.status === "connected" ? (
+  function renderConnection(): React.ReactNode {
+    if (state.status === "connected") {
+      return (
         <>
           <div className="connection-detail">Connected · {state.root}</div>
           <p className="muted">
@@ -617,7 +742,10 @@ function ConnectionSettings() {
             Disconnect
           </button>
         </>
-      ) : usesNativeConnection ? (
+      );
+    }
+    if (usesNativeConnection) {
+      return (
         <>
           <p>
             Start the Canvasdoc connector from your selected folder, then
@@ -627,51 +755,59 @@ function ConnectionSettings() {
             Reconnect
           </button>
         </>
-      ) : (
-        <form
-          className="connection-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const data = new FormData(event.currentTarget);
-            try {
-              connect(String(data.get("url")), String(data.get("token")));
-              setError("");
-            } catch (e) {
-              setError((e as Error).message);
-            }
-          }}
+      );
+    }
+    return (
+      <form
+        className="connection-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const data = new FormData(event.currentTarget);
+          try {
+            connect(String(data.get("url")), String(data.get("token")));
+            setError("");
+          } catch (e) {
+            setError((e as Error).message);
+          }
+        }}
+      >
+        <label>
+          Connector URL
+          <input
+            name="url"
+            aria-label="Connector URL"
+            defaultValue="wss://mac-mini.tail39179a.ts.net:3219"
+            required
+          />
+        </label>
+        <label>
+          Connection token
+          <input
+            name="token"
+            aria-label="Connection token"
+            type="password"
+            required
+            autoComplete="off"
+          />
+        </label>
+        <p className="muted">
+          Development connection. Token stays in this browser session. The
+          production extension will use native messaging.
+        </p>
+        <button
+          className="primary-button"
+          disabled={state.status === "connecting"}
         >
-          <label>
-            Connector URL
-            <input
-              name="url"
-              aria-label="Connector URL"
-              defaultValue="wss://mac-mini.tail39179a.ts.net:3219"
-              required
-            />
-          </label>
-          <label>
-            Connection token
-            <input
-              name="token"
-              aria-label="Connection token"
-              type="password"
-              required
-              autoComplete="off"
-            />
-          </label>
-          <p className="muted">
-            Development connection. Token stays in this browser session. The
-            production extension will use native messaging.
-          </p>
-          <button
-            className="primary-button"
-            disabled={state.status === "connecting"}
-          >
-            {state.status === "connecting" ? "Connecting…" : "Connect"}
-          </button>
-        </form>
-      )}
+          {state.status === "connecting" ? "Connecting…" : "Connect"}
+        </button>
+      </form>
+    );
+  }
+
+  return (
+    <div className="connection-content">
+      <p>Connect the Codex runtime started from your Canvasdoc folder.</p>
+      {renderConnection()}
       {(error || state.error) && (
         <p className="error" role="alert">
           {error || state.error}

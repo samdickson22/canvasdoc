@@ -59,38 +59,86 @@ body.canvasdoc-mounted .ic-Layout-wrapper {
     width: 100%;
   }
 }
-body.canvasdoc-mounted #header { visibility:hidden; }
-body.canvasdoc-mounted #wrapper { margin-left:220px; width:calc(100% - 220px); }
-body.canvasdoc-mounted.canvasdoc-sidebar-open #wrapper { width:calc(100% - 220px - var(--canvasdoc-sidebar-width)); }
-@media(max-width:1000px) { body.canvasdoc-mounted #wrapper { margin-left:72px;width:calc(100% - 72px); } body.canvasdoc-mounted.canvasdoc-sidebar-open #wrapper { width:calc(100% - 72px - var(--canvasdoc-sidebar-width)); } }
-body.canvasdoc-workspace-open #left-side { display:none; }
-body.canvasdoc-workspace-open .ic-app-main-content { margin-left:0; }
-body.canvasdoc-workspace-open #main { margin-left:0; }
-body.canvasdoc-workspace-open #right-side-wrapper { display:none !important; }
-body.canvasdoc-workspace-open #content-wrapper { flex:1; width:100%; max-width:none; }
-body.canvasdoc-workspace-open #content { padding:16px 24px; }
-body.canvasdoc-workspace-open #content > :not(#canvasdoc-tabs):not(#canvasdoc-workspace) { display:none !important; }
+body.canvasdoc-mounted #header {
+  visibility: hidden;
+}
+body.canvasdoc-mounted #wrapper {
+  margin-left: 220px;
+  width: calc(100% - 220px);
+}
+body.canvasdoc-mounted.canvasdoc-sidebar-open #wrapper {
+  width: calc(100% - 220px - var(--canvasdoc-sidebar-width));
+}
+@media (max-width: 1000px) {
+  body.canvasdoc-mounted #wrapper {
+    margin-left: 72px;
+    width: calc(100% - 72px);
+  }
+  body.canvasdoc-mounted.canvasdoc-sidebar-open #wrapper {
+    width: calc(100% - 72px - var(--canvasdoc-sidebar-width));
+  }
+}
+body.canvasdoc-workspace-open #left-side {
+  display: none;
+}
+body.canvasdoc-workspace-open .ic-app-main-content {
+  margin-left: 0;
+}
+body.canvasdoc-workspace-open #main {
+  margin-left: 0;
+}
+body.canvasdoc-workspace-open #right-side-wrapper {
+  display: none !important;
+}
+body.canvasdoc-workspace-open #content-wrapper {
+  flex: 1;
+  width: 100%;
+  max-width: none;
+}
+body.canvasdoc-workspace-open #content {
+  padding: 16px 24px;
+}
+body.canvasdoc-workspace-open
+  #content
+  > :not(#canvasdoc-tabs):not(#canvasdoc-workspace) {
+  display: none !important;
+}
 
-@media(max-width:1100px) {
-  body.canvasdoc-mounted.canvasdoc-sidebar-open #wrapper { margin-right:0; width:calc(100% - 220px); }
+@media (max-width: 1100px) {
+  body.canvasdoc-mounted.canvasdoc-sidebar-open #wrapper {
+    margin-right: 0;
+    width: calc(100% - 220px);
+  }
 }
-@media(max-width:1000px) {
-  body.canvasdoc-mounted.canvasdoc-sidebar-open #wrapper { margin-right:0; width:calc(100% - 72px); }
+@media (max-width: 1000px) {
+  body.canvasdoc-mounted.canvasdoc-sidebar-open #wrapper {
+    margin-right: 0;
+    width: calc(100% - 72px);
+  }
 }
-@media(prefers-reduced-motion:reduce) {
-  body.canvasdoc-mounted .ic-Layout-wrapper { transition:none; }
+@media (prefers-reduced-motion: reduce) {
+  body.canvasdoc-mounted .ic-Layout-wrapper {
+    transition: none;
+  }
 }
 
 /* Native snapshots animate layout handoffs without remounting the live agent. */
-::view-transition-old(root), ::view-transition-new(root) {
-  animation-duration:180ms;
-  animation-timing-function:cubic-bezier(.2,.8,.2,1);
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 ::view-transition-group(canvasdoc-conversation) {
-  animation-duration:200ms;
-  animation-timing-function:cubic-bezier(.2,.8,.2,1);
+  animation-duration: 200ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-#canvasdoc-conversation { view-transition-name:canvasdoc-conversation; }
-@media(prefers-reduced-motion:reduce) {
-  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation:none !important; }
+#canvasdoc-conversation {
+  view-transition-name: canvasdoc-conversation;
+}
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }

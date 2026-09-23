@@ -1,5 +1,5 @@
-import { unzipSync, strFromU8 } from "fflate";
 import { XMLParser, XMLValidator } from "fast-xml-parser";
+import { strFromU8, unzipSync } from "fflate";
 import path from "node:path";
 export const EXTRACTOR_VERSION = "canvasdoc-text-v1";
 export type Extracted = {
@@ -39,12 +39,10 @@ export async function extractDocument(
         if (text.length > LIMIT) throw Error("Extracted text exceeds 4 MB.");
         p.cleanup();
       }
-      return {
-        status:
-          empty === pdf.numPages ? "needs-ocr" : empty ? "partial" : "ready",
-        text,
-        units: pdf.numPages,
-      };
+      let status: Extracted["status"] = "ready";
+      if (empty === pdf.numPages) status = "needs-ocr";
+      else if (empty) status = "partial";
+      return { status, text, units: pdf.numPages };
     } finally {
       await task.destroy();
     }
@@ -86,13 +84,16 @@ export async function extractDocument(
       throw Error("Invalid presentation XML.");
     return s;
   };
-  const arr = (v: any) => (v == null ? [] : Array.isArray(v) ? v : [v]);
+  function asArray(value: any): any[] {
+    if (value == null) return [];
+    return Array.isArray(value) ? value : [value];
+  }
   const relationships = (file: string) =>
-    arr(parser.parse(xml(file)).Relationships?.Relationship);
+    asArray(parser.parse(xml(file)).Relationships?.Relationship);
   const targets = new Map(
     relationships("ppt/_rels/presentation.xml.rels").map((r) => [r["@_Id"], r]),
   );
-  const slides = arr(
+  const slides = asArray(
     parser.parse(xml("ppt/presentation.xml")).presentation?.sldIdLst?.sldId,
   );
   if (!slides.length || slides.length > 2000)
@@ -103,7 +104,7 @@ export async function extractDocument(
     for (const node of nodes)
       for (const [tag, value] of Object.entries(node)) {
         if (tag === "t")
-          text += arr(value)
+          text += asArray(value)
             .map((v) => v["#text"] ?? "")
             .join("");
         else if (tag === "br") text += "\n";

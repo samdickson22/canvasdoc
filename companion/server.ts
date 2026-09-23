@@ -1,15 +1,19 @@
-import { isSyncedSource } from "../src/workspace-files.ts";
-import { applyDisplayEvent, finishDisplayParts, type DisplayPart } from "./message-parts.ts";
+import { createHash, randomBytes } from "node:crypto";
+import { readFile, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
-import { WebSocketServer, WebSocket } from "ws";
-import { mkdir, readFile, writeFile, rename, unlink } from "node:fs/promises";
-import { randomBytes, createHash } from "node:crypto";
 import path from "node:path";
+import { WebSocket, WebSocketServer } from "ws";
+import { isSyncedSource } from "../src/workspace-files.ts";
 import { CodexRuntime, atomicJson, type RpcEvent } from "./codex.ts";
+import { listWorkspaceFiles, readWorkspaceFile } from "./files.ts";
 import { HistoryExporter } from "./history-export.ts";
 import { MaterialMirror } from "./materials.ts";
+import {
+  applyDisplayEvent,
+  finishDisplayParts,
+  type DisplayPart,
+} from "./message-parts.ts";
 import { saveUpload } from "./uploads.ts";
-import { listWorkspaceFiles, readWorkspaceFile } from "./files.ts";
 
 const rootArg = process.argv[2];
 if (!rootArg)
@@ -88,19 +92,21 @@ const approvals = new Map<
 let active: Run | undefined;
 let filesBefore = new Map<string, number>();
 let persistence = Promise.resolve();
-function persist() {
+function persist(): Promise<void> {
   const snapshot = structuredClone({ runs, receipts });
   persistence = persistence
     .catch(() => {})
     .then(() => atomicJson(journalFile, snapshot));
   return persistence;
 }
-const broadcast = (value: unknown) => {
+function broadcast(value: unknown): void {
   const s = JSON.stringify(value);
   for (const c of clients) if (c.readyState === WebSocket.OPEN) c.send(s);
-};
-const publish = (run: Run) => broadcast({ type: "run", run });
-async function pump() {
+}
+function publish(run: Run): void {
+  return broadcast({ type: "run", run });
+}
+async function pump(): Promise<void> {
   if (active) return;
   const run = runs.find((r) => r.status === "queued");
   if (!run) return;
@@ -109,7 +115,11 @@ async function pump() {
   await persist();
   publish(run);
   try {
-    filesBefore = new Map((await listWorkspaceFiles(config.root)).filter(f => !isSyncedSource(f.path)).map(f => [f.path, f.modified]));
+    filesBefore = new Map(
+      (await listWorkspaceFiles(config.root))
+        .filter((f) => !isSyncedSource(f.path))
+        .map((f) => [f.path, f.modified]),
+    );
     const envelope = JSON.stringify({
       sourceThreadId: run.command.sourceThreadId,
       sourceMessageId: run.command.requestId,
@@ -167,7 +177,12 @@ runtime.subscribe((event: RpcEvent) => {
         publish(run);
       }
       if (event.method === "turn/completed") {
-        run.files = (await listWorkspaceFiles(config.root).catch(() => [])).filter(f => !isSyncedSource(f.path) && filesBefore.get(f.path) !== f.modified).map(f => f.path);
+        run.files = (await listWorkspaceFiles(config.root).catch(() => []))
+          .filter(
+            (f) =>
+              !isSyncedSource(f.path) && filesBefore.get(f.path) !== f.modified,
+          )
+          .map((f) => f.path);
         finishDisplayParts(run);
         run.turnId = event.params.turn.id;
         run.status =
@@ -206,7 +221,7 @@ wss.on("connection", (socket, request) => {
     let incoming: any;
     commandQueue = commandQueue
       .then(async () => {
-        const message = incoming = JSON.parse(bytes.toString());
+        const message = (incoming = JSON.parse(bytes.toString()));
         if (!authenticated) {
           if (
             message.type !== "connect" ||
@@ -241,27 +256,70 @@ wss.on("connection", (socket, request) => {
         }
         if (message.type === "materials") {
           void materials.handle(message).then(
-            result => socket.readyState === WebSocket.OPEN && socket.send(JSON.stringify({type:"materials-result", id:message.id, result})),
-            error => socket.readyState === WebSocket.OPEN && socket.send(JSON.stringify({type:"materials-result", id:message.id, error:error.message})),
+            (result) =>
+              socket.readyState === WebSocket.OPEN &&
+              socket.send(
+                JSON.stringify({
+                  type: "materials-result",
+                  id: message.id,
+                  result,
+                }),
+              ),
+            (error) =>
+              socket.readyState === WebSocket.OPEN &&
+              socket.send(
+                JSON.stringify({
+                  type: "materials-result",
+                  id: message.id,
+                  error: error.message,
+                }),
+              ),
           );
           return;
         }
         if (message.type === "files-list" || message.type === "files-read") {
           try {
-            const result = message.type === "files-list" ? await listWorkspaceFiles(config.root) : await readWorkspaceFile(config.root, message.path);
-            socket.send(JSON.stringify({ type: "files-result", id: message.id, result }));
+            const result =
+              message.type === "files-list"
+                ? await listWorkspaceFiles(config.root)
+                : await readWorkspaceFile(config.root, message.path);
+            socket.send(
+              JSON.stringify({ type: "files-result", id: message.id, result }),
+            );
           } catch (error) {
-            socket.send(JSON.stringify({ type: "files-result", id: message.id, error: (error as Error).message }));
+            socket.send(
+              JSON.stringify({
+                type: "files-result",
+                id: message.id,
+                error: (error as Error).message,
+              }),
+            );
           }
           return;
         }
         if (message.type === "upload") {
           try {
-            const filePath = await saveUpload(config.root, message.name, message.base64);
-            materials.extractor.enqueue(filePath,"User attachment");
-            socket.send(JSON.stringify({ type: "upload-result", id: message.id, path: filePath }));
+            const filePath = await saveUpload(
+              config.root,
+              message.name,
+              message.base64,
+            );
+            materials.extractor.enqueue(filePath, "User attachment");
+            socket.send(
+              JSON.stringify({
+                type: "upload-result",
+                id: message.id,
+                path: filePath,
+              }),
+            );
           } catch (error) {
-            socket.send(JSON.stringify({ type: "upload-result", id: message.id, error: (error as Error).message }));
+            socket.send(
+              JSON.stringify({
+                type: "upload-result",
+                id: message.id,
+                error: (error as Error).message,
+              }),
+            );
           }
           return;
         }
@@ -339,7 +397,11 @@ wss.on("connection", (socket, request) => {
           return;
         }
         if (message.type === "stop") {
-          if (active && active.command.requestId === message.requestId && active.turnId)
+          if (
+            active &&
+            active.command.requestId === message.requestId &&
+            active.turnId
+          )
             await runtime.interrupt(active.turnId);
           else {
             const queued = runs.find(
@@ -416,9 +478,16 @@ wss.on("connection", (socket, request) => {
       .catch((error) => {
         if (socket.readyState === WebSocket.OPEN)
           socket.send(
-            JSON.stringify(incoming?.type === "send" && typeof incoming.command?.requestId === "string"
-              ? {type:"send-rejected",requestId:incoming.command.requestId,message:error.message}
-              : { type: "error", message: error.message }),
+            JSON.stringify(
+              incoming?.type === "send" &&
+                typeof incoming.command?.requestId === "string"
+                ? {
+                    type: "send-rejected",
+                    requestId: incoming.command.requestId,
+                    message: error.message,
+                  }
+                : { type: "error", message: error.message },
+            ),
           );
       });
   });
@@ -438,7 +507,7 @@ server.listen(port, "127.0.0.1", () =>
     }),
   ),
 );
-async function stop() {
+async function stop(): Promise<void> {
   for (const c of clients) c.close();
   wss.close();
   server.close();

@@ -4,11 +4,20 @@ import type { SavedMessage } from "../types.ts";
 // persisted history and the main provider session remain intact.
 const requests = new Set<string>();
 
-export const rememberHomeRequest = (id: string) => requests.add(id);
-export const isVisibleHomeRequest = (id: string) => requests.has(id);
-export const visibleHomeMessages = (messages: SavedMessage[] = []) =>
-  messages.filter(message => requests.has(
-    message.role === "assistant" && message.id.startsWith("assistant:")
-      ? message.id.slice("assistant:".length)
-      : message.id,
-  ));
+export function rememberHomeRequest(id: string): Set<string> {
+  return requests.add(id);
+}
+export function isVisibleHomeRequest(id: string): boolean {
+  return requests.has(id);
+}
+export function visibleHomeMessages(
+  messages: SavedMessage[] = [],
+): SavedMessage[] {
+  return messages.filter((message) =>
+    requests.has(
+      message.role === "assistant" && message.id.startsWith("assistant:")
+        ? message.id.slice("assistant:".length)
+        : message.id,
+    ),
+  );
+}

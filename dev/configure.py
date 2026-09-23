@@ -42,7 +42,13 @@ for file in (source / "docker-compose/config").glob("*.yml"):
 values = dict(line.split("=", 1) for line in env.read_text().splitlines() if "=" in line)
 origin = values.get("CANVASDOC_ORIGIN", "http://localhost:3210").rstrip("/")
 url = urlsplit(origin)
-if url.scheme not in ("http", "https") or not url.hostname or url.username or url.password or url.path:
+if (
+    url.scheme not in ("http", "https")
+    or not url.hostname
+    or url.username
+    or url.password
+    or url.path
+):
     raise SystemExit("CANVASDOC_ORIGIN must be an HTTP(S) origin.")
 (config / "domain.yml").write_text(f"""development:
   domain: {json.dumps(url.netloc)}

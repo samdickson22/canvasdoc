@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from "react";
-import type { PersonalTask, ThreadRecord } from "./types";
 import { browserStorage } from "./storage/browser.ts";
 import { empty, mutate, type Data, type Mutation } from "./storage/data.ts";
+import type { PersonalTask, ThreadRecord } from "./types.ts";
 export { parseSavedData } from "./storage/data.ts";
 let key = "";
 let data = empty();
@@ -11,14 +11,14 @@ let pending: Mutation[] = [];
 let tail = Promise.resolve();
 let unsubscribe: undefined | (() => void);
 const listeners = new Set<() => void>();
-function emit() {
+function emit(): void {
   listeners.forEach((fn) => fn());
 }
-function project() {
+function project(): void {
   data = pending.reduce(mutate, committed);
   emit();
 }
-export async function initializeStore(userId: string) {
+export async function initializeStore(userId: string): Promise<void> {
   key = `canvasdoc:v1:${location.origin}:${userId}`;
   unsubscribe?.();
   try {
@@ -61,15 +61,21 @@ function update(op: Mutation): Promise<boolean> {
   return operation.then(() => ok);
 }
 export const store = {
-  saveMaterials(catalog: NonNullable<Data["materialCatalog"]>) { return update({type:"material-catalog",catalog}); },
-  cacheCanvas(cache: NonNullable<Data['canvasCache']>) { return update({type:"canvas-cache",cache}); },
-  setModel(id: string, effort?: string) { return update({type:"model",model:{id,effort}}); },
+  saveMaterials(catalog: NonNullable<Data["materialCatalog"]>) {
+    return update({ type: "material-catalog", catalog });
+  },
+  cacheCanvas(cache: NonNullable<Data["canvasCache"]>) {
+    return update({ type: "canvas-cache", cache });
+  },
+  setModel(id: string, effort?: string) {
+    return update({ type: "model", model: { id, effort } });
+  },
   async flush() {
     await tail;
     return !storageError && pending.length === 0;
   },
   get: () => data,
-  enqueue(command: import("./runtime/protocol").UserCommand) {
+  enqueue(command: import("./runtime/protocol.ts").UserCommand) {
     return update({
       type: "enqueue",
       command,
@@ -99,9 +105,9 @@ export const store = {
     return update({ type: "toggle-task", id });
   },
 };
-export function useData() {
+export function useData(): Data {
   return useSyncExternalStore(store.subscribe, store.get);
 }
-export function useStorageError() {
+export function useStorageError(): string {
   return useSyncExternalStore(store.subscribe, store.error);
 }

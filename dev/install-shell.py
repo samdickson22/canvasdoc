@@ -5,7 +5,15 @@ import re
 root = Path(__file__).resolve().parent
 layout = root / 'canvas-lms/app/views/layouts/application.html.erb'
 source = layout.read_text()
-source = re.sub(r'<% if Rails\.env\.development\? %>\s*(?:<% content_for :head do %>\s*)?<!-- canvasdoc development loader -->.*?<% end %>\s*(?:<% end %>\s*)?', '', source, flags=re.S)
+source = re.sub(
+    r'<% if Rails\.env\.development\? %>\s*'
+    r'(?:<% content_for :head do %>\s*)?'
+    r'<!-- canvasdoc development loader -->.*?<% end %>\s*'
+    r'(?:<% end %>\s*)?',
+    '',
+    source,
+    flags=re.S,
+)
 loader = '''<% if Rails.env.development? %>
 <!-- canvasdoc development loader -->
 <link rel="stylesheet" href="/canvasdoc/bootstrap.css">

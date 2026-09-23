@@ -124,16 +124,18 @@ const AttachmentUI: FC = () => {
     }
   });
 
-  const uploadState = useAuiState((s) =>
-    s.attachment.status.type === "running"
-      ? "uploading"
-      : s.attachment.status.type === "incomplete" &&
-          s.attachment.status.reason === "error"
-        ? "error"
-        : undefined,
-  );
+  const uploadState = useAuiState((s) => {
+    const status = s.attachment.status;
+    if (status.type === "running") return "uploading";
+    if (status.type === "incomplete" && status.reason === "error")
+      return "error";
+    return undefined;
+  });
   const isUploading = uploadState === "uploading";
   const isError = uploadState === "error";
+  let statusLabel = "";
+  if (isError) statusLabel = ", upload failed";
+  else if (isUploading) statusLabel = ", uploading";
 
   const errorMessage = useAuiState((s) =>
     s.attachment.status.type === "incomplete" &&
@@ -166,13 +168,7 @@ const AttachmentUI: FC = () => {
                   )}
                   role="button"
                   tabIndex={0}
-                  aria-label={`${typeLabel} attachment${
-                    isError
-                      ? ", upload failed"
-                      : isUploading
-                        ? ", uploading"
-                        : ""
-                  }`}
+                  aria-label={`${typeLabel} attachment${statusLabel}`}
                 />
               }
             >

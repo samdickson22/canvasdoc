@@ -1,5 +1,5 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { parseSavedData } from "../src/store.ts";
 
 const saved = () => ({

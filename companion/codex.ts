@@ -1,16 +1,16 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { createInterface } from "node:readline";
+import { randomUUID } from "node:crypto";
 import {
   mkdir,
   readFile,
-  writeFile,
-  rename,
   realpath,
+  rename,
   unlink,
+  writeFile,
 } from "node:fs/promises";
 import path from "node:path";
+import { createInterface } from "node:readline";
 import lockfile from "proper-lockfile";
-import { randomUUID } from "node:crypto";
 
 export type RpcEvent = {
   method: string;
@@ -24,7 +24,7 @@ export type WorkspaceConfig = {
   runtimeThreadId?: string;
   runtimeStartedTurn?: boolean;
 };
-export async function atomicJson(file: string, data: unknown) {
+export async function atomicJson(file: string, data: unknown): Promise<void> {
   const temp = `${file}.${randomUUID()}.tmp`;
   try {
     await writeFile(temp, JSON.stringify(data, null, 2), { mode: 0o600 });
@@ -36,7 +36,13 @@ export async function atomicJson(file: string, data: unknown) {
 
 /** Owns only the App Server child and the explicitly selected workspace. */
 export class CodexRuntime {
-  models: { id: string; name: string; description: string; efforts: string[]; defaultEffort: string }[] = [];
+  models: {
+    id: string;
+    name: string;
+    description: string;
+    efforts: string[];
+    defaultEffort: string;
+  }[] = [];
   currentModel?: string;
   currentEffort?: string;
   config!: WorkspaceConfig;
@@ -93,18 +99,32 @@ export class CodexRuntime {
           );
         if (this.config.root !== root) {
           if (process.env.CANVASDOC_RELOCATE !== "1")
-            throw new Error("This Canvasdoc folder moved. Run npx canvasdoc-cli --folder PATH --relocate to resume it here.");
+            throw new Error(
+              "This Canvasdoc folder moved. Run npx canvasdoc-cli --folder PATH --relocate to resume it here.",
+            );
           this.config.root = root;
           await atomicJson(configPath, this.config);
         }
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-        this.config = { version: 1, workspaceId: randomUUID(), root, runtimeStartedTurn: false };
+        this.config = {
+          version: 1,
+          workspaceId: randomUUID(),
+          root,
+          runtimeStartedTurn: false,
+        };
         await atomicJson(configPath, this.config);
       }
-      const prefix: unknown = JSON.parse(process.env.CANVASDOC_CODEX_PREFIX || "[]");
-      if (!Array.isArray(prefix) || !prefix.every(value => typeof value === "string"))
-        throw new Error("CANVASDOC_CODEX_PREFIX must be a JSON array of strings.");
+      const prefix: unknown = JSON.parse(
+        process.env.CANVASDOC_CODEX_PREFIX || "[]",
+      );
+      if (
+        !Array.isArray(prefix) ||
+        !prefix.every((value) => typeof value === "string")
+      )
+        throw new Error(
+          "CANVASDOC_CODEX_PREFIX must be a JSON array of strings.",
+        );
       this.child = spawn(this.bin, [...prefix, "app-server", "--stdio"], {
         cwd: root,
         env: process.env,
@@ -163,16 +183,30 @@ export class CodexRuntime {
       let result;
       if (this.config.runtimeThreadId) {
         try {
-          result = await this.rpc("thread/resume", { ...options, threadId: this.config.runtimeThreadId });
+          result = await this.rpc("thread/resume", {
+            ...options,
+            threadId: this.config.runtimeThreadId,
+          });
         } catch (error) {
           // Codex does not write a rollout for a thread until its first turn.
           // Only replace a positively identified empty thread, never used history.
-          if (this.config.runtimeStartedTurn !== false ||
-              !(error instanceof Error) || !error.message.startsWith("no rollout found for thread id ")) throw error;
+          if (
+            this.config.runtimeStartedTurn !== false ||
+            !(error instanceof Error) ||
+            !error.message.startsWith("no rollout found for thread id ")
+          )
+            throw error;
           this.config.runtimeThreadId = undefined;
-          result = await this.rpc("thread/start", { ...options, ephemeral: false });
+          result = await this.rpc("thread/start", {
+            ...options,
+            ephemeral: false,
+          });
         }
-      } else result = await this.rpc("thread/start", { ...options, ephemeral: false });
+      } else
+        result = await this.rpc("thread/start", {
+          ...options,
+          ephemeral: false,
+        });
       if (
         this.config.runtimeThreadId &&
         result.thread.id !== this.config.runtimeThreadId
@@ -184,11 +218,29 @@ export class CodexRuntime {
       try {
         let cursor: string | null = null;
         do {
-          const page = await this.rpc("model/list", { cursor, limit: 100, includeHidden: false });
-          this.models.push(...page.data.filter((m: any) => !m.hidden).map((m: any) => ({ id: m.model, name: m.displayName, description: m.description, efforts: m.supportedReasoningEfforts.map((e: any) => e.reasoningEffort), defaultEffort: m.defaultReasoningEffort })));
+          const page = await this.rpc("model/list", {
+            cursor,
+            limit: 100,
+            includeHidden: false,
+          });
+          this.models.push(
+            ...page.data
+              .filter((m: any) => !m.hidden)
+              .map((m: any) => ({
+                id: m.model,
+                name: m.displayName,
+                description: m.description,
+                efforts: m.supportedReasoningEfforts.map(
+                  (e: any) => e.reasoningEffort,
+                ),
+                defaultEffort: m.defaultReasoningEffort,
+              })),
+          );
           cursor = page.nextCursor;
         } while (cursor && this.models.length < 1000);
-      } catch { /* The runtime can still use its configured model if discovery is unavailable. */ }
+      } catch {
+        /* The runtime can still use its configured model if discovery is unavailable. */
+      }
       await atomicJson(configPath, this.config);
       return this.config;
     } catch (error) {
@@ -222,12 +274,21 @@ export class CodexRuntime {
     });
   }
   async send(text: string, requestId: string, model?: string, effort?: string) {
-    const selected = this.models.find(m => m.id === model);
-    if (model && model !== this.currentModel && !selected) throw new Error("This model is not available in the connected Codex runtime.");
-    if (effort && !selected?.efforts.includes(effort)) throw new Error("This reasoning effort is not supported by the selected model.");
+    const selected = this.models.find((m) => m.id === model);
+    if (model && model !== this.currentModel && !selected)
+      throw new Error(
+        "This model is not available in the connected Codex runtime.",
+      );
+    if (effort && !selected?.efforts.includes(effort))
+      throw new Error(
+        "This reasoning effort is not supported by the selected model.",
+      );
     if (this.config.runtimeStartedTurn !== true) {
       const config = { ...this.config, runtimeStartedTurn: true };
-      await atomicJson(path.join(this.config.root, ".canvasdoc", "config.json"), config);
+      await atomicJson(
+        path.join(this.config.root, ".canvasdoc", "config.json"),
+        config,
+      );
       this.config = config;
     }
     return this.rpc("turn/start", {
@@ -235,8 +296,8 @@ export class CodexRuntime {
       clientUserMessageId: requestId,
       input: [{ type: "text", text, text_elements: [] }],
       cwd: this.config.root,
-      ...(model ? {model} : {}),
-      ...(effort ? {effort} : {}),
+      ...(model ? { model } : {}),
+      ...(effort ? { effort } : {}),
     });
   }
   async interrupt(turnId: string) {

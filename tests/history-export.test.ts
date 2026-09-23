@@ -1,15 +1,15 @@
-import test from "node:test";
 import assert from "node:assert/strict";
 import {
   mkdtemp,
   readFile,
   readdir,
-  writeFile,
-  unlink,
   rm,
+  unlink,
+  writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import test from "node:test";
 import { HistoryExporter } from "../companion/history-export.ts";
 
 test("concurrent and stale exports cannot replace the newest committed browser revision", async () => {

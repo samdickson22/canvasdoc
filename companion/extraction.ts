@@ -1,15 +1,15 @@
+import { execFile } from "node:child_process";
+import { createHash, randomUUID } from "node:crypto";
 import {
-  readFile,
-  writeFile,
+  lstat,
   mkdir,
+  readdir,
+  readFile,
+  realpath,
   rename,
   unlink,
-  lstat,
-  realpath,
-  readdir,
+  writeFile,
 } from "node:fs/promises";
-import { createHash, randomUUID } from "node:crypto";
-import { execFile } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { EXTRACTOR_VERSION } from "./document-text.ts";
@@ -23,8 +23,9 @@ type Job = {
   pendingOutputHash?: string;
   error?: string;
 };
-const hash = (bytes: Buffer | string) =>
-  createHash("sha256").update(bytes).digest("hex");
+function hash(bytes: Buffer | string): string {
+  return createHash("sha256").update(bytes).digest("hex");
+}
 const worker = fileURLToPath(
   new URL(
     import.meta.url.endsWith(".ts")

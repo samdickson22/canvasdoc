@@ -13,13 +13,32 @@ const tools = new Set([
   "imageView",
   "collabAgentToolCall",
 ]);
-const limited = (value: unknown) => {
+function limited(value: unknown): string {
   const text =
     typeof value === "string" ? value : JSON.stringify(value ?? null);
   return text.length > 12000
     ? text.slice(0, 12000) + "\n[Preview truncated]"
     : text;
-};
+}
+function toolArguments(item: any): Record<string, unknown> {
+  switch (item.type) {
+    case "commandExecution":
+      return { command: item.command, cwd: item.cwd };
+    case "fileChange":
+      return {
+        files: item.changes?.map((change: any) => ({
+          path: change.path,
+          kind: change.kind,
+        })),
+      };
+    case "mcpToolCall":
+    case "dynamicToolCall":
+      return { arguments: item.arguments };
+    default:
+      return { action: item.action ?? item.query ?? item.path ?? item.tool };
+  }
+}
+
 export function applyDisplayEvent(
   run: RunParts,
   method: string,
@@ -31,9 +50,11 @@ export function applyDisplayEvent(
   const parts = (run.parts ??= []);
   if (method === "item/reasoning/summaryTextDelta") {
     const key = `${id}:summary:${params.summaryIndex ?? 0}`;
-    const previous = parts.find(p => p.itemId === key);
-    if (previous && previous.type === "reasoning") previous.text += params.delta || "";
-    else parts.push({type:"reasoning", itemId:key, text:params.delta || ""});
+    const previous = parts.find((p) => p.itemId === key);
+    if (previous && previous.type === "reasoning")
+      previous.text += params.delta || "";
+    else
+      parts.push({ type: "reasoning", itemId: key, text: params.delta || "" });
     return true;
   }
   const index = parts.findIndex((p) => p.itemId === id);
@@ -65,19 +86,7 @@ export function applyDisplayEvent(
     ["failed", "declined"].includes(item.status) ||
     (typeof item.exitCode === "number" && item.exitCode !== 0) ||
     !!item.error;
-  const args =
-    item.type === "commandExecution"
-      ? { command: item.command, cwd: item.cwd }
-      : item.type === "fileChange"
-        ? {
-            files: item.changes?.map((c: any) => ({
-              path: c.path,
-              kind: c.kind,
-            })),
-          }
-        : item.type === "mcpToolCall" || item.type === "dynamicToolCall"
-          ? { arguments: item.arguments }
-          : { action: item.action ?? item.query ?? item.path ?? item.tool };
+  const args = toolArguments(item);
   const toolName =
     (
       {
@@ -119,7 +128,7 @@ export function applyDisplayEvent(
   else parts[index] = part;
   return true;
 }
-export function finishDisplayParts(run: RunParts) {
+export function finishDisplayParts(run: RunParts): void {
   for (const p of run.parts ?? [])
     if (p.type === "tool-call" && p.result === undefined) {
       Object.assign(p, {

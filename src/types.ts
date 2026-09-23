@@ -37,7 +37,7 @@ export type PersonalTask = {
 };
 export type SavedMessage = {
   files?: string[];
-  parts?: import("../companion/message-parts").DisplayPart[];
+  parts?: import("../companion/message-parts.ts").DisplayPart[];
   attachments?: import("@assistant-ui/react").CompleteAttachment[];
   id: string;
   role: "user" | "assistant";

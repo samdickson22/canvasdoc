@@ -4,8 +4,12 @@ course.update!(syllabus_body: "<h2>Development syllabus</h2><p>Synthetic materia
 attachment = course.attachments.find_by(display_name: "material-sync-notes.txt")
 if !attachment || !File.exist?(attachment.full_filename)
   upload = StringIO.new("Canvasdoc material fixture v1\nA loop repeats a block of code.\n")
-  def upload.original_filename; "material-sync-notes.txt"; end
-  def upload.content_type; "text/plain"; end
+  def upload.original_filename
+    "material-sync-notes.txt"
+  end
+  def upload.content_type
+    "text/plain"
+  end
   attachment ||= course.attachments.build(folder: Folder.root_folders(course).first, display_name: "material-sync-notes.txt")
   attachment.uploaded_data = upload
   attachment.save!

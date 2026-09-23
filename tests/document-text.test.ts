@@ -1,8 +1,8 @@
-import test from "node:test";
+import { strToU8, zipSync } from "fflate";
 import assert from "node:assert/strict";
+import test from "node:test";
 import { extractDocument } from "../companion/document-text.ts";
 import { pdfFixture, pptxFixture } from "./fixtures/documents.ts";
-import { zipSync, strToU8 } from "fflate";
 test("PDF extraction retains page boundaries and Latin Unicode", async () => {
   const r = await extractDocument(
     pdfFixture(["First café", "Second page"]),

@@ -1,8 +1,9 @@
 import { useSyncExternalStore } from "react";
-import { boundedChatContext } from "./chat-context";
-import { store } from "../store";
-import { rememberHomeRequest } from "./home-view";
-import type { PageContext } from "../types";
+import { encodeBase64 } from "../bytes.ts";
+import { store } from "../store.ts";
+import type { PageContext } from "../types.ts";
+import { boundedChatContext } from "./chat-context.ts";
+import { rememberHomeRequest } from "./home-view.ts";
 export type Approval = {
   id: string;
   method: string;
@@ -12,7 +13,13 @@ export type Approval = {
 type State = {
   materials?: boolean;
   workspaceId?: string;
-  models?: { id: string; name: string; description: string; efforts: string[]; defaultEffort: string }[];
+  models?: {
+    id: string;
+    name: string;
+    description: string;
+    efforts: string[];
+    defaultEffort: string;
+  }[];
   currentModel?: string;
   currentEffort?: string;
   status: "disconnected" | "connecting" | "connected";
@@ -31,48 +38,125 @@ let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 let backupTimer: ReturnType<typeof setTimeout> | undefined;
 let savedConnection: { url: string; token: string } | undefined;
 const listeners = new Set<() => void>();
-const uploads = new Map<string, { resolve: (path: string) => void; reject: (error: Error) => void }>();
-const fileRequests = new Map<string, { resolve: (result: any) => void; reject: (error: Error) => void }>();
-const materialRequests = new Map<string, { resolve: (result: any) => void; reject: (error: Error) => void }>();
-export function materialRequest<T>(operation: Record<string, unknown>): Promise<T> {
-  if (!state.materials) return Promise.reject(new Error("Update canvasdoc-cli to enable course material syncing."));
+const uploads = new Map<
+  string,
+  { resolve: (path: string) => void; reject: (error: Error) => void }
+>();
+const fileRequests = new Map<
+  string,
+  { resolve: (result: any) => void; reject: (error: Error) => void }
+>();
+const materialRequests = new Map<
+  string,
+  { resolve: (result: any) => void; reject: (error: Error) => void }
+>();
+export function materialRequest<T>(
+  operation: Record<string, unknown>,
+): Promise<T> {
+  if (!state.materials)
+    return Promise.reject(
+      new Error("Update canvasdoc-cli to enable course material syncing."),
+    );
   const id = crypto.randomUUID();
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { materialRequests.delete(id); reject(new Error("Material sync timed out. It will retry.")); }, 60000);
-    materialRequests.set(id, {resolve: value => {clearTimeout(timer); resolve(value)}, reject: error => {clearTimeout(timer); reject(error)}});
-    try { send({type:"materials", id, account:store.account(), ...operation}); }
-    catch (error) { materialRequests.delete(id); clearTimeout(timer); reject(error); }
+    const timer = setTimeout(() => {
+      materialRequests.delete(id);
+      reject(new Error("Material sync timed out. It will retry."));
+    }, 60000);
+    materialRequests.set(id, {
+      resolve: (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      reject: (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    });
+    try {
+      send({ type: "materials", id, account: store.account(), ...operation });
+    } catch (error) {
+      materialRequests.delete(id);
+      clearTimeout(timer);
+      reject(error);
+    }
   });
 }
-export const connectionState = () => state;
-export const subscribeConnection = (listener: () => void) => { listeners.add(listener); return () => {listeners.delete(listener)}; };
+export function connectionState(): State {
+  return state;
+}
+export function subscribeConnection(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => {
+    listeners.delete(listener);
+  };
+}
 const fileChunks = new Map<string, string[]>();
-export function workspaceRequest<T>(type: "files-list" | "files-read", path?: string): Promise<T> {
+export function workspaceRequest<T>(
+  type: "files-list" | "files-read",
+  path?: string,
+): Promise<T> {
   const id = crypto.randomUUID();
-  return new Promise((resolve,reject) => {
-    const timer = setTimeout(() => {fileRequests.delete(id);fileChunks.delete(id);reject(new Error("Reconnect your computer to load files."));},15000);
-    fileRequests.set(id,{resolve:r=>{clearTimeout(timer);resolve(r)},reject:e=>{clearTimeout(timer);reject(e)}});
-    try {send({type,id,path})} catch(error) {fileRequests.delete(id);clearTimeout(timer);reject(error)}
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      fileRequests.delete(id);
+      fileChunks.delete(id);
+      reject(new Error("Reconnect your computer to load files."));
+    }, 15000);
+    fileRequests.set(id, {
+      resolve: (r) => {
+        clearTimeout(timer);
+        resolve(r);
+      },
+      reject: (e) => {
+        clearTimeout(timer);
+        reject(e);
+      },
+    });
+    try {
+      send({ type, id, path });
+    } catch (error) {
+      fileRequests.delete(id);
+      clearTimeout(timer);
+      reject(error);
+    }
   });
 }
 export async function uploadFile(file: File): Promise<string> {
-  if (file.size > 5 * 1024 * 1024) throw new Error("Files must be 5 MB or smaller.");
+  if (file.size > 5 * 1024 * 1024)
+    throw new Error("Files must be 5 MB or smaller.");
   const bytes = new Uint8Array(await file.arrayBuffer());
-  let binary = "";
-  for (let i = 0; i < bytes.length; i += 32768) binary += String.fromCharCode(...bytes.subarray(i, i + 32768));
+  const base64 = encodeBase64(bytes);
   const id = crypto.randomUUID();
   return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => { uploads.delete(id); reject(new Error("File upload timed out. Reconnect and try again.")); }, 30000);
-    uploads.set(id, { resolve: path => { clearTimeout(timer); resolve(path); }, reject: error => { clearTimeout(timer); reject(error); } });
-    try { send({ type: "upload", id, name: file.name, base64: btoa(binary) }); }
-    catch (error) { uploads.delete(id); clearTimeout(timer); reject(error); }
+    const timer = setTimeout(() => {
+      uploads.delete(id);
+      reject(new Error("File upload timed out. Reconnect and try again."));
+    }, 30000);
+    uploads.set(id, {
+      resolve: (path) => {
+        clearTimeout(timer);
+        resolve(path);
+      },
+      reject: (error) => {
+        clearTimeout(timer);
+        reject(error);
+      },
+    });
+    try {
+      send({ type: "upload", id, name: file.name, base64 });
+    } catch (error) {
+      uploads.delete(id);
+      clearTimeout(timer);
+      reject(error);
+    }
   });
 }
-function update(patch: Partial<State>) {
+function update(patch: Partial<State>): void {
   state = { ...state, ...patch };
   listeners.forEach((fn) => fn());
 }
-function send(value: unknown) {
+function send(value: unknown): void {
   if (nativePort && state.status === "connected") {
     nativePort.postMessage(value);
     return;
@@ -81,7 +165,7 @@ function send(value: unknown) {
     throw new Error("Connect your computer to send.");
   socket.send(JSON.stringify(value));
 }
-async function applyRun(run: any) {
+async function applyRun(run: any): Promise<void> {
   const c = run.command;
   if (
     !c ||
@@ -130,7 +214,11 @@ async function applyRun(run: any) {
     persisted?.messages.some((m) => m.id === c.requestId) &&
     (!(run.text || run.parts?.length || run.files?.length) ||
       persisted.messages.some(
-        (m) => m.id === `assistant:${c.requestId}` && m.text === run.text && JSON.stringify(m.parts) === JSON.stringify(run.parts) && JSON.stringify(m.files) === JSON.stringify(run.files),
+        (m) =>
+          m.id === `assistant:${c.requestId}` &&
+          m.text === run.text &&
+          JSON.stringify(m.parts) === JSON.stringify(run.parts) &&
+          JSON.stringify(m.files) === JSON.stringify(run.files),
       ))
   ) {
     try {
@@ -138,7 +226,7 @@ async function applyRun(run: any) {
     } catch {}
   }
 }
-function scheduleBackup() {
+function scheduleBackup(): void {
   clearTimeout(backupTimer);
   backupTimer = setTimeout(() => {
     if (state.status !== "connected") return;
@@ -154,7 +242,7 @@ function scheduleBackup() {
     }
   }, 1200);
 }
-export function connect(url: string, token: string) {
+export function connect(url: string, token: string): void {
   const parsed = new URL(url);
   if (
     parsed.protocol !== "wss:" &&
@@ -196,7 +284,7 @@ export function connect(url: string, token: string) {
       });
   };
 }
-function receive(event: { data: string }) {
+function receive(event: { data: string }): void {
   let m: any;
   try {
     m = JSON.parse(event.data);
@@ -204,29 +292,62 @@ function receive(event: { data: string }) {
     return;
   }
   if (m.type === "materials-result") {
-    const request = materialRequests.get(m.id); materialRequests.delete(m.id);
-    if (m.error) request?.reject(new Error(m.error)); else request?.resolve(m.result);
+    const request = materialRequests.get(m.id);
+    materialRequests.delete(m.id);
+    if (m.error) request?.reject(new Error(m.error));
+    else request?.resolve(m.result);
     return;
   }
   if (m.type === "send-rejected") {
-    const command=store.get().outbox?.[m.requestId];
-    if(command) {
+    const command = store.get().outbox?.[m.requestId];
+    if (command) {
       void store.acknowledge(m.requestId);
-      update({error:m.message,runs:{...state.runs,[m.requestId]:{command,status:"error",error:m.message,text:"",createdAt:new Date().toISOString()}}});
+      update({
+        error: m.message,
+        runs: {
+          ...state.runs,
+          [m.requestId]: {
+            command,
+            status: "error",
+            error: m.message,
+            text: "",
+            createdAt: new Date().toISOString(),
+          },
+        },
+      });
     }
     return;
   }
   if (m.type === "files-result-chunk") {
-    if (!fileRequests.has(m.id) || !Number.isInteger(m.count) || m.count < 1 || m.count > 64 || !Number.isInteger(m.index) || m.index < 0 || m.index >= m.count || typeof m.data !== "string" || m.data.length > 600000) return;
-    const chunks=fileChunks.get(m.id) || Array(m.count).fill(null);
-    chunks[m.index]=m.data;fileChunks.set(m.id,chunks);
-    if(chunks.some(c=>c===null))return;
+    if (
+      !fileRequests.has(m.id) ||
+      !Number.isInteger(m.count) ||
+      m.count < 1 ||
+      m.count > 64 ||
+      !Number.isInteger(m.index) ||
+      m.index < 0 ||
+      m.index >= m.count ||
+      typeof m.data !== "string" ||
+      m.data.length > 600000
+    )
+      return;
+    const chunks = fileChunks.get(m.id) || Array(m.count).fill(null);
+    chunks[m.index] = m.data;
+    fileChunks.set(m.id, chunks);
+    if (chunks.some((c) => c === null)) return;
     fileChunks.delete(m.id);
-    m={type:"files-result",id:m.id,result:{...m.metadata,base64:chunks.join("")}};
+    m = {
+      type: "files-result",
+      id: m.id,
+      result: { ...m.metadata, base64: chunks.join("") },
+    };
   }
   if (m.type === "files-result") {
-    const request = fileRequests.get(m.id); fileRequests.delete(m.id); fileChunks.delete(m.id);
-    if (m.error) request?.reject(new Error(m.error)); else request?.resolve(m.result);
+    const request = fileRequests.get(m.id);
+    fileRequests.delete(m.id);
+    fileChunks.delete(m.id);
+    if (m.error) request?.reject(new Error(m.error));
+    else request?.resolve(m.result);
     return;
   }
   if (m.type === "upload-result") {
@@ -283,14 +404,22 @@ function receive(event: { data: string }) {
   if (m.type === "error") update({ error: m.message });
 }
 
-export function initializeConnection() {
+export function initializeConnection(): void {
   window.addEventListener("canvasdoc:committed", scheduleBackup);
   const pairing = new URLSearchParams(location.hash.slice(1));
   const pairingUrl = pairing.get("canvasdoc_connect");
   const pairingToken = pairing.get("canvasdoc_token");
   if (pairingUrl || pairingToken) {
-    history.replaceState(history.state, "", location.pathname + location.search);
-    if (!isExtension && /^ws:\/\/127\.0\.0\.1:\d+$/.test(pairingUrl || "") && /^[A-Za-z0-9_-]{43}$/.test(pairingToken || "")) {
+    history.replaceState(
+      history.state,
+      "",
+      location.pathname + location.search,
+    );
+    if (
+      !isExtension &&
+      /^ws:\/\/127\.0\.0\.1:\d+$/.test(pairingUrl || "") &&
+      /^[A-Za-z0-9_-]{43}$/.test(pairingToken || "")
+    ) {
       connect(pairingUrl!, pairingToken!);
       return;
     }
@@ -306,7 +435,7 @@ export function initializeConnection() {
     if (saved) connect(saved.url, saved.token);
   } catch {}
 }
-export function connectNative() {
+export function connectNative(): void {
   if (!isExtension) return;
   const previous = nativePort;
   nativePort = undefined;
@@ -321,11 +450,17 @@ export function connectNative() {
     const error = chrome.runtime.lastError;
     if (nativePort !== current) return;
     nativePort = undefined;
-    update({ status: "disconnected", error: error?.message || state.error || "Chrome's connection to Canvasdoc closed. Reconnect to try again." });
+    update({
+      status: "disconnected",
+      error:
+        error?.message ||
+        state.error ||
+        "Chrome's connection to Canvasdoc closed. Reconnect to try again.",
+    });
   });
 }
 export const usesNativeConnection = isExtension;
-export function disconnect() {
+export function disconnect(): void {
   nativePort?.disconnect();
   nativePort = undefined;
   savedConnection = undefined;
@@ -343,9 +478,10 @@ export async function sendMessage(
   canvasContext?: string,
   attachments?: import("@assistant-ui/react").CompleteAttachment[],
   requestId = crypto.randomUUID(),
-) {
-  update({error:undefined});
-  if (!text.trim() || text.length > 50000) throw new Error("Messages must contain between 1 and 50,000 characters.");
+): Promise<`${string}-${string}-${string}-${string}-${string}`> {
+  update({ error: undefined });
+  if (!text.trim() || text.length > 50000)
+    throw new Error("Messages must contain between 1 and 50,000 characters.");
   if (context.kind === "home") rememberHomeRequest(requestId);
   const command = {
     requestId,
@@ -362,16 +498,22 @@ export async function sendMessage(
   if (state.status === "connected") send({ type: "send", command });
   return requestId;
 }
-export function stopRun(requestId: string) {
+export function stopRun(requestId: string): void {
   send({ type: "stop", requestId });
 }
-export function answerQuestions(id: string, answers: Record<string, string>) {
+export function answerQuestions(
+  id: string,
+  answers: Record<string, string>,
+): void {
   send({ type: "approval", id, answers });
 }
-export function answerApproval(id: string, decision: "accept" | "decline") {
+export function answerApproval(
+  id: string,
+  decision: "accept" | "decline",
+): void {
   send({ type: "approval", id, decision });
 }
-export function useConnection() {
+export function useConnection(): State {
   return useSyncExternalStore(
     (fn) => {
       listeners.add(fn);

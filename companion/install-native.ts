@@ -1,6 +1,6 @@
-import { mkdir, writeFile, realpath } from "node:fs/promises";
-import path from "node:path";
+import { mkdir, realpath, writeFile } from "node:fs/promises";
 import os from "node:os";
+import path from "node:path";
 const [
   rootArg,
   extensionId,
@@ -15,7 +15,9 @@ if (process.platform !== "darwin")
 const root = await realpath(rootArg);
 const dir = path.join(root, ".canvasdoc");
 await mkdir(dir, { recursive: true });
-const quote = (s: string) => "'" + s.replaceAll("'", "'\\''") + "'";
+function quote(s: string): string {
+  return "'" + s.replaceAll("'", "'\\''") + "'";
+}
 const launcher = path.join(dir, "native-host.sh");
 await writeFile(
   launcher,

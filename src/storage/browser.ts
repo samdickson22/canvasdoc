@@ -1,10 +1,4 @@
-import {
-  empty,
-  mutate,
-  parseSavedData,
-  type Data,
-  type Mutation,
-} from "./data.ts";
+import { mutate, parseSavedData, type Data, type Mutation } from "./data.ts";
 const extension = typeof chrome !== "undefined" && !!chrome.runtime?.id;
 export const browserStorage = {
   async load(key: string): Promise<Data> {

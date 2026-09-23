@@ -1,10 +1,10 @@
-import test from "node:test";
 import assert from "node:assert/strict";
+import test from "node:test";
+import { readDashboardWork } from "../src/canvas.ts";
 import {
   assignmentCompleted,
   setAssignmentCompletion,
 } from "../src/planner.ts";
-import { readDashboardWork } from "../src/canvas.ts";
 import type { Todo } from "../src/types.ts";
 Object.defineProperty(globalThis, "document", {
   value: { cookie: "" },
