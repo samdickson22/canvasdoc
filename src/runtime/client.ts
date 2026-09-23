@@ -100,7 +100,7 @@ async function applyRun(run: any) {
       text: c.text,
       createdAt: run.createdAt,
     });
-  if (run.text || run.parts?.length || run.files?.length) {
+  if (run.text || run.parts?.length || run.files?.length || run.error || ["interrupted", "cancelled"].includes(run.status)) {
     const id = `assistant:${c.requestId}`;
     const index = messages.findIndex((m) => m.id === id);
     const message = {
@@ -109,6 +109,7 @@ async function applyRun(run: any) {
       text: run.text,
       parts: run.parts,
       files: run.files,
+      run: { status: run.status, startedAt: run.startedAt, completedAt: run.completedAt, error: run.error },
       createdAt: run.createdAt,
     };
     if (index < 0) messages.push(message);

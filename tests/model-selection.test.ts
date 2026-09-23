@@ -10,7 +10,7 @@ test('model selection changes the next turn without changing the main thread or 
  let call:any;
  runtime.rpc=async(method,params)=>{call={method,params};return {turn:{id:'turn'}}};
  await runtime.send('hello','request','model-a','high');
- assert.equal(call.params.model,'model-a');assert.equal(call.params.effort,'high');
+ assert.equal(call.params.summary,'concise');assert.equal(call.params.model,'model-a');assert.equal(call.params.effort,'high');
  assert.equal(call.params.threadId,'same-main-thread');assert.equal(call.params.cwd,'/canvasdoc');
  await assert.rejects(runtime.send('hello','request','unknown'),/not available/);
  await assert.rejects(runtime.send('hello','request','model-a','impossible'),/not supported/);

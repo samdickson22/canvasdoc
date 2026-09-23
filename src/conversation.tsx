@@ -12,6 +12,7 @@ import { PortalContainerContext } from "./assistant-ui/lib/portal-container";
 import { attachmentAdapter } from "./runtime/attachments";
 import { isVisibleHomeRequest, rememberHomeRequest, visibleHomeMessages } from "./runtime/home-view";
 import { pageReference } from "./runtime/chat-context";
+import { presentMessage } from "./runtime/message-presentation";
 import { materialContext } from "./material-sync";
 import { store, useData } from "./store";
 import type { PageContext, ThreadRecord } from "./types";
@@ -50,13 +51,7 @@ export function Conversation({
       (home
         ? visibleHomeMessages(saved?.messages)
         : (saved?.messages ?? [])
-      ).map((message) => ({
-        id: message.id,
-        role: message.role,
-        content: message.parts?.length ? message.parts : [{ type: "text", text: message.text }],
-        createdAt: new Date(message.createdAt),
-        attachments: message.attachments,
-      })),
+      ).map(presentMessage),
     [saved?.messages, home],
   );
   const runtime = useExternalStoreRuntime({
@@ -148,7 +143,7 @@ export function Conversation({
         className={`conversation ${home ? "conversation-home" : ""} ${messages.length ? "conversation-active" : ""}`}
       >
         <PortalContainerContext.Provider value={portalContainer}>
-          {(sendError || failedRun?.error) && <p className="error" role="alert">{sendError || failedRun?.error}</p>}
+          {(sendError || (failedRun?.error && !saved?.messages.some(m => m.id === `assistant:${failedRun.command.requestId}` && m.run?.error))) && <p className="error" role="alert">{sendError || failedRun?.error}</p>}
           <ChatGPT
             workMode={home || workMode}
             connected={connection.status === "connected"}

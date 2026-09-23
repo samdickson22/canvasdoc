@@ -56,6 +56,8 @@ type Run = {
   files?: string[];
   error?: string;
   createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
 };
 const journalFile = path.join(stateDir, "delivery.json");
 let runs: Run[] = [];
@@ -69,8 +71,9 @@ try {
 }
 for (const run of runs)
   if (["working", "queued"].includes(run.status)) {
-    finishDisplayParts(run);
+    finishDisplayParts(run, true);
     run.status = "interrupted";
+    run.completedAt = new Date().toISOString();
     run.error =
       "Connector restarted during this request. Review the partial result before continuing.";
   }
@@ -106,6 +109,7 @@ async function pump() {
   if (!run) return;
   active = run;
   run.status = "working";
+  run.startedAt = new Date().toISOString();
   await persist();
   publish(run);
   try {
@@ -127,6 +131,8 @@ async function pump() {
     publish(run);
   } catch (error) {
     run.status = "error";
+    run.completedAt = new Date().toISOString();
+    finishDisplayParts(run, true);
     run.error = (error as Error).message;
     await persist();
     publish(run);
@@ -163,17 +169,18 @@ runtime.subscribe((event: RpcEvent) => {
         return;
       const run = active;
       if (applyDisplayEvent(run, event.method, event.params)) {
-        if (!event.method.endsWith("/delta")) await persist();
+        if (!/(?:\/delta|Delta)$/.test(event.method)) await persist();
         publish(run);
       }
       if (event.method === "turn/completed") {
         run.files = (await listWorkspaceFiles(config.root).catch(() => [])).filter(f => !isSyncedSource(f.path) && filesBefore.get(f.path) !== f.modified).map(f => f.path);
-        finishDisplayParts(run);
+        run.completedAt = new Date().toISOString();
+        finishDisplayParts(run, event.params.turn.status !== "completed");
         run.turnId = event.params.turn.id;
         run.status =
           event.params.turn.status === "completed"
             ? "completed"
-            : "interrupted";
+            : event.params.turn.status === "failed" ? "error" : "interrupted";
         if (event.params.turn.error)
           run.error = event.params.turn.error.message || "Runtime failed";
         await persist();

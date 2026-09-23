@@ -235,6 +235,7 @@ export class CodexRuntime {
       clientUserMessageId: requestId,
       input: [{ type: "text", text, text_elements: [] }],
       cwd: this.config.root,
+      summary: "concise",
       ...(model ? {model} : {}),
       ...(effort ? {effort} : {}),
     });
