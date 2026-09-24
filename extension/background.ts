@@ -3,7 +3,7 @@ import { nativeReceiver } from "../companion/native-framing.ts";
 import { mutate, parseSavedData, type Mutation } from "../src/storage/data.ts";
 import origins from "./origins.json" with { type: "json" };
 
-const pages = new Set([...origins.canvas, ...origins.development]);
+const pages = new Set([...origins.canvas.map((school) => school.origin), ...origins.development]);
 const supportedPage = (url: string) => {
   try { return pages.has(new URL(url).origin); } catch { return false; }
 };

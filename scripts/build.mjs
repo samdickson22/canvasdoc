@@ -65,7 +65,7 @@ const build = await context({
           const manifest = JSON.parse(await readFile("extension/manifest.json", "utf8"));
           const metadata = JSON.parse(await readFile("package.json", "utf8"));
           const origins = JSON.parse(await readFile("extension/origins.json", "utf8"));
-          await writeFile(`${output}/manifest.json`, JSON.stringify({ ...withOrigins(manifest, [...origins.development, ...origins.canvas]), version: metadata.version }, null, 2));
+          await writeFile(`${output}/manifest.json`, JSON.stringify({ ...withOrigins(manifest, [...origins.development, ...origins.canvas.map((school) => school.origin)]), version: metadata.version }, null, 2));
           await rm(`${output}/notices`, { recursive: true, force: true });
           await mkdir(`${output}/notices`, { recursive: true });
           for (const [source, name] of [

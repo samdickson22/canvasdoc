@@ -10,12 +10,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { canvasOrigin, readSettings, selectRoot, saveSettings } from './setup.mjs';
 import { prepareCodexHome } from '../companion/codex-home.ts';
+import origins from '../extension/origins.json' with { type: 'json' };
 
 const args = process.argv.slice(2);
 // The Chrome Web Store build. An unpacked development build has its own ID and is passed with --extension-id.
 const STORE_EXTENSION_ID = 'pbibigofgbljlhhaadjgiikdkjiahhap';
-const help = `Canvasdoc\n\nUsage: npx canvasdoc-cli [--folder PATH] [--origin URL] [--no-open] [--relocate]\n\nFirst run chooses a folder and Canvas URL. Later runs resume the same agent.\nKeep this terminal open while using Canvasdoc. Chat attachments support files up to 5 MB. Node.js 22.13 or later is required.\nThe Canvasdoc browser extension or development UI must already be installed.
-Update this connector to use the chat model and reasoning-effort selector.\n\n--folder PATH  Select or create a Canvasdoc folder\n--extension-id ID  Also register an unpacked extension ID (the store build is registered by default on macOS)\n--no-extension  Skip Chrome registration and pair the development UI with a token\n--origin URL   Canvas site allowed to connect\n--relocate     Resume an existing agent from its moved folder (requires --folder)
+const help = `Canvasdoc\n\nUsage: npx canvasdoc-cli [--folder PATH] [--origin URL] [--no-open] [--relocate]\n\nFirst run chooses a folder and your school's Canvas. Later runs resume the same agent.\nKeep this terminal open while using Canvasdoc. Chat attachments support files up to 5 MB. Node.js 22.13 or later is required.\nThe Canvasdoc browser extension or development UI must already be installed.
+Update this connector to use the chat model and reasoning-effort selector.\n\n--folder PATH  Select or create a Canvasdoc folder\n--extension-id ID  Also register an unpacked extension ID (the store build is registered by default on macOS)\n--no-extension  Skip Chrome registration and pair the development UI with a token\n--origin URL   Canvas site allowed to connect (asked on first run otherwise)\n--relocate     Resume an existing agent from its moved folder (requires --folder)
 --setup-browser  Configure Chrome tab control and native Mac app tools, then exit\n--setup-computer-use  Configure native Mac app tools for this workspace and exit\n--no-open      Start without opening a browser\n--help         Show this help\n--version      Show version`;
 
 async function main() {
@@ -43,6 +44,20 @@ async function main() {
     rl ??= createInterface({ input: process.stdin, output: process.stdout });
     return (await rl.question(`${label}${fallback ? ` [${fallback}]` : ''}: `)).trim() || fallback;
   }
+  // Supported schools come from the same list as the extension, so the prompt never offers one it can't serve.
+  async function askCanvas() {
+    if (process.env.CANVASDOC_DEV_ORIGIN) return ask('Canvas URL', process.env.CANVASDOC_DEV_ORIGIN);
+    if (!process.stdin.isTTY) throw new Error('First run needs a terminal, or pass --folder and --origin.');
+    console.log('Which Canvas do you use?');
+    origins.canvas.forEach((school, index) => console.log(`  ${index + 1}. ${school.name} (${new URL(school.origin).host})`));
+    for (;;) {
+      const answer = await ask('Number', origins.canvas.length === 1 ? '1' : undefined) ?? '';
+      const school = origins.canvas[Number(answer) - 1];
+      if (school) return school.origin;
+      if (/^https?:\/\//.test(answer)) return answer;
+      console.log(`Enter a number from 1 to ${origins.canvas.length}.`);
+    }
+  }
   let root;
   let origin;
   try {
@@ -57,7 +72,7 @@ async function main() {
       const identity = JSON.parse(await readFile(path.join(root, '.canvasdoc/config.json'), 'utf8'));
       if (identity.version !== 1 || !identity.workspaceId || !identity.root) throw new Error('The selected folder has no valid Canvasdoc workspace to relocate.');
     }
-    origin = canvasOrigin(options.origin || saved?.origin || await ask('Canvas URL', process.env.CANVASDOC_DEV_ORIGIN));
+    origin = canvasOrigin(options.origin || saved?.origin || await askCanvas());
   } finally { rl?.close(); }
   const codexHome = await prepareCodexHome(root);
   let bin = process.env.CANVASDOC_CODEX_BIN || 'codex';

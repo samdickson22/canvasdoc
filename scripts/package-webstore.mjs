@@ -6,7 +6,7 @@ const dir = 'release/webstore';
 const manifest = await stageExtension(dir);
 // The store build serves only real Canvas schools, never development origins.
 const {canvas}=JSON.parse(await readFile('extension/origins.json','utf8'));
-Object.assign(manifest,withOrigins({...manifest,host_permissions:['https://*.instructure.com/*','https://*.instructureusercontent.com/*']},canvas));
+Object.assign(manifest,withOrigins({...manifest,host_permissions:['https://*.instructure.com/*','https://*.instructureusercontent.com/*']},canvas.map(school=>school.origin)));
 delete manifest.key;
 manifest.icons={};
 // Small original window mark, generated at each native icon size.

@@ -27,13 +27,13 @@ Material coverage depends on what each course exposes and what the student accou
 
 ## Install for students
 
-Install the [Chrome extension](https://chromewebstore.google.com/detail/pbibigofgbljlhhaadjgiikdkjiahhap), then run this in Terminal with your school's Canvas address:
+Install the [Chrome extension](https://chromewebstore.google.com/detail/pbibigofgbljlhhaadjgiikdkjiahhap), then run this in Terminal:
 
 ```bash
-curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash -s -- --origin https://canvas.calpoly.edu
+curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash
 ```
 
-The installer ([`cli/install.sh`](cli/install.sh)) uses your Node.js 22.13+ when present, or downloads and verifies a private copy under `~/Library/Application Support/Canvasdoc/node` without sudo. It then runs `npx canvasdoc-cli@latest`, which brings Codex and opens its sign-in on first run. With Node.js already installed, `npx canvasdoc-cli@latest --origin <canvas-url>` does the same. The extension shows the command for the current Canvas site whenever the companion is not connected.
+The installer ([`cli/install.sh`](cli/install.sh)) uses your Node.js 22.13+ when present, or downloads and verifies a private copy under `~/Library/Application Support/Canvasdoc/node` without sudo. It then runs `npx canvasdoc-cli@latest`, which asks which supported school you use (from `extension/origins.json`), brings Codex, and opens its sign-in on first run. With Node.js already installed, `npx canvasdoc-cli@latest` does the same. Arguments after `bash -s --` pass through to the CLI. The extension shows the command with `--origin` for the current Canvas site whenever the companion is not connected, so copying it from Canvas skips the school question.
 
 ## Install and run from source
 

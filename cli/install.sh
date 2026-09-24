@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Canvasdoc setup: makes sure Node.js is available, then starts the Canvasdoc companion.
-# Usage: curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash -s -- --origin https://canvas.calpoly.edu
+# Usage: curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash
+# Arguments after `bash -s --` go to canvasdoc-cli, for example --origin https://canvas.calpoly.edu.
 # canvasdoc-cli brings its own Codex and opens Codex sign-in on first run. No sudo is needed.
 set -euo pipefail
 

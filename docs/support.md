@@ -6,23 +6,15 @@ Email [sjedickson+canvasdoc@gmail.com](mailto:sjedickson+canvasdoc@gmail.com) fo
 
 ## Installing and starting the companion
 
-Canvasdoc needs a companion running on your Mac. Install the [Chrome extension](https://chromewebstore.google.com/detail/pbibigofgbljlhhaadjgiikdkjiahhap), then run the command for your school in Terminal. It installs Node.js privately if your Mac doesn't have it, then starts the companion, which includes Codex.
-
-Cal Poly:
+Canvasdoc needs a companion running on your Mac. Install the [Chrome extension](https://chromewebstore.google.com/detail/pbibigofgbljlhhaadjgiikdkjiahhap), then run this in Terminal. It installs Node.js privately if your Mac doesn't have it, then starts the companion, which includes Codex.
 
 ```
-curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash -s -- --origin https://canvas.calpoly.edu
+curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash
 ```
 
-UCLA:
+If you already have [Node.js](https://nodejs.org/) 22.13 or later, `npx canvasdoc-cli@latest` does the same. Inside Canvas, Canvasdoc shows a ready-to-copy command for your school whenever it isn't connected.
 
-```
-curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash -s -- --origin https://bruinlearn.ucla.edu
-```
-
-If you already have [Node.js](https://nodejs.org/) 22.13 or later, `npx canvasdoc-cli@latest --origin <your Canvas address>` does the same. Canvasdoc also shows the command for your Canvas site whenever it isn't connected.
-
-The first run asks you to choose a Canvasdoc folder and signs you in to Codex for that folder. Keep the Terminal window open while you use Canvasdoc. Later runs remember your folder.
+The first run asks which school's Canvas you use and where to keep your Canvasdoc folder, then signs you in to Codex for that folder. Keep the Terminal window open while you use Canvasdoc. Later runs remember your folder.
 
 ## Reporting a problem
 

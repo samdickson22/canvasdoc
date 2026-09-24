@@ -108,7 +108,8 @@ test("runtime relay accepts every supported Canvas school and rejects other site
   onConnect({ name: "canvasdoc:runtime", sender: { id: "test-extension", url }, onMessage: { addListener() { listening = true; } }, onDisconnect: { addListener() {} }, postMessage() {}, disconnect() { disconnected = true; } });
   return { disconnected, listening };
  };
- assert.ok(origins.canvas.includes("https://bruinlearn.ucla.edu"));
- for (const origin of origins.canvas) assert.deepEqual(open(`${origin}/courses/1`), { disconnected: false, listening: true });
+ const schools = origins.canvas.map((school: { origin: string }) => school.origin);
+ assert.ok(schools.includes("https://bruinlearn.ucla.edu"));
+ for (const origin of schools) assert.deepEqual(open(`${origin}/courses/1`), { disconnected: false, listening: true });
  assert.deepEqual(open("https://canvas.example.edu/courses/1"), { disconnected: true, listening: false });
 });
