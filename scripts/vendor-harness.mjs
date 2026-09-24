@@ -9,7 +9,7 @@ import {
 import { execFileSync } from "node:child_process";
 import path from "node:path";
 const source = process.argv[2];
-const commit = "f57811c592f1c8295d60d81c79b6141cd21a6f05";
+const commit = "c189c339ec82dbdce76dfead269b55b2d719c9e0";
 if (
   !source ||
   execFileSync("git", ["-C", source, "rev-parse", "HEAD"], {
@@ -84,6 +84,3 @@ for (const [name, dir, entries] of [
     ) + "\n",
   );
 }
-
-// Preserve Canvasdoc per-conversation cancellation until upstream supports it.
-execFileSync("git", ["apply", "scripts/harness-scoped-interruption.patch"]);

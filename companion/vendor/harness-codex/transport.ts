@@ -896,9 +896,13 @@ export const useCodexTransport = (
       }
     }
   };
-  const interruptActive = async () => {
+  const interruptActive = async (
+    includes: (threadId: string) => boolean = () => true,
+  ) => {
     ensure(true);
-    for (const target of activeTurns()) {
+    for (const target of activeTurns().filter((turn) =>
+      includes(turn.threadId),
+    )) {
       if (
         !activeTurns().some(
           (turn) =>
@@ -1112,8 +1116,6 @@ export const useCodexTransport = (
         turn.status === "failed"
           ? (turn.error?.message ?? "Codex turn failed")
           : recordedFailure();
-      // Global run/stop clears its queue explicitly. A targeted interruption or
-      // provider interruption must not discard other conversations' work.
     }
     if (
       notification.method === "turn/completed" &&
@@ -1446,36 +1448,40 @@ export const useCodexTransport = (
       return latest.current.client;
     },
     reconcile: () => operate(reconcile),
-    interruptMessage: (messageId) => operate(async () => {
-      const queued = cell.snapshot.queue.find((q) => q.message.id === messageId);
-      if (queued) {
-        cell.snapshot.queue = cell.snapshot.queue.filter((q) => q !== queued);
-        await commit();
-        return;
-      }
-      const submission = cell.snapshot.submissions[messageId];
-      if (!submission || ["cancelled", "rejected"].includes(submission.status)) return;
-      if (!submission.turnId) {
-        if (["sending", "uncertain"].includes(submission.status))
-          throw new Error("codex: reconcile the unknown turn before cancelling");
-        return;
-      }
-      const targets = activeTurns();
-      if (!targets.some((t) => t.threadId === submission.threadId && t.turnId === submission.turnId)) return;
-      const belongsToTarget = (threadId: string): boolean => {
-        if (threadId === submission.threadId) return true;
-        const parent = cell.snapshot.threads[threadId]?.parentThreadId;
-        return !!parent && belongsToTarget(parent);
-      };
-      ensure(true);
-      for (const target of targets.filter((t) => belongsToTarget(t.threadId))) {
-        if (!activeTurns().some((t) => t.threadId === target.threadId && t.turnId === target.turnId)) continue;
-        try { await latest.current.client.request("turn/interrupt", target); }
-        catch (error) {
-          if (activeTurns().some((t) => t.threadId === target.threadId && t.turnId === target.turnId)) throw error;
+    interruptMessage: (messageId) =>
+      operate(async () => {
+        if (cell.snapshot.queue.some((q) => q.message.id === messageId)) {
+          cell.snapshot.queue = cell.snapshot.queue.filter(
+            (q) => q.message.id !== messageId,
+          );
+          await commit();
+          return;
         }
-      }
-    }),
+        const submission = cell.snapshot.submissions[messageId];
+        if (
+          !submission ||
+          submission.status === "cancelled" ||
+          submission.status === "rejected"
+        )
+          return;
+        if (!submission.turnId)
+          throw new Error(
+            "codex: reconcile the unknown turn before cancelling",
+          );
+        if (
+          !activeTurns().some(
+            (turn) =>
+              turn.threadId === submission.threadId &&
+              turn.turnId === submission.turnId,
+          )
+        )
+          return;
+        const delegatedFrom = (threadId: string | null | undefined): boolean =>
+          threadId === submission.threadId ||
+          (!!threadId &&
+            delegatedFrom(cell.snapshot.threads[threadId]?.parentThreadId));
+        await interruptActive(delegatedFrom);
+      }),
     send: (input, config = {}) =>
       enqueue(
         {
@@ -1565,7 +1571,7 @@ export namespace CodexTransport {
     flush(): Promise<void>;
     subscribe(listener: () => void): () => void;
     reconcile(): Promise<void>;
-    /** Interrupt only this submission and its delegated work, retaining other queued messages. */
+    /** Removes a queued message, or interrupts its active turn and that turn's subagent threads. */
     interruptMessage(messageId: string): Promise<void>;
     send(
       input: CodexProtocol.UserInput[],

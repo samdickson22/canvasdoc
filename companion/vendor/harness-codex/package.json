@@ -22,6 +22,6 @@
   },
   "canvasdocUpstream": {
     "repository": "https://github.com/assistant-ui/harness-sdk",
-    "commit": "f57811c592f1c8295d60d81c79b6141cd21a6f05"
+    "commit": "c189c339ec82dbdce76dfead269b55b2d719c9e0"
   }
 }

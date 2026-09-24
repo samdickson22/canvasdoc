@@ -2,14 +2,14 @@
 
 Vendored from `assistant-ui/harness-sdk`, branch
 `experimental/codex-harness-integration`, commit
-`f57811c592f1c8295d60d81c79b6141cd21a6f05`.
+`c189c339ec82dbdce76dfead269b55b2d719c9e0`.
 
 This directory contains `packages/harness-sdk/codex/src`.
 The adjacent `harness-core` directory contains `packages/harness-sdk/core/src`.
 Both unpublished packages are pinned together and installed as local npm packages.
 Statewire is pinned to the matching published version, `0.19.1`.
 
-Source: https://github.com/assistant-ui/harness-sdk/tree/f57811c592f1c8295d60d81c79b6141cd21a6f05/packages/harness-sdk
+Source: https://github.com/assistant-ui/harness-sdk/tree/c189c339ec82dbdce76dfead269b55b2d719c9e0/packages/harness-sdk
 
 Regenerate from a checkout at the pinned commit:
 
@@ -19,10 +19,8 @@ node scripts/vendor-harness.mjs /path/to/harness-sdk
 
 The script copies the complete source trees and adds `.ts` extensions to relative
 imports for direct Node execution. Local package manifests expose those sources.
-The script also applies `scripts/harness-scoped-interruption.patch`, which retains
-per-conversation cancellation without discarding other queued work. This existing
-local patch remains necessary because upstream only provides a global stop. Keep
-other application adaptation in `companion/codex.ts` and `companion/harness-parts.ts`.
+The vendored sources are unmodified upstream code. Keep application adaptation in
+`companion/codex.ts` and `companion/harness-parts.ts`.
 The MIT license is retained here and included in the bundled CLI.
 
 Canvasdoc mounts one `CodexTransport` in a Tap root for the workspace's persistent
