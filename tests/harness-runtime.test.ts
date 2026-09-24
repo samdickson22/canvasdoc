@@ -110,6 +110,8 @@ test(
       const firstTurn = messages.find(m => m.method === "turn/start");
       assert.equal(firstTurn.params.model, "gpt-5.6-luna");
       assert.equal(firstTurn.params.effort, "medium");
+      assert.equal(firstTurn.params.approvalPolicy, "never");
+      assert.deepEqual(firstTurn.params.sandboxPolicy, { type: "dangerFullAccess" });
       assert.equal(
         messages.filter((m) => m.method === "initialized").length,
         1,
@@ -162,6 +164,8 @@ test(
       const chosenTurn = after.find(m => m.method === "turn/start" && m.params.clientUserMessageId === "request-2");
       assert.equal(chosenTurn.params.model, "model-b");
       assert.equal(chosenTurn.params.effort, "high");
+      assert.equal(chosenTurn.params.approvalPolicy, "never");
+      assert.deepEqual(chosenTurn.params.sandboxPolicy, { type: "dangerFullAccess" });
       assert.equal(
         after.filter(
           (m) =>

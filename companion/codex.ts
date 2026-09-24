@@ -264,7 +264,15 @@ export class CodexRuntime {
             (s) => s.status === "sending",
           );
           const selected = sending && owner.turnSettings[sending.message.id];
-          return { cwd: root, summary: "concise", ...selected } as NonNullable<
+          // Forks created by regeneration do not inherit session overrides.
+          // Apply Canvasdoc's execution policy to every turn, including forks.
+          return {
+            cwd: root,
+            summary: "concise",
+            ...selected,
+            approvalPolicy: "never",
+            sandboxPolicy: { type: "dangerFullAccess" },
+          } as NonNullable<
             CodexTransport.Options["turn"]
           >;
         },
