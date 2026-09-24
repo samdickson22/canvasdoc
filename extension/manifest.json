@@ -4,11 +4,7 @@
   "description": "Your local coursework agent, with Canvas assignments, course materials, and a persistent workspace.",
   "content_scripts": [
     {
-      "matches": [
-        "https://mac-mini.tail39179a.ts.net:3211/*",
-        "http://localhost:3210/*",
-        "https://canvas.calpoly.edu/*"
-      ],
+      "matches": [],
       "css": [
         "bootstrap.css"
       ],
@@ -18,11 +14,7 @@
       "run_at": "document_start"
     },
     {
-      "matches": [
-        "https://mac-mini.tail39179a.ts.net:3211/*",
-        "http://localhost:3210/*",
-        "https://canvas.calpoly.edu/*"
-      ],
+      "matches": [],
       "js": [
         "canvasdoc.js"
       ],
@@ -37,17 +29,21 @@
   "background": {
     "service_worker": "background.js"
   },
-  "content_security_policy": {"extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"},
-  "web_accessible_resources": [{
-    "resources": ["pdf/viewer.html", "mermaid.js"],
-    "matches": ["https://mac-mini.tail39179a.ts.net/*", "http://localhost/*", "https://canvas.calpoly.edu/*"]
-  }],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "pdf/viewer.html",
+        "mermaid.js"
+      ],
+      "matches": []
+    }
+  ],
   "host_permissions": [
-    "https://mac-mini.tail39179a.ts.net:3211/*",
-    "http://localhost:3210/*",
     "https://*.instructure.com/*",
-    "https://*.instructureusercontent.com/*",
-    "https://canvas.calpoly.edu/*"
+    "https://*.instructureusercontent.com/*"
   ],
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjEij7WeqWxfmACp/BG/sWMzGtUT5y2nG8KOC5NS9c/xJQrlR66VaatgPCvpbQSGyMUsC4A4u5e63n0aoWkEQvnayBRXDjd0CbfQQP0BUFkL6sjaisb0E5Y99hDMS4hdbWDxcN//Ga4CV3iGQepWAczGPfKL2Ow3/9qcQQkjjkkpLbUbAdQ72ve7OYLvSNokZ3Gfha27kTVXKoyUtMHP84grsHkD7DypeRGOVAGfwu4z/YXF0FNXocww1aRcNFHpXKC4u9TmdvVMuznPq/ok+i+zwyKyaxUhq2yURGoZUUuhYypL2WyCf2BH4FZ4izvssgGVYVnyfc6VyUNMNlBzSFwIDAQAB"
 }

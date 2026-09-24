@@ -8,6 +8,7 @@ import hostStyles from "./host.css";
 import { initializeConnection } from "./runtime/client";
 import { startMaterialSync } from "./material-sync";
 import { setTimeZone } from "./preferences";
+import origins from "../extension/origins.json" with { type: "json" };
 
 declare global {
   interface Window {
@@ -184,7 +185,7 @@ mount().catch((error) =>
 
 function startDevRefresh() {
   if (typeof chrome !== "undefined" && chrome.runtime?.id) return;
-  if (!["https://mac-mini.tail39179a.ts.net:3211", "http://localhost:3210"].includes(location.origin)) return;
+  if (!origins.development.includes(location.origin)) return;
   let version: string | undefined;
   let lastInput = 0;
   let canvasFormEdited = false;

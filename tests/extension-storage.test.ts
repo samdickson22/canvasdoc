@@ -39,6 +39,7 @@ test("extension background serializes concurrent tabs without losing either task
     Array,
     Object,
     Error,
+    URL,
   });
   const commit = (id: string) =>
     new Promise<any>((resolve) =>
@@ -94,4 +95,20 @@ test("native relay forwards the Canvas account and rejects an account from anoth
  onConnect({name:"canvasdoc:runtime",sender:{id:"test-extension",url:"https://canvas.calpoly.edu/courses/1"},onMessage:{addListener(fn:any){incoming=fn}},onDisconnect:{addListener(){}},postMessage:(m:any)=>replies.push(m),disconnect(){disconnected=true}});
  const handshake={type:"connect",account:"canvasdoc:v1:https://canvas.calpoly.edu:123"};incoming(handshake);assert.equal(forwarded[0],handshake);
  incoming({type:"connect",account:"canvasdoc:v1:http://localhost:3210:123"});assert.equal(forwarded.length,1);assert.equal(disconnected,true);assert.equal(replies[0].code,"account_mismatch");
+});
+
+test("runtime relay accepts every supported Canvas school and rejects other sites", async () => {
+ const origins = JSON.parse(await readFile("extension/origins.json", "utf8"));
+ let onConnect: any;
+ const native = { onMessage: { addListener() {} }, onDisconnect: { addListener() {} }, postMessage() {}, disconnect() {} };
+ const chrome = { runtime: { id: "test-extension", onMessage: { addListener() {} }, onConnect: { addListener(fn: any) { onConnect = fn; } }, connectNative: () => native } };
+ vm.runInNewContext(await readFile("dist/background.js", "utf8"), { chrome, console, URL });
+ const open = (url: string) => {
+  let disconnected = false; let listening = false;
+  onConnect({ name: "canvasdoc:runtime", sender: { id: "test-extension", url }, onMessage: { addListener() { listening = true; } }, onDisconnect: { addListener() {} }, postMessage() {}, disconnect() { disconnected = true; } });
+  return { disconnected, listening };
+ };
+ assert.ok(origins.canvas.includes("https://bruinlearn.ucla.edu"));
+ for (const origin of origins.canvas) assert.deepEqual(open(`${origin}/courses/1`), { disconnected: false, listening: true });
+ assert.deepEqual(open("https://canvas.example.edu/courses/1"), { disconnected: true, listening: false });
 });

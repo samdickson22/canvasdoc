@@ -3,6 +3,7 @@ import { mkdir, writeFile, copyFile, readFile, cp, rm } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
+import { withOrigins } from "./manifest-origins.mjs";
 
 const watch = process.argv.includes("--watch");
 const output = resolve("dist");
@@ -63,7 +64,8 @@ const build = await context({
           }
           const manifest = JSON.parse(await readFile("extension/manifest.json", "utf8"));
           const metadata = JSON.parse(await readFile("package.json", "utf8"));
-          await writeFile(`${output}/manifest.json`, JSON.stringify({ ...manifest, version: metadata.version }, null, 2));
+          const origins = JSON.parse(await readFile("extension/origins.json", "utf8"));
+          await writeFile(`${output}/manifest.json`, JSON.stringify({ ...withOrigins(manifest, [...origins.development, ...origins.canvas]), version: metadata.version }, null, 2));
           await rm(`${output}/notices`, { recursive: true, force: true });
           await mkdir(`${output}/notices`, { recursive: true });
           for (const [source, name] of [

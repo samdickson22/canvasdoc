@@ -1,14 +1,18 @@
 import { materialDownload } from "./material-download";
 import { nativeReceiver } from "../companion/native-framing.ts";
 import { mutate, parseSavedData, type Mutation } from "../src/storage/data.ts";
+import origins from "./origins.json" with { type: "json" };
+
+const pages = new Set([...origins.canvas, ...origins.development]);
+const supportedPage = (url: string) => {
+  try { return pages.has(new URL(url).origin); } catch { return false; }
+};
 const queues = new Map<string, Promise<unknown>>();
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (
     sender.id !== chrome.runtime.id ||
     !sender.url ||
-    !/^(https:\/\/mac-mini\.tail39179a\.ts\.net:3211|http:\/\/localhost:3210|https:\/\/canvas\.calpoly\.edu)(\/|$)/.test(
-      sender.url,
-    )
+    !supportedPage(sender.url)
   )
     return;
   if (message.type === "canvasdoc:material-download") {
@@ -57,9 +61,7 @@ chrome.runtime.onConnect.addListener((port) => {
     port.name !== "canvasdoc:runtime" ||
     sender?.id !== chrome.runtime.id ||
     !sender.url ||
-    !/^(https:\/\/mac-mini\.tail39179a\.ts\.net:3211|http:\/\/localhost:3210|https:\/\/canvas\.calpoly\.edu)(\/|$)/.test(
-      sender.url,
-    )
+    !supportedPage(sender.url)
   ) {
     port.disconnect();
     return;

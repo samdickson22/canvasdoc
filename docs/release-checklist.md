@@ -39,7 +39,7 @@ Internal React components and helper functions are not public APIs. Future forma
 - The store extension ID (`pbibigofgbljlhhaadjgiikdkjiahhap`) is the CLI's default on macOS. `start.sh` adds the unpacked build's ID alongside it, so one native host serves both. If the store item is ever re-created under a new ID, update `STORE_EXTENSION_ID` in `cli/canvasdoc.mjs`.
 - Enter https://canvasdoc-public.vercel.app/privacy/ in the developer dashboard's privacy field and https://canvasdoc-public.vercel.app/support/ as the support URL. The public support/privacy contact is sjedickson+canvasdoc@gmail.com. Keep the [policy source](privacy.md) and [public site](public-site.md) current and verify both URLs without authentication before submission.
 - Capture actual, current product screenshots for the listing. Do not submit mockups as product screenshots.
-- Suggested description: “A local coursework agent inside Canvas, with assignment conversations, course materials, and a persistent workspace on your computer.” State clearly that a local companion and Codex account are required and current support is Cal Poly only.
+- Suggested description: “A local coursework agent inside Canvas, with assignment conversations, course materials, and a persistent workspace on your computer.” State clearly that a local companion and Codex account are required and current support is Cal Poly and UCLA (BruinLearn).
 - Complete Chrome's data-use disclosures to match [the privacy policy](privacy.md), including course content, chat content, and local runtime/model-provider processing.
 - Provide reviewer instructions and synthetic test access; never provide a student's real credentials.
 - Verify the packaged third-party notices match the code included in the release; rebuild the notices directory when dependencies or reused code change.
@@ -50,7 +50,7 @@ Internal React components and helper functions are not public APIs. Future forma
 - `storage`: browser-owned conversations, drafts, tasks, preferences, and material metadata.
 - `unlimitedStorage`: local conversation history and course metadata can exceed the default extension storage quota.
 - `nativeMessaging`: connect Chrome to the local Canvasdoc companion.
-- `canvas.calpoly.edu`: display the UI and read Canvas with the user's existing login; update planner completion only on user action.
+- Supported Canvas schools (`canvas.calpoly.edu`, `bruinlearn.ucla.edu`): display the UI and read Canvas with the user's existing login; update planner completion only on user action. Add a school by adding its origin to `extension/origins.json`. A new host permission makes Chrome ask existing users to re-approve the extension on update and triggers another store review.
 - `*.instructure.com`, `*.instructureusercontent.com`: download Canvas-hosted material files across Canvas/CDN redirects. The content script only injects on the supported Canvas origin.
 
 There is no `<all_urls>`, cookie-reading API permission, or browser-history permission. Automatic local history export means Canvasdoc conversation history, not browsing history.

@@ -1,12 +1,12 @@
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
+import { withOrigins } from './manifest-origins.mjs';
 import { deflateSync } from 'node:zlib';
 import { stageExtension, zipDirectory } from './package-utils.mjs';
 const dir = 'release/webstore';
 const manifest = await stageExtension(dir);
-const origin='https://canvas.calpoly.edu/*';
-manifest.content_scripts=manifest.content_scripts.map(script=>({...script,matches:[origin]}));
-manifest.host_permissions=[origin,'https://*.instructure.com/*','https://*.instructureusercontent.com/*'];
-manifest.web_accessible_resources=manifest.web_accessible_resources.map(resource=>({...resource,matches:[origin]}));
+// The store build serves only real Canvas schools, never development origins.
+const {canvas}=JSON.parse(await readFile('extension/origins.json','utf8'));
+Object.assign(manifest,withOrigins({...manifest,host_permissions:['https://*.instructure.com/*','https://*.instructureusercontent.com/*']},canvas));
 delete manifest.key;
 manifest.icons={};
 // Small original window mark, generated at each native icon size.

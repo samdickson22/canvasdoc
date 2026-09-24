@@ -1,8 +1,8 @@
 # Canvasdoc privacy policy
 
-Updated September 18, 2026.
+Updated September 25, 2026.
 
-Canvasdoc is developed by Sam Dickson. It connects Canvas to a coursework agent running on your computer through a local companion and Codex. It currently supports Cal Poly Canvas. Local execution does not mean offline processing: the agent sends information to its model provider to respond to your requests.
+Canvasdoc is developed by Sam Dickson. It connects Canvas to a coursework agent running on your computer through a local companion and Codex. It currently supports Cal Poly and UCLA (BruinLearn) Canvas. Local execution does not mean offline processing: the agent sends information to its model provider to respond to your requests.
 
 ## Information Canvasdoc handles
 
