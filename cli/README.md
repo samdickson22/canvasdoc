@@ -2,7 +2,7 @@
 
 Run `npx canvasdoc-cli` to choose a Canvasdoc folder and Canvas URL, sign in to Codex for that folder, and start the local connector. Keep the terminal open while working. Later runs remember the folder and resume the same main agent.
 
-Requires Node.js 22.13 or later. Uses an existing Codex CLI when available and includes Codex as a fallback. Sign-in runs only when the folder's private Codex home has no active login.
+Requires Node.js 22.13 or later. On a Mac without Node.js, `curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash -s -- --origin <canvas-url>` installs a private copy first and then runs this package. Uses an existing Codex CLI when available and includes Codex as a fallback. Sign-in runs only when the folder's private Codex home has no active login.
 
 Canvasdoc is in early development. The Canvasdoc browser UI must already be installed on your Canvas site. This package does not install a browser extension or modify your school's Canvas deployment. On macOS, the launcher registers the Chrome Web Store extension with Chrome's native host automatically. Pass `--extension-id <id>` to also register an unpacked development build, or `--no-extension` to skip registration and pair the development UI with a token, which is the only mode on Linux.
 

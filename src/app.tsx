@@ -41,6 +41,7 @@ import {
   usesNativeConnection,
 } from "./runtime/client";
 import { useTimeZone } from "./preferences";
+import { SetupCommand } from "./assistant-ui/components/assistant-ui/elements/setup-command";
 
 export type Mounts = {
   sidebar: HTMLElement;
@@ -606,10 +607,7 @@ function ConnectionSettings() {
         <><p>Your computer is connected, but Codex needs to reconnect.</p><button className="primary-button" onClick={() => { try { reconnectAgent(); } catch (error) { setError((error as Error).message); } }}>Reconnect agent</button></>
       ) : usesNativeConnection ? (
         <>
-          <p>
-            Start the Canvasdoc connector from your selected folder, then
-            reconnect.
-          </p>
+          <SetupCommand />
           <button className="primary-button" onClick={connectNative}>
             Reconnect
           </button>

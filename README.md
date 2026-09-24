@@ -16,15 +16,26 @@ One persistent Codex agent works across these conversations and shares the selec
 
 ## Requirements and current limits
 
-- macOS, Google Chrome, and Node.js 22.13 or later. Native bridge installation is currently macOS-only.
+- macOS and Google Chrome. Native bridge installation is currently macOS-only.
+- Node.js 22.13 or later. The one-line installer below adds a private copy when it is missing.
 - A Codex sign-in for your Canvasdoc folder. The launcher reuses an existing Codex installation, includes a fallback binary, and starts the login flow when needed.
-- A supported Canvas origin. The current extension is configured for Cal Poly's `https://canvas.calpoly.edu` and development origins; it is not yet a general installation for every Canvas school.
+- A supported Canvas school: Cal Poly (`https://canvas.calpoly.edu`) or UCLA BruinLearn (`https://bruinlearn.ucla.edu`). Supported origins live in `extension/origins.json`; the manifest, store package, and extension background derive from that list.
 
 Canvasdoc uses your signed-in Canvas browser session, so no Canvas API token is needed. The companion runs on your machine and uses your Codex provider access; Canvasdoc does not host inference. Local execution does not mean the model runs offline: prompts and supplied materials are sent through the configured provider.
 
 Material coverage depends on what each course exposes and what the student account can access. Approval/tool UI and agent-initiated Canvas tooling remain areas of active development. Material sync does not automatically submit coursework or write to production Canvas.
 
-## Install and run
+## Install for students
+
+Install the [Chrome extension](https://chromewebstore.google.com/detail/pbibigofgbljlhhaadjgiikdkjiahhap), then run this in Terminal with your school's Canvas address:
+
+```bash
+curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash -s -- --origin https://canvas.calpoly.edu
+```
+
+The installer ([`cli/install.sh`](cli/install.sh)) uses your Node.js 22.13+ when present, or downloads and verifies a private copy under `~/Library/Application Support/Canvasdoc/node` without sudo. It then runs `npx canvasdoc-cli@latest`, which brings Codex and opens its sign-in on first run. With Node.js already installed, `npx canvasdoc-cli@latest --origin <canvas-url>` does the same. The extension shows the command for the current Canvas site whenever the companion is not connected.
+
+## Install and run from source
 
 ```bash
 git clone https://github.com/samdickson22/canvasdoc.git

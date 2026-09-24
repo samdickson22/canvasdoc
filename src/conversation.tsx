@@ -205,6 +205,7 @@ export function Conversation({
       finally { setRegenerating(false); }
     },
   });
+  const connectionState = <ConnectionState phase={connection.status === "connected" ? "online" : connection.status === "connecting" ? "reconnecting" : "dropped"} onRetry={onConnect} />;
   useEffect(() => () => {
     if (runtime.thread.getState().speech) runtime.thread.stopSpeaking();
   }, [runtime, context.threadId]);
@@ -261,7 +262,7 @@ export function Conversation({
         <PortalContainerContext.Provider value={portalContainer}>
           {(sendError || (failedRun?.error && !saved?.messages.some(m => m.id === `assistant:${failedRun.command.requestId}` && m.run?.error))) && <p className="error" role="alert">{sendError || failedRun?.error}</p>}
           <ChatGPT
-            footerSlot={!compact && <>
+            footerSlot={compact ? connection.status !== "connected" && connectionState : <>
               {connection.approvals.filter(approval => approval.requestId && approval.requestId === active?.command.requestId).map(approval => (
                 <RuntimeApproval key={approval.id} approval={approval} connected={connection.status === "connected"} />
               ))}
@@ -269,7 +270,7 @@ export function Conversation({
                 <ApprovalCard state="request" icon={<RefreshCwIcon className="size-4" />} title="Check the agent's last result"
                   subtitle="Reconnect to reconcile what the agent did before continuing." allowLabel="Reconnect agent"
                   onAllow={() => { try { reconnectAgent(); } catch (error) { setSendError((error as Error).message); } }} />}
-              <ConnectionState phase={connection.status === "connected" ? "online" : connection.status === "connecting" ? "reconnecting" : "dropped"} onRetry={onConnect} />
+              {connectionState}
             </>}
             suggestions={suggestionsFor(context.kind)}
             preparing={!!preparingId && preparingId === nextId}

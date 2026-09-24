@@ -1,18 +1,28 @@
 # Canvasdoc support
 
-Updated September 24, 2026.
+Updated September 25, 2026.
 
-Email [sjedickson+canvasdoc@gmail.com](mailto:sjedickson+canvasdoc@gmail.com) for installation help, bug reports, or privacy requests. Canvasdoc is developed by Sam Dickson and currently supports Cal Poly Canvas with a local companion and a Codex account.
+Email [sjedickson+canvasdoc@gmail.com](mailto:sjedickson+canvasdoc@gmail.com) for installation help, bug reports, or privacy requests. Canvasdoc is developed by Sam Dickson and currently supports Cal Poly and UCLA (BruinLearn) Canvas with a local companion and a Codex account.
 
 ## Installing and starting the companion
 
-Canvasdoc needs a companion running on your Mac. Install the [Chrome extension](https://chromewebstore.google.com/detail/pbibigofgbljlhhaadjgiikdkjiahhap), install [Node.js](https://nodejs.org/) 22.13 or later, then run this in Terminal:
+Canvasdoc needs a companion running on your Mac. Install the [Chrome extension](https://chromewebstore.google.com/detail/pbibigofgbljlhhaadjgiikdkjiahhap), then run the command for your school in Terminal. It installs Node.js privately if your Mac doesn't have it, then starts the companion, which includes Codex.
+
+Cal Poly:
 
 ```
-npx canvasdoc-cli@latest --origin https://canvas.calpoly.edu
+curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash -s -- --origin https://canvas.calpoly.edu
 ```
 
-The first run asks you to choose a Canvasdoc folder and signs you in to Codex for that folder. Keep the Terminal window open while you use Canvasdoc. Later runs remember your folder and only need `npx canvasdoc-cli@latest`.
+UCLA:
+
+```
+curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash -s -- --origin https://bruinlearn.ucla.edu
+```
+
+If you already have [Node.js](https://nodejs.org/) 22.13 or later, `npx canvasdoc-cli@latest --origin <your Canvas address>` does the same. Canvasdoc also shows the command for your Canvas site whenever it isn't connected.
+
+The first run asks you to choose a Canvasdoc folder and signs you in to Codex for that folder. Keep the Terminal window open while you use Canvasdoc. Later runs remember your folder.
 
 ## Reporting a problem
 

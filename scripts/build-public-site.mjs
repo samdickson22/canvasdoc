@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import Markdown from 'react-markdown';
@@ -29,5 +29,7 @@ for (const [slug, title, source] of pages) {
   await mkdir(`${output}/${slug}`, { recursive: true });
   await writeFile(`${output}/${slug}/index.html`, page(title, body));
 }
-await writeFile(`${output}/index.html`, page('Canvasdoc privacy and support', '<h1>Canvasdoc</h1><p>A local coursework assistant inside Canvas. Currently supports Cal Poly Canvas and requires a local companion and a Codex account.</p><p>Read the <a href="/privacy/">privacy policy</a> to understand local storage and model-provider processing, or visit <a href="/support/">support</a> for help.</p><p>Email <a href="mailto:sjedickson+canvasdoc@gmail.com">sjedickson+canvasdoc@gmail.com</a> for support or privacy requests.</p>'));
+await writeFile(`${output}/index.html`, page('Canvasdoc privacy and support', '<h1>Canvasdoc</h1><p>A local coursework assistant inside Canvas. Currently supports Cal Poly and UCLA (BruinLearn) Canvas and requires a local companion and a Codex account.</p><p>Read the <a href="/privacy/">privacy policy</a> to understand local storage and model-provider processing, or visit <a href="/support/">support</a> for help.</p><p>Email <a href="mailto:sjedickson+canvasdoc@gmail.com">sjedickson+canvasdoc@gmail.com</a> for support or privacy requests.</p>'));
+// The one-line installer referenced by the support page and the extension's setup prompt.
+await copyFile('cli/install.sh', `${output}/install.sh`);
 console.log(`Public site prepared in ${output}. Not published.`);

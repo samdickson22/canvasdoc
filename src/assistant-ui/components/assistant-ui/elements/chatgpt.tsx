@@ -62,7 +62,7 @@ export const ChatGPT: FC<WorkOptions> = (options) => {
         data-work-mode={(!options.compact && options.workMode) || undefined}
         className="aui-root min-h-0 flex h-full flex-col items-stretch bg-white px-4 text-[#0d0d0d] dark:bg-black dark:text-[#ececec]"
       >
-        {options.compact ? <Composer placeholder="Ask Canvasdoc…" /> : <>
+        {options.compact ? <>{options.footerSlot}<Composer placeholder="Ask Canvasdoc…" /></> : <>
         <SelectionQuote />
         <AuiIf condition={(s) => s.thread.isEmpty}>
           <EmptyState />
