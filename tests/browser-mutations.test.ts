@@ -59,7 +59,7 @@ test("cancellation durably removes queued sends and blocks replay until cancella
   data = parseSavedData(JSON.stringify(data));
   assert.equal(data.outbox?.[command.requestId], undefined);
   assert.equal(data.cancelledRequests?.[command.requestId], true);
-  assert.equal(data.threads.home.messages.length, 1);
+  assert.equal(data.threads.home.messages.length, 0);
   data = mutate(data, enqueue);
   assert.equal(data.outbox?.[command.requestId], undefined);
   data = mutate(data, { type: "ack", requestId: command.requestId });

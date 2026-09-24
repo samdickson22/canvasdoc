@@ -379,7 +379,7 @@ const assistantActionClassName =
   "flex size-8 items-center justify-center rounded-lg text-[#5d5d5d] transition-colors hover:bg-black/[0.07] hover:text-[#5d5d5d] dark:text-[#cdcdcd] dark:hover:bg-white/15 dark:hover:text-[#cdcdcd]";
 
 const AssistantMessage: FC = () => {
-  const { queuedMessages, onReadAloud, preparing } = useContext(WorkContext);
+  const { onReadAloud, preparing } = useContext(WorkContext);
   const spokenText = useAuiState(s => finalAnswerText(s.message.parts));
   return (
     <MessagePrimitive.Root className="relative mx-auto flex w-full max-w-3xl flex-col">
@@ -396,7 +396,7 @@ const AssistantMessage: FC = () => {
               case "reasoning": return null;
               case "tool-call": return part.toolUI ?? <ActivityTool {...part} />;
               case "data": return <RunData part={part} />;
-              case "indicator": return <LiveActivity hasQueuedMessages={!!queuedMessages?.length} preparing={preparing} />;
+              case "indicator": return <LiveActivity preparing={preparing} />;
               default: return null;
             }
           }}

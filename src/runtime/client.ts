@@ -105,6 +105,12 @@ async function applyRun(run: any) {
   const previous = store.get().threads[c.sourceThreadId];
   const userId = c.regenerate?.parentId ?? c.requestId;
   const replyId = c.regenerate?.messageId ?? `assistant:${c.requestId}`;
+  // Cancelling a prompt before it started removes it; late snapshots must not restore it.
+  if (!run.startedAt && !previous?.messages.some(m => m.id === userId) &&
+      (run.status === "cancelled" || store.get().cancelledRequests?.[c.requestId])) {
+    if (run.status === "cancelled") try { send({ type: "ack-delivery", requestId: c.requestId }); } catch {}
+    return;
+  }
   const priorReply = previous?.messages.find(m => m.id === replyId);
   if (priorReply?.run?.requestId && priorReply.run.requestId !== c.requestId &&
       priorReply.run.requestId !== c.regenerate?.requestId) {

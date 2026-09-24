@@ -49,9 +49,10 @@ export function Conversation({
 }) {
   const data = useData();
   const { threads, outbox } = data;
-  const [preparing, setPreparing] = useState(false);
+  const [preparingId, setPreparingId] = useState<string>();
+  const [regenerating, setRegenerating] = useState(false);
+  const preparing = !!preparingId || regenerating;
   const preparation = useRef<AbortController | null>(null);
-  const queued = Object.values(outbox ?? {}).some(command => command.sourceThreadId === context.threadId && (!home || isVisibleHomeRequest(command.requestId)));
   const [portalContainer, setPortalContainer] = useState<HTMLDivElement | null>(
     null,
   );
@@ -72,33 +73,38 @@ export function Conversation({
     onError: setSendError,
     onUploadState: (id, status) => setUploadStates(previous => ({ ...previous, [id]: status })),
   }), []);
-  const active = Object.values(connection.runs).find(
-    (run: any) =>
-      run.command.sourceThreadId === context.threadId &&
-      (!home || isVisibleHomeRequest(run.command.requestId)) &&
-      ["working", "queued"].includes(run.status),
-  );
-  const queuedCommands = new Map(Object.values(connection.runs)
-    .filter(run => run.status === "queued")
-    .map(run => [run.command.requestId, run.command]));
-  for (const command of Object.values(outbox ?? {})) {
-    if (!connection.runs[command.requestId] || connection.runs[command.requestId].status === "queued")
-      queuedCommands.set(command.requestId, command);
-  }
-  const queuedMessages = [...queuedCommands.values()]
-    .filter(command => command.sourceThreadId === context.threadId &&
-      (!home || isVisibleHomeRequest(command.requestId)) && !data.cancelledRequests?.[command.requestId])
-    .map(command => ({ id: command.requestId, text: command.text, pendingDelivery: connection.status !== "connected" }));
+  const inThread = (requestId: string, sourceThreadId: string) =>
+    sourceThreadId === context.threadId && (!home || isVisibleHomeRequest(requestId));
+  const threadRuns = Object.values(connection.runs).filter((run: any) => inThread(run.command.requestId, run.command.sourceThreadId));
+  const active = threadRuns.find((run: any) => ["working", "uncertain", "recovering"].includes(run.status));
+  // Prompts the agent has not started: being prepared, awaiting delivery, or in Harness's queue.
+  const waiting = new Set([
+    ...(preparingId ? [preparingId] : []),
+    ...Object.values(outbox ?? {}).filter(command => !command.regenerate && inThread(command.requestId, command.sourceThreadId)).map(command => command.requestId),
+    ...threadRuns.filter((run: any) => run.status === "queued" && !run.command.regenerate).map((run: any) => run.command.requestId),
+  ]);
   const saved = threads[context.threadId];
+  const visible = home && !showHistory ? visibleHomeMessages(saved?.messages) : (saved?.messages ?? []);
+  // Like assistant-ui's message queue, only the next prompt joins the transcript.
+  // Prompts behind running work stay in the queue above the composer until they start.
+  let busy = !!active;
+  let nextId: string | undefined;
+  const queuedIds = new Set<string>();
+  for (const message of visible) {
+    if (message.role === "assistant" && ["working", "queued"].includes(message.run?.status ?? "")) busy = true;
+    if (message.role !== "user" || !waiting.has(message.id)) continue;
+    if (busy) queuedIds.add(message.id);
+    else nextId = message.id;
+    busy = true;
+  }
+  const queuedMessages = visible.filter(message => queuedIds.has(message.id))
+    .map(message => ({ id: message.id, text: message.text, pendingDelivery: connection.status !== "connected" }));
   const latestUserId = saved?.messages.filter(message=>message.role==="user").at(-1)?.id;
   const failedRun = Object.values(connection.runs).find((run:any)=>run.command.requestId===latestUserId && (!home || isVisibleHomeRequest(run.command.requestId)) && run.error);
+  const hidden = [...queuedIds].join();
   const messages = useMemo<ThreadMessageLike[]>(
-    () =>
-      (home && !showHistory
-        ? visibleHomeMessages(saved?.messages)
-        : (saved?.messages ?? [])
-      ).map(presentMessage),
-    [saved?.messages, home, showHistory],
+    () => visible.filter(message => !queuedIds.has(message.id)).map(presentMessage),
+    [saved?.messages, home, showHistory, hidden],
   );
   const onNew = async (message: AppendMessage) => {
       const text = message.content
@@ -114,7 +120,7 @@ export function Conversation({
       if (home) rememberHomeRequest(requestId);
       const controller = new AbortController();
       preparation.current = controller;
-      setPreparing(true);
+      setPreparingId(requestId);
       const saveMessage = () => store.saveMessage({
         id: context.threadId, title: context.title, href: context.href,
         updatedAt: new Date().toISOString(),
@@ -152,12 +158,14 @@ export function Conversation({
           requestId,
         );
       } catch (error) {
-        setSendError(controller.signal.aborted ? "Message stopped before sending to the agent." : `Message was saved but could not be sent: ${(error as Error).message}`);
+        // The prompt returns to the composer, so it must not also stay in the thread or outbox.
+        void stopRun(requestId).catch(() => {});
+        setSendError(controller.signal.aborted ? "Message stopped before sending to the agent." : `Message could not be sent: ${(error as Error).message}`);
         if (!runtime.thread.composer.getState().text) runtime.thread.composer.setText(text);
         if (quote && !runtime.thread.composer.getState().quote) runtime.thread.composer.setQuote(quote);
       } finally {
         preparation.current = null;
-        setPreparing(false);
+        setPreparingId(undefined);
       }
   };
   const runtime = useExternalStoreRuntime({
@@ -174,24 +182,27 @@ export function Conversation({
     adapters: { attachments: attachmentAdapter, speech: speechAdapter },
     messages,
     isSendDisabled: connection.status !== "connected" || preparing,
-    isRunning: preparing || queued || !!active,
+    isRunning: regenerating || waiting.size > 0 || !!active,
+    // Stop the current turn. Queued prompts stay visible and can be removed individually.
     onCancel: async () => {
       preparation.current?.abort();
-      const ids = new Set(Object.values(store.get().outbox ?? {})
-        .filter(command => command.sourceThreadId === context.threadId && (!home || isVisibleHomeRequest(command.requestId)))
-        .map(command => command.requestId));
-      if (active) ids.add(active.command.requestId);
-      try { await Promise.all([...ids].map(stopRun)); }
+      const current = active?.command.requestId ?? nextId;
+      if (!current || current === preparingId) return;
+      if (current === nextId) {
+        const text = visible.find(message => message.id === nextId)?.text;
+        if (text && !runtime.thread.composer.getState().text) runtime.thread.composer.setText(text);
+      }
+      try { await stopRun(current); }
       catch (error) { setSendError((error as Error).message); }
     },
     convertMessage: (message) => message,
     onNew,
     onReload: async (parentId, { sourceId }) => {
       setSendError("");
-      setPreparing(true);
+      setRegenerating(true);
       try { await regenerateMessage(context, parentId, sourceId); }
       catch (error) { setSendError((error as Error).message); }
-      finally { setPreparing(false); }
+      finally { setRegenerating(false); }
     },
   });
   useEffect(() => () => {
@@ -261,7 +272,7 @@ export function Conversation({
               <ConnectionState phase={connection.status === "connected" ? "online" : connection.status === "connecting" ? "reconnecting" : "dropped"} onRetry={onConnect} />
             </>}
             suggestions={suggestionsFor(context.kind)}
-            preparing={preparing}
+            preparing={!!preparingId && preparingId === nextId}
             compact={compact}
             onReadAloud={speechAdapter ? text => { speechText.current = text; } : undefined}
             queuedMessages={queuedMessages}

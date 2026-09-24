@@ -17,10 +17,9 @@ import {
 import type { DisplayPart } from "../../../../../companion/message-parts";
 import type { SavedMessage } from "../../../../types";
 
-export function LiveActivity({ hasQueuedMessages = false, preparing = false }: { hasQueuedMessages?: boolean; preparing?: boolean }) {
+export function LiveActivity({ preparing = false }: { preparing?: boolean }) {
   const parts = useAuiState(s => s.message.parts) as readonly DisplayPart[];
   const run = useAuiState(s => s.message.metadata.custom.run);
-  if (!run && hasQueuedMessages) return null;
   const last = parts.at(-1);
   // WorkHistory owns the status while a work group is present.
   if (parts.some(part => "providerMetadata" in part && part.providerMetadata?.canvasdoc?.work)) return null;

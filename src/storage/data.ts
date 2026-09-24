@@ -124,10 +124,17 @@ export function mutate(current: Data, op: Mutation): Data {
   } else if (op.type === "message") {
     const prior = current.threads[op.thread.id];
     const messages = new Map((prior?.messages ?? []).map(message => [message.id, message]));
+    const isNew = !messages.has(op.message.id);
     mergeMessage(messages, op.message);
+    const list = [...messages.values()];
+    // A reply can start after later messages were queued; keep it under its prompt.
+    const prompt = isNew && op.message.id.startsWith("assistant:")
+      ? list.findIndex(message => message.id === op.message.id.slice("assistant:".length))
+      : -1;
+    if (prompt >= 0) list.splice(prompt + 1, 0, list.pop()!);
     next.threads = {
       ...current.threads,
-      [op.thread.id]: { ...prior, ...op.thread, draft: prior?.draft ?? "", messages: [...messages.values()] },
+      [op.thread.id]: { ...prior, ...op.thread, draft: prior?.draft ?? "", messages: list },
     };
   } else if (op.type === "task")
     next.tasks = current.tasks.some((t) => t.id === op.task.id)
@@ -179,8 +186,15 @@ export function mutate(current: Data, op: Mutation): Data {
   } else if (op.type === "ack" || op.type === "cancel") {
     next.outbox = { ...current.outbox };
     delete next.outbox[op.requestId];
-    if (op.type === "cancel")
+    if (op.type === "cancel") {
       next.cancelledRequests = { ...current.cancelledRequests, [op.requestId]: true };
+      // A prompt cancelled before the agent started it never became part of the conversation.
+      next.threads = Object.fromEntries(Object.entries(current.threads).map(([id, thread]) => [id,
+        thread.messages.some(message => message.id === op.requestId && message.role === "user") &&
+        !thread.messages.some(message => message.id === `assistant:${op.requestId}`)
+          ? { ...thread, messages: thread.messages.filter(message => message.id !== op.requestId) }
+          : thread]));
+    }
   } else if (op.type === "ack-cancellation") {
     next.cancelledRequests = { ...current.cancelledRequests };
     delete next.cancelledRequests[op.requestId];
