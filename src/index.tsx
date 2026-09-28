@@ -1,6 +1,8 @@
 import { createRoot } from "react-dom/client";
 import { App, type Mounts } from "./app";
-import { pageContext } from "./model";
+import { isCoursework, pageContext } from "./model";
+import { resolveCoursework } from "./canvas";
+import { reportEvent } from "./runtime/client";
 import { initializeStore, store } from "./store";
 import styles from "./styles.css";
 import assistantStyles from "../dist/assistant-ui.css";
@@ -68,13 +70,14 @@ async function mount() {
   initializeConnection();
   startDevRefresh();
   const content = document.querySelector<HTMLElement>("#content")!;
-  const context = pageContext(
+  const context = await resolveCoursework(pageContext(
     location.pathname,
     location.search,
     content.querySelector("h1")?.textContent?.trim() || document.title,
     store.get().tasks,
-  );
-  const stopMaterials = startMaterialSync(context.kind === "assignment" ? context.courseId : undefined);
+  ));
+  reportEvent("page", { kind: context.kind, threadId: context.threadId, path: location.pathname, title: context.title });
+  const stopMaterials = startMaterialSync(isCoursework(context.kind) ? context.courseId : undefined);
   const sheet = document.createElement("style");
   sheet.textContent = hostStyles;
   sheet.id = "canvasdoc-host-styles";
@@ -112,12 +115,12 @@ async function mount() {
   const isHome = context.kind === "home" || context.kind === "personal";
   const main = isHome ? region("canvasdoc-main", content) : null;
   const original =
-    context.kind === "assignment"
+    isCoursework(context.kind)
       ? Array.from(content.children).filter(
           (element): element is HTMLElement => element instanceof HTMLElement,
         )
       : context.kind === "personal" && main ? [main.host] : [];
-  const hasWorkspace = context.kind === "assignment" || context.kind === "personal";
+  const hasWorkspace = isCoursework(context.kind) || context.kind === "personal";
   const tabs =
     hasWorkspace
       ? region("canvasdoc-tabs", content, true)

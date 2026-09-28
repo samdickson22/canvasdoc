@@ -59,7 +59,7 @@ const build = await context({
             target: "chrome120",
             minify: true,
           });
-          for (const file of ["bootstrap.js", "bootstrap.css"]) {
+          for (const file of ["bootstrap.js", "bootstrap.css", "icon-16.png", "icon-32.png", "icon-48.png", "icon-128.png"]) {
             await copyFile(`extension/${file}`, `${output}/${file}`);
           }
           const manifest = JSON.parse(await readFile("extension/manifest.json", "utf8"));

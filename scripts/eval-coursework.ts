@@ -172,6 +172,7 @@ async function evaluate(runtime: CodexRuntime, scenario: any) {
   }
 }
 
+process.env.CANVASDOC_STATE_DIR ??= path.join(run, "state");
 if (live && report.deterministic === "PASS") {
   report.behavioral = "RUNNING";
   await save();

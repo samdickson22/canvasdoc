@@ -32,7 +32,7 @@ test('Canvas collection to chat preserves requirements and successful freshness 
   const {collectMaterials,materialContext,observeCanvasWork,syncMaterials}=await import(pathToFileURL(out).href);
   const first=await collectMaterials(new AbortController().signal);
   (globalThis as any).__catalog=first;
-  assert.match(materialContext(1,2),/Explain evidence/);
+  assert.match(materialContext({courseId:1,assignmentId:2}),/Explain evidence/);
   const key='/api/v1/courses/1/assignments?include[]=submission&per_page=100';
   const successfulAt=first.responses[key].successfulAt;
   assignment.description='<p>Changed without module edits</p>';
@@ -45,14 +45,14 @@ test('Canvas collection to chat preserves requirements and successful freshness 
   assert.match(failed.responses[key].error,/503/);
   assert.equal(failed.resources.find((r:any)=>r.id==='1:assignment:2').text,second.resources.find((r:any)=>r.id==='1:assignment:2').text);
   (globalThis as any).__catalog=failed;
-  assert.match(materialContext(1,2),/503/);
+  assert.match(materialContext({courseId:1,assignmentId:2}),/503/);
   discoveryFails=true;
   const discoveryFailure=await collectMaterials(new AbortController().signal,failed,undefined,true);
   assert.deepEqual(discoveryFailure.resources,failed.resources);
   assert.equal(discoveryFailure.responses['active-courses'].successfulAt,failed.responses['active-courses'].successfulAt);
   assert.match(discoveryFailure.responses['active-courses'].error,/503/);
   (globalThis as any).__catalog=discoveryFailure;
-  assert.match(materialContext(1,2),/Course discovery/);
+  assert.match(materialContext({courseId:1,assignmentId:2}),/Course discovery/);
   discoveryFails=false;
   // Discover a newly observed page even while the full listing remains cached.
   (globalThis as any).__catalog={...first,responses:{...first.responses,[key]:{at:Date.now(),successfulAt:Date.now()-1000,value:[]}}};
@@ -70,12 +70,12 @@ test('Canvas collection to chat preserves requirements and successful freshness 
   // Page observations must reach chat before the background collector or disk.
   observeCanvasWork([{id:1,name:'Synthetic',course_code:'SYN'}],undefined,{...assignment,description:'Newest page requirements',rubric:undefined});
   await Promise.resolve();
-  const context=materialContext(1,2);
+  const context=materialContext({courseId:1,assignmentId:2});
   assert.match(context,/Newest page requirements/);
   assert.match(context,/Not returned by Canvas/);
   // Stall the actual fetch boundary while requesting another snapshot.
   t.mock.method(globalThis,'fetch',()=>new Promise(()=>{}));
   void syncMaterials(1,false,true);
-  assert.match(materialContext(1,2),/Newest page requirements/);
+  assert.match(materialContext({courseId:1,assignmentId:2}),/Newest page requirements/);
  }finally{delete (globalThis as any).__catalog;await rm(directory,{recursive:true,force:true})}
 });

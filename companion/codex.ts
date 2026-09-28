@@ -1,16 +1,8 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
-import {
-  mkdir,
-  readFile,
-  writeFile,
-  rename,
-  realpath,
-  unlink,
-} from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import lockfile from "proper-lockfile";
-import { randomUUID } from "node:crypto";
 import { createTapRoot, useResource, flushTapSync } from "@assistant-ui/tap";
 import { CodexClient, CodexTransport } from "@harness-sdk/codex";
 import { projectThread } from "@harness-sdk/codex/projection";
@@ -19,32 +11,33 @@ import type { Harness } from "harness-sdk";
 import { decodeMessage, encodeMessage } from "./vendor/harness-codex/json.ts";
 
 import { installBundledSkills } from "./skills.ts";
-import { prepareCodexHome } from "./codex-home.ts";
+import { prepareCodexHome, workspaceIdentity, type WorkspaceConfig } from "./codex-home.ts";
+import { atomicJson } from "./atomic-json.ts";
+export { atomicJson };
+export type { WorkspaceConfig };
 
+/** Rate-limit windows from the app-server, as percentages of the plan's included usage. */
+export type UsageWindows = {
+  primary?: { usedPercent: number; resetsAt?: number | null; windowMinutes?: number | null };
+  secondary?: { usedPercent: number; resetsAt?: number | null; windowMinutes?: number | null };
+};
+function usageWindows(snapshot: any): UsageWindows | undefined {
+  const window = (w: any) => w && Number.isFinite(w.usedPercent)
+    ? { usedPercent: w.usedPercent, resetsAt: w.resetsAt ?? null, windowMinutes: w.windowDurationMins ?? null } : undefined;
+  const primary = window(snapshot?.primary);
+  const secondary = window(snapshot?.secondary);
+  return primary || secondary ? { ...(primary ? { primary } : {}), ...(secondary ? { secondary } : {}) } : undefined;
+}
 export type RpcEvent = {
   method: string;
   params: Record<string, any>;
   id?: string | number;
-};
-export type WorkspaceConfig = {
-  version: 1;
-  workspaceId: string;
-  root: string;
 };
 function hasHistory(snapshot?: CodexTransport.Snapshot) {
   return Boolean(snapshot && (
     Object.keys(snapshot.submissions).length ||
     Object.values(snapshot.threads).some(thread => thread.turns.length)
   ));
-}
-export async function atomicJson(file: string, data: unknown) {
-  const temp = `${file}.${randomUUID()}.tmp`;
-  try {
-    await writeFile(temp, JSON.stringify(data, null, 2), { mode: 0o600 });
-    await rename(temp, file);
-  } finally {
-    await unlink(temp).catch(() => {});
-  }
 }
 
 /** Owns only the App Server child and the explicitly selected workspace. */
@@ -58,7 +51,14 @@ export class CodexRuntime {
   }[] = [];
   currentModel = "gpt-5.6-luna";
   currentEffort = "medium";
+  /** Codex sign-in state for the workspace's private home. Sign-in runs from the browser panel. */
+  account: { signedIn: boolean; email?: string; plan?: string; usageAllowed?: boolean; usage?: UsageWindows; error?: string } = { signedIn: false };
+  private usageRefresh?: ReturnType<typeof setTimeout>;
   config!: WorkspaceConfig;
+  /** Private state for this workspace outside the folder: Codex home, lock, journal, exports. */
+  stateDir!: string;
+  /** The private Codex home, where rollout transcripts live under sessions/. */
+  codexHome!: string;
   private child?: ChildProcessWithoutNullStreams;
   private regenerating = false;
   private transportRoot?: ReturnType<
@@ -108,10 +108,27 @@ export class CodexRuntime {
     if (this.transportRoot || this.releaseLock)
       throw new Error("Codex runtime is already started.");
     this.models = [];
-    const root = await realpath(this.root); // Never silently create a replacement root.
-    const dir = path.join(root, ".canvasdoc");
-    await mkdir(dir, { recursive: true });
-    this.releaseLock = await lockfile.lock(dir, {
+    // Never silently create a replacement root. Messages name the exact command so the panel can offer it.
+    const root = await realpath(this.root).catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+      throw new Error(
+        `Your Canvasdoc folder is missing at ${this.root}. Restore it, or if you moved it, run: npx canvasdoc-cli --folder "/new/location" --relocate`,
+      );
+    });
+    const configPath = path.join(root, ".canvasdoc", "config.json");
+    this.config = await workspaceIdentity(root);
+    if (this.config.root !== root) {
+      if (process.env.CANVASDOC_RELOCATE !== "1")
+        throw new Error(
+          `This Canvasdoc folder moved from ${this.config.root}. To resume it here, run: npx canvasdoc-cli --folder "${root}" --relocate`,
+        );
+      this.config.root = root;
+      await atomicJson(configPath, this.config);
+    }
+    const codexHome = await prepareCodexHome(root);
+    this.stateDir = codexHome.stateDir;
+    this.codexHome = codexHome.home;
+    this.releaseLock = await lockfile.lock(this.stateDir, {
       stale: 10000,
       update: 2000,
       retries: { retries: 24, minTimeout: 500, maxTimeout: 500, factor: 1 },
@@ -124,36 +141,6 @@ export class CodexRuntime {
       },
     });
     try {
-      const codexHome = await prepareCodexHome(root);
-      const configPath = path.join(dir, "config.json");
-      try {
-        const saved = JSON.parse(await readFile(configPath, "utf8"));
-        this.config = { version: saved.version, workspaceId: saved.workspaceId, root: saved.root };
-        if (
-          this.config.version !== 1 ||
-          !this.config.workspaceId ||
-          typeof this.config.root !== "string"
-        )
-          throw new Error(
-            "Workspace identity or location changed; explicit relocation is required.",
-          );
-        if (this.config.root !== root) {
-          if (process.env.CANVASDOC_RELOCATE !== "1")
-            throw new Error(
-              "This Canvasdoc folder moved. Run npx canvasdoc-cli --folder PATH --relocate to resume it here.",
-            );
-          this.config.root = root;
-          await atomicJson(configPath, this.config);
-        }
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
-        this.config = {
-          version: 1,
-          workspaceId: randomUUID(),
-          root,
-        };
-        await atomicJson(configPath, this.config);
-      }
       await installBundledSkills(root);
       const prefix: unknown = JSON.parse(
         process.env.CANVASDOC_CODEX_PREFIX || "[]",
@@ -342,37 +329,24 @@ export class CodexRuntime {
       flushTapSync(() => {});
       if (!this.connected)
         throw new Error(this.error ?? "Codex session recovery failed.");
-      const account = await this.rpc("account/read", {});
-      if (account.requiresOpenaiAuth && !account.account)
-        throw new Error(
-          "Run npx canvasdoc-cli for this folder to sign in to its private Codex home.",
-        );
-      try {
-        let cursor: string | null = null;
-        do {
-          const page = await this.rpc("model/list", {
-            cursor,
-            limit: 100,
-            includeHidden: false,
-          });
-          this.models.push(
-            ...page.data
-              .filter((m: any) => !m.hidden)
-              .map((m: any) => ({
-                id: m.model,
-                name: m.displayName,
-                description: m.description,
-                efforts: m.supportedReasoningEfforts.map(
-                  (e: any) => e.reasoningEffort,
-                ),
-                defaultEffort: m.defaultReasoningEffort,
-              })),
-          );
-          cursor = page.nextCursor;
-        } while (cursor && this.models.length < 1000);
-      } catch {
-        /* Sending requires a discovered model; keep the connection available to retry. */
-      }
+      // A signed-out home still starts; the panel drives sign-in and sending waits for it.
+      this.subscribe((event) => {
+        if (event.method === "account/login/completed") void this.finishLogin(event.params);
+        if (event.method === "account/rateLimits/updated" && this.account.signedIn) {
+          const usage = usageWindows(event.params.rateLimits);
+          if (usage) { this.account = { ...this.account, usage: { ...this.account.usage, ...usage } }; this.emit({ method: "canvasdoc/account", params: {} }); }
+        }
+        // A finished turn spent budget; refresh the windows shortly after so the selector stays honest.
+        if (event.method === "turn/completed" && this.account.signedIn) {
+          clearTimeout(this.usageRefresh);
+          this.usageRefresh = setTimeout(() => {
+            void this.readAccount().then(() => this.emit({ method: "canvasdoc/account", params: {} }), () => {});
+          }, 1500);
+          this.usageRefresh.unref?.();
+        }
+      });
+      await this.readAccount();
+      await this.loadModels();
       await this.transport.flush();
       return this.config;
     } catch (error) {
@@ -392,6 +366,67 @@ export class CodexRuntime {
   }
   rpc(method: string, params: Record<string, unknown> = {}): Promise<any> {
     return this.client.request(method, params);
+  }
+  private async readAccount() {
+    const response = await this.rpc("account/read", {});
+    const account = response.account;
+    this.account = account || !response.requiresOpenaiAuth
+      ? { signedIn: true, ...(account?.email ? { email: account.email } : {}), ...(account?.planType ? { plan: account.planType } : {}) }
+      : { signedIn: false };
+    if (!this.account.signedIn) return;
+    // Whether included usage is currently allowed; the panel warns before the first message fails.
+    try {
+      const limits = await this.rpc("account/rateLimits/read", {});
+      if (typeof limits?.ordinaryUsageAllowed === "boolean") this.account.usageAllowed = limits.ordinaryUsageAllowed;
+      if (!this.account.plan && typeof limits?.rateLimits?.planType === "string") this.account.plan = limits.rateLimits.planType;
+      const usage = usageWindows(limits?.rateLimits);
+      if (usage) this.account.usage = usage;
+    } catch {
+      /* Rate limits are advisory; sending still reports the real error. */
+    }
+  }
+  private async loadModels() {
+    const models: CodexRuntime["models"] = [];
+    try {
+      let cursor: string | null = null;
+      do {
+        const page = await this.rpc("model/list", { cursor, limit: 100, includeHidden: false });
+        models.push(
+          ...page.data
+            .filter((m: any) => !m.hidden)
+            .map((m: any) => ({
+              id: m.model,
+              name: m.displayName,
+              description: m.description,
+              efforts: m.supportedReasoningEfforts.map((e: any) => e.reasoningEffort),
+              defaultEffort: m.defaultReasoningEffort,
+            })),
+        );
+        cursor = page.nextCursor;
+      } while (cursor && models.length < 1000);
+      this.models = models;
+    } catch {
+      /* Sending requires a discovered model; keep the connection available to retry. */
+    }
+  }
+  /** Starts the ChatGPT OAuth flow in the private home. The browser opens the returned URL. */
+  async login(): Promise<{ authUrl: string; loginId: string }> {
+    const response = await this.rpc("account/login/start", { type: "chatgpt" });
+    if (response.type !== "chatgpt" || typeof response.authUrl !== "string")
+      throw new Error("Codex did not offer a browser sign-in.");
+    this.account = { ...this.account, error: undefined };
+    return { authUrl: response.authUrl, loginId: response.loginId };
+  }
+  private async finishLogin(params: Record<string, any>) {
+    try {
+      if (params.success) {
+        await this.readAccount();
+        await this.loadModels();
+      } else this.account = { ...this.account, error: typeof params.error === "string" ? params.error : "Codex sign-in did not finish." };
+    } catch (error) {
+      this.account = { ...this.account, error: (error as Error).message };
+    }
+    this.emit({ method: "canvasdoc/account", params: {} });
   }
   private configureTurn(requestId: string, model = this.currentModel, effort?: string) {
     const selected = this.models.find((m) => m.id === model);
@@ -560,6 +595,7 @@ export class CodexRuntime {
     };
   }
   async close() {
+    clearTimeout(this.usageRefresh);
     const child = this.child;
     this.child = undefined;
     this.unsubscribeClient?.();

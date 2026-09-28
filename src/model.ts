@@ -31,6 +31,27 @@ export function pageContext(
       title,
       href: pathname,
     };
+  // Graded quizzes and discussions are also assignments; resolveCoursework re-keys them to the assignment thread.
+  const quiz = pathname.match(/^\/courses\/(\d+)\/quizzes\/(\d+)(?:\/(?:take|history|statistics))?\/?$/);
+  if (quiz)
+    return {
+      kind: "quiz",
+      threadId: `quiz:${quiz[1]}:${quiz[2]}`,
+      courseId: Number(quiz[1]),
+      quizId: Number(quiz[2]),
+      title,
+      href: `/courses/${quiz[1]}/quizzes/${quiz[2]}`,
+    };
+  const discussion = pathname.match(/^\/courses\/(\d+)\/discussion_topics\/(\d+)\/?$/);
+  if (discussion)
+    return {
+      kind: "discussion",
+      threadId: `discussion:${discussion[1]}:${discussion[2]}`,
+      courseId: Number(discussion[1]),
+      discussionId: Number(discussion[2]),
+      title,
+      href: `/courses/${discussion[1]}/discussion_topics/${discussion[2]}`,
+    };
   if (pathname === "/" || pathname === "/dashboard")
     return { kind: "home", threadId: "home", title: "Dashboard", href: "/" };
   const course = pathname.match(/^\/courses\/(\d+)/);
@@ -42,6 +63,10 @@ export function pageContext(
     href: pathname,
   };
 }
+
+/** Pages that get the assignment treatment: the real Canvas page with the attached conversation and workspace. */
+export const isCoursework = (kind: PageContext["kind"]) => kind === "assignment" || kind === "quiz" || kind === "discussion";
+export const courseworkLabel = (kind: PageContext["kind"]) => kind === "quiz" ? "Quiz" : kind === "discussion" ? "Discussion" : "Assignment";
 
 export function safeLink(value: string, origin: string): string | null {
   try {

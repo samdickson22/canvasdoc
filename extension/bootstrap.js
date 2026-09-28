@@ -1,7 +1,7 @@
 // Run before Canvas paints. A timeout always restores Canvas if the app cannot mount.
 (() => {
   if (location.pathname.startsWith('/login') || document.documentElement.classList.contains('canvasdoc-booting')) return;
-  const mainView = location.pathname === '/' || /^\/courses\/\d+\/assignments\/\d+/.test(location.pathname);
+  const mainView = location.pathname === '/' || /^\/courses\/\d+\/(assignments|quizzes|discussion_topics)\/\d+/.test(location.pathname);
   document.documentElement.toggleAttribute('data-canvasdoc-boot-sidebar', mainView && innerWidth > 1100);
   document.documentElement.classList.add('canvasdoc-booting');
   performance.mark('canvasdoc:boot');

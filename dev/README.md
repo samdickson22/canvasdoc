@@ -59,7 +59,7 @@ CANVASDOC_CONNECTOR_PORT=3228 CANVASDOC_CONFIG_DIR="$PWD/dev/.state/cli" \
   --folder "$PWD/dev/.state/workspace" --origin http://localhost:3210 --no-open --no-extension
 ```
 
-The first run opens Codex sign-in for this workspace's private home. Sign in independently on each machine; do not copy credentials or sessions from the desktop app or the other Mac. The development CLI settings and synthetic workspace stay under ignored `dev/.state/`. Port 3228 keeps this connector separate from the usual port 3218. Pair the development page with `ws://127.0.0.1:3228` and the token in `dev/.state/workspace/.canvasdoc/dev-connection-token`. For a worktree preview, use that preview's origin instead.
+The first run opens Codex sign-in for this workspace's private home. Sign in independently on each machine; do not copy credentials or sessions from the desktop app or the other Mac. The development CLI settings and synthetic workspace stay under ignored `dev/.state/`. Port 3228 keeps this connector separate from the usual port 3218. Pair the development page with `ws://127.0.0.1:3228` and the token in `connection-token` under the workspace's state directory (`~/Library/Application Support/Canvasdoc/workspaces/<workspaceId>/`, or `CANVASDOC_STATE_DIR` when set). For a worktree preview, use that preview's origin instead.
 
 Fixtures include three courses, nine assignments, sample text submissions, and course pages. `dev/.state/fixtures.json` records their IDs after a successful seed. Re-running the seed reuses those records.
 
@@ -73,6 +73,6 @@ The environment is not verified until a real student login, dashboard, and assig
 
 Run `npm run build` and `node dev/preview.mjs` from the worktree. The preview listens on `127.0.0.1:3240`, forwards Canvas requests to the existing development server on port 3210, and serves `/canvasdoc/` assets only from that worktree's `dist`. It does not copy over another checkout's build. `CANVASDOC_PREVIEW_PORT` and `CANVASDOC_CANVAS_UPSTREAM` override those local addresses.
 
-For remote T3 preview access, expose this port with a private Tailscale Serve route, then start the CLI with that preview origin. For example, `tailscale serve --bg --https=3241 http://127.0.0.1:3240` makes the preview available on the machine's tailnet hostname at port 3241. Pass that HTTPS origin to `canvasdoc-cli --origin`. Keep the connector's workspace and token when restarting it. Each browser tab still needs its development connection paired.
+For remote T3 preview access, expose this port with a private Tailscale Serve route, then start the CLI with that preview origin. For example, `tailscale serve --bg --https=3241 http://127.0.0.1:3240` makes the preview available on the machine's tailnet hostname at port 3241. Pass that HTTPS origin to `canvasdoc-cli --origin`. Keep the connector's workspace and token when restarting it. Each browser tab still needs its development connection paired. If Canvas rejects the tailnet hostname with a blocked-host error, set `CANVASDOC_PREVIEW_HOST=localhost:3210` so the proxy presents an allowed host and rewrites redirects back to the preview origin.
 
 The asset response includes `X-Canvasdoc-Checkout` and disables caching, so a preview can verify which checkout it is running. The proxy is for the synthetic development Canvas instance only.

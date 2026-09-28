@@ -18,6 +18,7 @@ export async function serve(mode, threadId) {
   let active,
     pending,
     timers = [];
+  let signedOut = process.env.CANVASDOC_FIXTURE_SIGNED_OUT === "1";
   const later = (fn, ms) => timers.push(setTimeout(fn, ms));
   const delta = (text) => {
     if (!active) return;
@@ -103,7 +104,19 @@ export async function serve(mode, threadId) {
       continue;
     }
     let result = {};
-    if (m.method === "account/read") result = { requiresOpenaiAuth: false };
+    // CANVASDOC_FIXTURE_SIGNED_OUT starts signed out; account/login/start completes the sign-in.
+    if (m.method === "account/read")
+      result = signedOut ? { account: null, requiresOpenaiAuth: true }
+        : { requiresOpenaiAuth: true, account: { type: "chatgpt", email: "student@example.edu", planType: "plus" } };
+    if (m.method === "account/rateLimits/read")
+      result = { ordinaryUsageAllowed: process.env.CANVASDOC_FIXTURE_USAGE !== "blocked", rateLimits: { planType: "plus", primary: { usedPercent: 12 } } };
+    if (m.method === "account/login/start") {
+      result = { type: "chatgpt", loginId: "login-1", authUrl: "https://auth.example/oauth?login=1" };
+      later(() => {
+        signedOut = false;
+        emit({ method: "account/login/completed", params: { loginId: "login-1", success: true, error: null } });
+      }, 150);
+    }
     if (["thread/start", "thread/resume", "thread/read"].includes(m.method))
       result = { thread, model: "gpt-6-astra", reasoningEffort: "medium" };
     if (m.method === "thread/fork") {

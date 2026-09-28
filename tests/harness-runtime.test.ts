@@ -1,9 +1,12 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { CodexRuntime, type RpcEvent } from "../companion/codex.ts";
+// Private runtime state goes to a temporary directory, never the developer's Application Support.
+process.env.CANVASDOC_STATE_DIR = await mkdtemp(path.join(os.tmpdir(), "canvasdoc-state-"));
+after(() => rm(process.env.CANVASDOC_STATE_DIR!, { recursive: true, force: true }));
 
 function nextEvent(runtime: CodexRuntime, method: string) {
   return new Promise<RpcEvent>((resolve, reject) => {

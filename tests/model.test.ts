@@ -99,3 +99,20 @@ test("personal tasks validate dates and keep official Canvas fields out of their
   assert.equal(task.completed, false);
   assert.equal("submission" in task, false);
 });
+
+test("quiz and discussion pages get their own stable threads before resolution", async () => {
+  const { isCoursework, courseworkLabel } = await import("../src/model.ts");
+  const quiz = pageContext("/courses/3/quizzes/44", "", "Week 2 quiz");
+  assert.equal(quiz.kind, "quiz");
+  assert.equal(quiz.threadId, "quiz:3:44");
+  assert.equal(quiz.quizId, 44);
+  assert.equal(pageContext("/courses/3/quizzes/44/take", "?preview=1", "Taking").threadId, "quiz:3:44");
+  assert.equal(quiz.href, "/courses/3/quizzes/44");
+  const discussion = pageContext("/courses/3/discussion_topics/9/", "", "Intro post");
+  assert.equal(discussion.kind, "discussion");
+  assert.equal(discussion.threadId, "discussion:3:9");
+  assert.equal(discussion.discussionId, 9);
+  assert.equal(pageContext("/courses/3/discussion_topics", "", "Discussions").kind, "page");
+  assert.ok(isCoursework("quiz") && isCoursework("discussion") && isCoursework("assignment") && !isCoursework("page"));
+  assert.equal(courseworkLabel("discussion"), "Discussion");
+});

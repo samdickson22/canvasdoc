@@ -71,8 +71,11 @@ export type PageContext = {
   threadId: string;
   title: string;
   href: string;
-  kind: "home" | "assignment" | "page" | "personal";
+  kind: "home" | "assignment" | "quiz" | "discussion" | "page" | "personal";
   courseId?: number;
   assignmentId?: number;
+  /** Set on quiz and discussion pages, including graded ones that resolve to an assignment thread. */
+  quizId?: number;
+  discussionId?: number;
   taskId?: string;
 };

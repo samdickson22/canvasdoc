@@ -6,9 +6,9 @@ Canvas owns official course data and submission state. Browser extension storage
 
 One main Codex agent runs from that root through Harness SDK. Assignment directories organize files; they do not create independent main sessions. Harness owns execution and recovery, while Canvasdoc routes messages and tracks browser delivery. See [transport ownership](../companion/vendor/harness-codex/README.md).
 
-The agent's working directory is the selected workspace. Its `CODEX_HOME` is the private `.canvasdoc/codex-home/` directory within that workspace. Sign-in, native sessions, and Codex settings live there, separate from the desktop app's default home. The launcher and companion also keep SQLite-backed Codex state in that private directory. They do not copy credentials or change the desktop app's configuration.
+The agent's working directory is the selected workspace. Its `CODEX_HOME` is a private directory outside that folder, `~/Library/Application Support/Canvasdoc/workspaces/<workspaceId>/codex-home/` (`CANVASDOC_STATE_DIR` overrides the parent for tests). Sign-in, native sessions, Codex settings, and SQLite state live there, separate from the desktop app's default home. The runtime lock, delivery journal, connection token, and history exports sit beside it. Documents can therefore sync to iCloud without touching locks, databases, or credentials. The launcher and companion do not copy credentials or change the desktop app's configuration.
 
-`config.json` under `.canvasdoc/` owns the workspace identity and location. The private home's `harness.json` owns the native thread ID, execution snapshot, and per-request model settings. A fresh private home starts a fresh agent; saved thread IDs and execution snapshots outside that home are not loaded. Browser conversations, delivery receipts, files, and workspace skills keep their existing locations.
+`config.json` under the workspace's `.canvasdoc/` owns the workspace identity and location, and its `workspaceId` names the private state directory. `account.json`, the bundled-skill manifest, material receipts, and the extraction ledger stay in the folder because they describe files in it. The private home's `harness.json` owns the native thread ID, execution snapshot, and per-request model settings. A fresh private home starts a fresh agent; saved thread IDs and execution snapshots outside that home are not loaded.
 
 ## Agent guidance and learned skills
 
@@ -36,6 +36,6 @@ Preserve conversation identity, drafts, history, pending approvals, and running 
 
 ## Recovery backups
 
-Browser history exports to `.canvasdoc/` as a recovery backup. Browser state remains primary; exports are not a second application database or competing writer. They run after browser commits, with debounce/coalescing, atomic writes, and reconnect retries.
+Browser history exports to the workspace's private state directory as a recovery backup. Browser state remains primary; exports are not a second application database or competing writer. They run after browser commits, with debounce/coalescing, atomic writes, and reconnect retries.
 
 Ordinary navigation and drafting must not wait for disk or the companion. Restoring exported history is explicit and must not silently replace newer browser data. The companion's delivery journal tracks routing and receipts for reconnect recovery; it must not become another execution queue.

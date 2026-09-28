@@ -12,7 +12,7 @@ test('a stalled material collector cannot block a chat context snapshot',async()
    b.onLoad({filter:/.*/,namespace:'stub'},args=>({contents:args.path==='react'?'export const useSyncExternalStore=()=>{}':args.path==='./material-collector'?'export const collectMaterials=()=>new Promise(()=>{});export const sha256=()=>{}':args.path==='./store'?'export const store={account:()=>"test",get:()=>({}),saveMaterials:()=>{}}':'export const connectionState=()=>({status:"disconnected"});export const materialRequest=()=>{};export const subscribeConnection=()=>()=>{}'}));
   }}]});
   const {materialContext}=await import(pathToFileURL(outfile).href);
-  const context=materialContext(1);
+  const context=materialContext({courseId:1});
   assert.equal(typeof context,'string');
   assert.match(context,/Use directory listings and search/);
   assert.match(context,/not confirmed in this browser session/);

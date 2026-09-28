@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { ModelSelector } from './assistant-ui/components/assistant-ui/elements/model-selector.aui';
 import { useConnection } from './runtime/client';
 import { store, useData } from './store';
+import { usageSummary } from './runtime/plan';
 export function CodexModelSelector() {
   const connection=useConnection();
   const data=useData();
@@ -10,5 +11,9 @@ export function CodexModelSelector() {
   const value=data.model?.id ?? connection.currentModel ?? models[0]?.id;
   if(!models.length)return <span className="model-unavailable" title="Connect an updated Canvasdoc CLI to load available models">{connection.currentModel || 'Codex'}</span>;
   const effort=data.model?.effort ?? (value===connection.currentModel ? connection.currentEffort : undefined) ?? catalog?.find(m=>m.id===value)?.defaultEffort;
-  return <ModelSelector models={models} value={value} effort={effort} onValueChange={id=>{const m=catalog?.find(m=>m.id===id);void store.setModel(id,m?.efforts.includes(effort||'')?effort:m?.defaultEffort)}} onEffortChange={effort=>{if(value)void store.setModel(value,effort)}} searchable size="sm" align="end" className="codex-model-trigger"/>;
+  const usage=usageSummary(connection.usage);
+  return <>
+    {usage && <span className="codex-usage" data-warning={usage.warning || undefined} title={usage.detail} aria-label={usage.detail}>{usage.text}</span>}
+    <ModelSelector models={models} value={value} effort={effort} onValueChange={id=>{const m=catalog?.find(m=>m.id===id);void store.setModel(id,m?.efforts.includes(effort||'')?effort:m?.defaultEffort)}} onEffortChange={effort=>{if(value)void store.setModel(value,effort)}} searchable size="sm" align="end" className="codex-model-trigger"/>
+  </>;
 }

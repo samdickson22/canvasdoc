@@ -365,6 +365,8 @@ select {
 }
 .connection-content > p { margin: 0; }
 .connection-content > button { align-self: flex-start; }
+.diagnostics-toggle { display: flex; gap: 8px; align-items: flex-start; font-size: 12px; color: #5b6357; line-height: 1.4; }
+.diagnostics-toggle input { margin-top: 2px; }
 .connection-content .error { margin: 0; overflow-wrap: anywhere; }
 .personal-page {
   padding: 35px 42px;

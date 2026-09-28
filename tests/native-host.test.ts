@@ -18,7 +18,7 @@ test('Chrome bridge connects without access to the workspace directory',async()=
   await build({entryPoints:['cli/native-setup.mjs'],outfile:path.join(temp,'setup.mjs'),bundle:true,platform:'node',format:'esm'});
   const {registerNative}=await import(pathToFileURL(path.join(temp,'setup.mjs')).href);
   const chrome=path.join(temp,'Application Support/Chrome/NativeMessagingHosts');
-  await registerNative(root,'oapolkgbmjlpnfeakajjgigbkikphdjj','https://canvas.calpoly.edu',port,chrome,path.join(temp,'Application Support/Canvasdoc'));
+  await registerNative(path.join(root,'.canvasdoc/dev-connection-token'),'oapolkgbmjlpnfeakajjgigbkikphdjj','https://canvas.calpoly.edu',port,chrome,path.join(temp,'Application Support/Canvasdoc'));
   const manifest=JSON.parse(await readFile(path.join(chrome,'com.canvasdoc.connector.json'),'utf8'));
   await rename(path.join(temp,'Documents'),path.join(temp,'Documents-unavailable'));
   child=spawn(manifest.path,[],{stdio:['pipe','pipe','pipe']});
@@ -111,4 +111,64 @@ test('native host forwards a 9 MB backup and skips an oversized message without 
   await until(()=>received.includes(small.length),'connection did not survive the oversized message');
   assert.equal(child.exitCode,null);
  }finally{child?.kill();for(const socket of server.clients)socket.terminate();server.close();await rm(temp,{recursive:true,force:true})}
+});
+
+test('native host kickstarts the service and keeps dialing until the connector listens',{timeout:15000},async()=>{
+ const temp=await mkdtemp(path.join(os.tmpdir(),'canvasdoc-native-retry-'));
+ const reservation=new WebSocketServer({host:'127.0.0.1',port:0});await new Promise<void>(r=>reservation.on('listening',r));
+ const port=(reservation.address() as {port:number}).port;
+ await new Promise<void>(r=>reservation.close(()=>r()));
+ let child:ReturnType<typeof spawn>|undefined;let server:WebSocketServer|undefined;
+ try{
+  await build({entryPoints:['companion/native-host.ts'],outfile:path.join(temp,'host.mjs'),bundle:true,platform:'node',format:'esm',banner:{js:'import {createRequire} from "node:module";const require=createRequire(import.meta.url);'}});
+  const kicked=path.join(temp,'kicked');
+  await writeFile(path.join(temp,'connection.json'),JSON.stringify({origin:'http://localhost:3210',port,token:'synthetic',kickstart:[process.execPath,'-e',`require("fs").writeFileSync(${JSON.stringify(kicked)},"1")`]}));
+  child=spawn(process.execPath,[path.join(temp,'host.mjs'),'--connection-config',path.join(temp,'connection.json')],{stdio:['pipe','pipe','pipe']});
+  const hello=Buffer.from(JSON.stringify({type:'connect',account:'canvasdoc:v1:http://localhost:3210:synthetic'}));const header=Buffer.alloc(4);header.writeUInt32LE(hello.length);child.stdin!.write(Buffer.concat([header,hello]));
+  const packets:any[]=[];let buffer=Buffer.alloc(0);
+  const first=new Promise<any>((resolve,reject)=>{child!.on('error',reject);child!.stdout!.on('data',data=>{buffer=Buffer.concat([buffer,data]);while(buffer.length>=4&&buffer.length>=4+buffer.readUInt32LE(0)){const n=buffer.readUInt32LE(0);packets.push(JSON.parse(buffer.subarray(4,4+n).toString()));buffer=buffer.subarray(4+n);resolve(packets[0])}})});
+  // The connector comes up only after the bridge has already been refused at least once.
+  await new Promise(r=>setTimeout(r,2200));
+  assert.equal(await readFile(kicked,'utf8'),'1');
+  assert.equal(packets.length,0);
+  server=new WebSocketServer({host:'127.0.0.1',port});await new Promise<void>(r=>server!.on('listening',r));
+  server.on('connection',socket=>socket.on('message',bytes=>{assert.equal(JSON.parse(bytes.toString()).token,'synthetic');socket.send(JSON.stringify({type:'connected'}))}));
+  assert.equal((await first).type,'connected');
+ }finally{child?.kill();if(server){for(const socket of server.clients)socket.terminate();server.close()}await rm(temp,{recursive:true,force:true})}
+});
+
+test('native host reports the connector\'s own start failure from the service log',{timeout:15000},async()=>{
+ const temp=await mkdtemp(path.join(os.tmpdir(),'canvasdoc-native-failure-'));
+ const reservation=new WebSocketServer({host:'127.0.0.1',port:0});await new Promise<void>(r=>reservation.on('listening',r));
+ const port=(reservation.address() as {port:number}).port;await new Promise<void>(r=>reservation.close(()=>r()));
+ let child:ReturnType<typeof spawn>|undefined;
+ try{
+  await build({entryPoints:['companion/native-host.ts'],outfile:path.join(temp,'host.mjs'),bundle:true,platform:'node',format:'esm',banner:{js:'import {createRequire} from "node:module";const require=createRequire(import.meta.url);'}});
+  const log=path.join(temp,'connector.log');
+  await writeFile(log,'{"ready":true,"port":1}\nCanvasdoc: This Canvasdoc folder moved from /old. To resume it here, run: npx canvasdoc-cli --folder "/new" --relocate\n');
+  await writeFile(path.join(temp,'connection.json'),JSON.stringify({origin:'http://localhost:3210',port,token:'synthetic',log,dialTimeoutMs:1500}));
+  child=spawn(process.execPath,[path.join(temp,'host.mjs'),'--connection-config',path.join(temp,'connection.json')],{stdio:['pipe','pipe','pipe']});
+  const packet=await new Promise<any>((resolve,reject)=>{let buffer=Buffer.alloc(0);child!.on('error',reject);child!.stdout!.on('data',d=>{buffer=Buffer.concat([buffer,d]);if(buffer.length>=4&&buffer.length>=4+buffer.readUInt32LE(0))resolve(JSON.parse(buffer.subarray(4,4+buffer.readUInt32LE(0)).toString()))})});
+  assert.equal(packet.type,'error');
+  assert.equal(packet.code,'connector_failed');
+  assert.match(packet.message,/^Canvasdoc could not start: This Canvasdoc folder moved from \/old\./);
+  assert.match(packet.message,/run: npx canvasdoc-cli --folder "\/new" --relocate$/);
+ }finally{child?.kill();await rm(temp,{recursive:true,force:true})}
+});
+
+test('native host reports a missing service immediately when launchd refuses the kickstart',{timeout:15000},async()=>{
+ const temp=await mkdtemp(path.join(os.tmpdir(),'canvasdoc-native-missing-'));
+ const reservation=new WebSocketServer({host:'127.0.0.1',port:0});await new Promise<void>(r=>reservation.on('listening',r));
+ const port=(reservation.address() as {port:number}).port;await new Promise<void>(r=>reservation.close(()=>r()));
+ let child:ReturnType<typeof spawn>|undefined;
+ try{
+  await build({entryPoints:['companion/native-host.ts'],outfile:path.join(temp,'host.mjs'),bundle:true,platform:'node',format:'esm',banner:{js:'import {createRequire} from "node:module";const require=createRequire(import.meta.url);'}});
+  await writeFile(path.join(temp,'connection.json'),JSON.stringify({origin:'http://localhost:3210',port,token:'synthetic',kickstart:[process.execPath,'-e','process.exit(113)'],dialTimeoutMs:20000}));
+  const started=Date.now();
+  child=spawn(process.execPath,[path.join(temp,'host.mjs'),'--connection-config',path.join(temp,'connection.json')],{stdio:['pipe','pipe','pipe']});
+  const packet=await new Promise<any>((resolve,reject)=>{let buffer=Buffer.alloc(0);child!.on('error',reject);child!.stdout!.on('data',d=>{buffer=Buffer.concat([buffer,d]);if(buffer.length>=4&&buffer.length>=4+buffer.readUInt32LE(0))resolve(JSON.parse(buffer.subarray(4,4+buffer.readUInt32LE(0)).toString()))})});
+  assert.equal(packet.code,'connector_failed');
+  assert.match(packet.message,/not installed/);
+  assert.ok(Date.now()-started<5000,'should not wait for the dial deadline');
+ }finally{child?.kill();await rm(temp,{recursive:true,force:true})}
 });

@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import {
   mkdtemp,
@@ -12,6 +12,10 @@ import {
 import path from "node:path";
 import os from "node:os";
 import { CodexRuntime } from "../companion/codex.ts";
+import { workspaceStateDir } from "../companion/codex-home.ts";
+// Private runtime state goes to a temporary directory, never the developer's Application Support.
+process.env.CANVASDOC_STATE_DIR = await mkdtemp(path.join(os.tmpdir(), "canvasdoc-state-"));
+after(() => rm(process.env.CANVASDOC_STATE_DIR!, { recursive: true, force: true }));
 async function workspace(t: any) {
   const root = await realpath(
     await mkdtemp(path.join(os.tmpdir(), "canvasdoc-harness-recovery-")),
@@ -71,7 +75,7 @@ test("a snapshot write failure blocks execution and still releases the process a
   const root = await workspace(t);
   const runtime = new CodexRuntime(root, process.execPath);
   await runtime.start();
-  const snapshot = path.join(root, ".canvasdoc/codex-home/harness.json");
+  const snapshot = path.join(runtime.stateDir, "codex-home/harness.json");
   await rename(snapshot, snapshot + ".backup");
   await mkdir(snapshot);
   await assert.rejects(
@@ -84,7 +88,7 @@ test("a snapshot write failure blocks execution and still releases the process a
   const pid = Number(await readFile(path.join(root, "child.pid"), "utf8"));
   await assert.rejects(runtime.close());
   assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
-  await assert.rejects(readFile(path.join(root, ".canvasdoc.lock")), {
+  await assert.rejects(readFile(`${runtime.stateDir}.lock`), {
     code: "ENOENT",
   });
 });
@@ -116,11 +120,13 @@ test("an unconfirmed lost response stays blocked after restart instead of being 
 
 test("a used private session cannot silently resume as another native thread", async (t) => {
   const root = await workspace(t);
-  await mkdir(path.join(root, ".canvasdoc/codex-home"), {recursive: true});
+  const home = path.join(workspaceStateDir("existing-workspace"), "codex-home");
+  await mkdir(home, {recursive: true});
+  await mkdir(path.join(root, ".canvasdoc"));
   await writeFile(path.join(root, ".canvasdoc/config.json"), JSON.stringify({
     version: 1, workspaceId: "existing-workspace", root,
   }));
-  const snapshotPath = path.join(root, ".canvasdoc/codex-home/harness.json");
+  const snapshotPath = path.join(home, "harness.json");
   const threadId = "different-used-session";
   await writeFile(snapshotPath, JSON.stringify({version: 1, workspaceId: "existing-workspace", snapshot: {
     activeThreadId: threadId,

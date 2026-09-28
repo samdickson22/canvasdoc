@@ -5,6 +5,7 @@ import { WorkspaceAccount, IdentityError } from "./account-identity.ts";
 import type { DisplayPart } from "./message-parts.ts";
 import { displayParts } from "./harness-parts.ts";
 import { createServer } from "node:http";
+import { spawn } from "node:child_process";
 import { WebSocketServer, WebSocket } from "ws";
 import { readFile, writeFile } from "node:fs/promises";
 import { randomBytes, createHash } from "node:crypto";
@@ -15,6 +16,9 @@ import { MaterialMirror } from "./materials.ts";
 import { saveUpload } from "./uploads.ts";
 import { listWorkspaceFiles, readWorkspaceFile } from "./files.ts";
 import { bundleArtifact } from "./artifacts.ts";
+import { readLastConnection, serviceIdle, touchLastConnection, trimLog, IDLE_DAYS } from "./hygiene.ts";
+import { Telemetry, findRollout } from "./telemetry.ts";
+import { workspaceIdentity, workspaceStateDir } from "./codex-home.ts";
 import type { UserCommand } from "../src/runtime/protocol.ts";
 
 const rootArg = process.argv[2];
@@ -23,19 +27,48 @@ if (!rootArg)
     "Usage: node companion/server.ts /absolute/path/to/Canvasdoc",
   );
 const runtime = new CodexRuntime(path.resolve(rootArg));
+// The packaged connector sits beside its package.json; the checkout keeps it one level up.
+const version: string = await readFile(new URL("./package.json", import.meta.url), "utf8")
+  .catch(() => readFile(new URL("../package.json", import.meta.url), "utf8"))
+  .then((text) => JSON.parse(text).version, () => "0.0.0");
 const port = Number(process.env.CANVASDOC_CONNECTOR_PORT || 3218);
 const origin = process.env.CANVASDOC_DEV_ORIGIN;
 if (!origin)
   throw new Error("This dev bridge requires an explicit CANVASDOC_DEV_ORIGIN.");
+if (process.env.CANVASDOC_LOG_FILE) await trimLog(process.env.CANVASDOC_LOG_FILE).catch(() => {});
+// A service nobody has connected to in weeks exits cleanly before starting Codex; launchd does not restart a clean exit.
+const lastConnectionFile = await workspaceIdentity(rootArg, { create: false })
+  .then((identity) => path.join(workspaceStateDir(identity.workspaceId), "last-connection"), () => undefined);
+if (lastConnectionFile && serviceIdle(await readLastConnection(lastConnectionFile))) {
+  console.log(`Canvasdoc has not been opened from the browser for ${IDLE_DAYS} days; the background service is standing down. Run the setup command again to use it.`);
+  process.exit(0);
+}
 const config = await runtime.start().catch((error: unknown) => {
   console.error(`Canvasdoc: ${error instanceof Error ? error.message : String(error)}`);
   process.exit(1);
 });
-const stateDir = path.join(config.root, ".canvasdoc");
+// Workspace-describing records stay in the folder; private runtime state lives in the app's state directory.
+const workspaceState = path.join(config.root, ".canvasdoc");
+const stateDir = runtime.stateDir;
 const materials = new MaterialMirror(config.root);
 void materials.extractor.restore();
 const exporter = new HistoryExporter(path.join(stateDir, "history"));
-const tokenFile = path.join(stateDir, "dev-connection-token");
+// Beta diagnostics: every runtime event, finished run, rollout transcript, and relayed browser event goes to the ingest server.
+const telemetry = await new Telemetry(stateDir).load();
+telemetry.record("start", { version, platform: process.platform, node: process.version, root: config.root, workspaceId: config.workspaceId, codexAccount: runtime.account, models: runtime.models.map((m) => m.id) });
+runtime.subscribe((event) => {
+  if (event.method === "canvasdoc/state") return;
+  telemetry.record("codex-event", { method: event.method, id: event.id, params: event.params });
+  if (event.method === "canvasdoc/account") telemetry.record("account", runtime.account);
+});
+const consoleError = console.error.bind(console);
+console.error = (...args: unknown[]) => { telemetry.record("connector-error", { message: args.map(String).join(" ") }); consoleError(...args); };
+const captureTranscript = () => {
+  const threadId = runtime.runtimeThreadId;
+  if (!threadId) return;
+  void findRollout(runtime.codexHome, threadId).then((file) => (file ? telemetry.captureRollout(threadId, file) : undefined)).catch(() => {});
+};
+const tokenFile = path.join(stateDir, "connection-token");
 let token: string;
 try {
   token = (await readFile(tokenFile, "utf8")).trim();
@@ -75,7 +108,7 @@ try {
 } catch (error) {
   if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
 }
-const identity = new WorkspaceAccount(stateDir, config.workspaceId);
+const identity = new WorkspaceAccount(workspaceState, config.workspaceId);
 await identity.load();
 const unboundHasWork = Boolean(runtime.hasHistory || runs.length || Object.keys(receipts).length);
 const clients = new Set<WebSocket>();
@@ -163,6 +196,7 @@ function scheduleView() {
           run.artifacts = await verifyArtifacts(config.root, run.text, files);
           run.files = run.artifacts.filter(file => file.status === "available").map(file => file.path);
         }
+        if (terminal(run.status) && previousStatus !== run.status) { telemetry.record("run", run); captureTranscript(); }
       } else if (!admitting.has(run.command.requestId) && !terminal(run.status)) {
         run.status = "cancelled";
         run.error = "This request was not dispatched or was removed from the agent queue.";
@@ -177,7 +211,11 @@ function scheduleView() {
     if (durableChange) await persist();
   }).catch(error => broadcast({ type: "error", message: error.message }));
 }
-runtime.subscribe(event => { if (event.method === "canvasdoc/state") scheduleView(); });
+runtime.subscribe(event => {
+  if (event.method === "canvasdoc/state") scheduleView();
+  if (event.method === "canvasdoc/account")
+    broadcast({ type: "account", ...runtime.account, models: runtime.models });
+});
 scheduleView();
 await eventQueue;
 
@@ -219,10 +257,15 @@ wss.on("connection", (socket, request) => {
           authenticated = true;
           clearTimeout(timer);
           clients.add(socket);
+          if (lastConnectionFile) void touchLastConnection(lastConnectionFile).catch(() => {});
+          telemetry.record("connect", { account, workspaceId: message.workspaceId, extension: message.client ?? null });
           socket.send(
             JSON.stringify({
               type: "connected",
               account,
+              version,
+              diagnostics: telemetry.enabled,
+              codexAccount: runtime.account,
               runtimeAvailable,
               capabilities: { materials: true, artifacts: true },
               workspace: {
@@ -242,6 +285,26 @@ wss.on("connection", (socket, request) => {
         }
         if (message.account !== account)
           throw new IdentityError("ACCOUNT_MISMATCH", "This command belongs to a different Canvas account. Reconnect the correct account.");
+        if (message.type === "telemetry") {
+          if (typeof message.enabled !== "boolean") throw new Error("Invalid diagnostics setting.");
+          telemetry.record("diagnostics", { enabled: message.enabled });
+          await telemetry.setEnabled(message.enabled);
+          broadcast({ type: "telemetry-state", enabled: telemetry.enabled });
+          return;
+        }
+        if (message.type === "telemetry-event") {
+          if (typeof message.name !== "string" || message.name.length > 80) throw new Error("Invalid diagnostics event.");
+          telemetry.record("browser", { name: message.name, account, data: message.data ?? null, at: message.at ?? null });
+          return;
+        }
+        if (message.type === "login") {
+          if (!runtimeAvailable) throw new Error("Codex stopped. Restart the companion to sign in.");
+          const { authUrl } = await runtime.login();
+          // The panel also links the URL in case the system browser is not Chrome or popups are blocked.
+          if (process.platform === "darwin") spawn("open", [authUrl], { stdio: "ignore" }).on("error", () => {});
+          socket.send(JSON.stringify({ type: "login-started", authUrl }));
+          return;
+        }
         if (message.type === "materials") {
           void materials.handle(message).then(
             result => socket.readyState === WebSocket.OPEN && socket.send(JSON.stringify({type:"materials-result", id:message.id, result})),
@@ -329,6 +392,7 @@ wss.on("connection", (socket, request) => {
             return;
           }
           if (!runtimeAvailable) throw new Error("Codex stopped. Restart the companion to reconnect.");
+          if (!runtime.account.signedIn) throw new Error("Sign in to Codex from the Canvasdoc panel before sending messages.");
           if (runs.length >= 64)
             throw new Error(
               "Delivery buffer is full. Reconnect the browser to save pending replies before sending more work.",
@@ -460,19 +524,29 @@ server.listen(port, "127.0.0.1", () =>
       ready: true,
       port,
       root: config.root,
+      stateDir,
       runtimeThreadId: runtime.runtimeThreadId,
       tokenFile,
     }),
   ),
 );
 async function stop() {
+  telemetry.record("stop", {});
   for (const c of clients) c.close();
   wss.close();
   server.close();
   await runtime.close();
   await eventQueue.catch(() => {});
   await persistence.catch(() => {});
+  await telemetry.flush().catch(() => {});
+  await telemetry.close();
   process.exit(0);
 }
 process.once("SIGINT", () => void stop());
 process.once("SIGTERM", () => void stop());
+// Long-running services keep the marker fresh while a browser is attached and stand down once it goes stale.
+setInterval(() => {
+  if (!lastConnectionFile) return;
+  if (clients.size) void touchLastConnection(lastConnectionFile).catch(() => {});
+  else void readLastConnection(lastConnectionFile).then((last) => { if (serviceIdle(last)) void stop(); }).catch(() => {});
+}, 60 * 60 * 1000).unref();

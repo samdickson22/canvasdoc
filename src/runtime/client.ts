@@ -18,6 +18,19 @@ type State = {
   currentModel?: string;
   currentEffort?: string;
   status: "disconnected" | "connecting" | "connected";
+  /** Codex sign-in for the workspace's private home; undefined until the companion reports it. */
+  signedIn?: boolean;
+  codexEmail?: string;
+  codexPlan?: string;
+  /** False when the account's included usage is currently blocked, per the runtime's rate-limit read. */
+  usageAllowed?: boolean;
+  usage?: import("./plan").UsageWindows;
+  /** Beta diagnostics sharing, as reported by the companion. */
+  diagnostics?: boolean;
+  signInError?: string;
+  signInUrl?: string;
+  /** Companion package version, for the update notice when the extension is newer. */
+  version?: string;
   root?: string;
   runtimeThreadId?: string;
   error?: string;
@@ -34,7 +47,32 @@ let backupTimer: ReturnType<typeof setTimeout> | undefined;
 let connectionAccount: string | undefined;
 const workspaceKey = (account: string) => `canvasdoc:workspace:${account}`;
 function handshake() {
-  return { type: "connect", account: connectionAccount, workspaceId: sessionStorage.getItem(workspaceKey(connectionAccount!)) || undefined };
+  return { type: "connect", account: connectionAccount, workspaceId: sessionStorage.getItem(workspaceKey(connectionAccount!)) || undefined,
+    client: {
+      extension: isExtension && typeof chrome.runtime.getManifest === "function" ? chrome.runtime.getManifest().version : "dev",
+      userAgent: typeof navigator === "undefined" ? undefined : navigator.userAgent,
+      page: typeof location === "undefined" ? undefined : location.pathname,
+    } };
+}
+// Browser-side diagnostics ride the companion's uploader; events wait here until a connection exists.
+const pendingEvents: { name: string; data?: unknown; at: string }[] = [];
+export function reportEvent(name: string, data?: unknown) {
+  const event = { name, data, at: new Date().toISOString() };
+  if (state.status === "connected" && state.diagnostics !== false) {
+    try { send({ type: "telemetry-event", ...event }); return; } catch { /* fall through to the queue */ }
+  }
+  pendingEvents.push(event);
+  if (pendingEvents.length > 200) pendingEvents.shift();
+}
+function flushEvents() {
+  if (state.diagnostics === false) { pendingEvents.length = 0; return; }
+  while (pendingEvents.length) {
+    const event = pendingEvents.shift()!;
+    try { send({ type: "telemetry-event", ...event }); } catch { pendingEvents.unshift(event); return; }
+  }
+}
+export function setDiagnostics(enabled: boolean) {
+  send({ type: "telemetry", enabled });
 }
 let savedConnection: { url: string; token: string } | undefined;
 const listeners = new Set<() => void>();
@@ -119,7 +157,10 @@ async function applyRun(run: any) {
     return;
   }
   if ((priorReply?.revision ?? -1) > (run.revision ?? -1)) return;
+  const previousStatus = state.runs[c.requestId]?.status ?? priorReply?.run?.status;
   update({ runs: { ...state.runs, [c.requestId]: run } });
+  if (previousStatus && previousStatus !== run.status && ["completed", "error"].includes(run.status))
+    announceCompletion(c.title, run.status === "error" ? "The agent hit an error." : "The agent finished.");
   const messages = [...(previous?.messages ?? [])];
   if (!messages.some((m) => m.id === userId))
     messages.push({
@@ -269,11 +310,21 @@ function receive(event: { data: string }) {
       return;
     }
     sessionStorage.setItem(workspaceKey(connectionAccount), m.workspace.workspaceId);
+    rememberBridgeOutcome(null);
     update({
       status: m.runtimeAvailable === false ? "disconnected" : "connected",
       materials: !!m.capabilities?.materials,
       artifacts: !!m.capabilities?.artifacts,
       workspaceId: m.workspace.workspaceId,
+      version: typeof m.version === "string" ? m.version : undefined,
+      signedIn: m.codexAccount ? m.codexAccount.signedIn !== false : true,
+      codexEmail: m.codexAccount?.email,
+      codexPlan: m.codexAccount?.plan,
+      usageAllowed: m.codexAccount?.usageAllowed,
+      usage: m.codexAccount?.usage,
+      diagnostics: typeof m.diagnostics === "boolean" ? m.diagnostics : undefined,
+      signInError: m.codexAccount?.error,
+      signInUrl: undefined,
       models: m.models || [],
       currentModel: m.currentModel,
       currentEffort: m.currentEffort,
@@ -283,6 +334,7 @@ function receive(event: { data: string }) {
       error: m.runtimeAvailable === false ? "Codex stopped. Restart the companion to reconnect." : undefined,
     });
     for (const run of m.runs) void applyRun(run);
+    if (m.runtimeAvailable !== false) flushEvents();
     if (m.runtimeAvailable !== false)
       {
         for (const requestId of Object.keys(store.get().cancelledRequests ?? {})) send({ type: "stop", requestId });
@@ -294,6 +346,19 @@ function receive(event: { data: string }) {
   }
   if (m.type === "receipt") {
     void store.acknowledge(m.requestId);
+    return;
+  }
+  if (m.type === "account") {
+    update({ signedIn: m.signedIn !== false, codexEmail: m.email, codexPlan: m.plan, usageAllowed: m.usageAllowed, usage: m.usage, signInError: m.error,
+      ...(m.signedIn !== false ? { signInUrl: undefined, models: m.models || state.models } : {}) });
+    return;
+  }
+  if (m.type === "telemetry-state") {
+    update({ diagnostics: m.enabled === true });
+    return;
+  }
+  if (m.type === "login-started") {
+    update({ signInUrl: typeof m.authUrl === "string" ? m.authUrl : undefined, signInError: undefined });
     return;
   }
   if (m.type === "run") {
@@ -327,11 +392,34 @@ function receive(event: { data: string }) {
     rejectRequests();
     const previous = nativePort;
     nativePort = undefined;
-    update({ status: "disconnected", error: state.error || m.message, canReconnectAgent: false });
+    const error = state.error || m.message;
+    reportEvent("bridge-disconnected", { error });
+    rememberBridgeOutcome({ error, at: Date.now() });
+    update({ status: "disconnected", error, canReconnectAgent: false });
     previous?.disconnect();
     return;
   }
   if (m.type === "error") update({ error: m.message });
+}
+
+// Students leave long runs in another tab; mark the title and raise a system notice until they come back.
+let titleMarked = false;
+function announceCompletion(title: string, message: string) {
+  if (typeof document === "undefined" || !document.hidden) return;
+  reportEvent("completion-announced", { title });
+  if (!titleMarked) {
+    titleMarked = true;
+    const original = document.title;
+    document.title = `✓ ${original}`;
+    const restore = () => {
+      if (document.hidden) return;
+      document.removeEventListener("visibilitychange", restore);
+      if (document.title.startsWith("✓ ")) document.title = document.title.slice(2);
+      titleMarked = false;
+    };
+    document.addEventListener("visibilitychange", restore);
+  }
+  if (isExtension) chrome.runtime.sendMessage({ type: "canvasdoc:notify", title: `Canvasdoc · ${title}`, message }, () => void chrome.runtime.lastError);
 }
 
 export function initializeConnection() {
@@ -357,14 +445,34 @@ export function initializeConnection() {
     if (saved) connect(saved.url, saved.token);
   } catch {}
 }
-export function connectNative() {
+// Each Canvas page load starts a fresh bridge attempt. The last outcome in this tab is shown right away
+// so navigation does not restart the spinner; the new attempt still runs and replaces it when it settles.
+const BRIDGE_OUTCOME = "canvasdoc:bridge-outcome";
+const BRIDGE_OUTCOME_TTL = 2 * 60 * 1000;
+function rememberBridgeOutcome(outcome: { error: string; at: number } | null) {
+  try {
+    if (outcome) sessionStorage.setItem(BRIDGE_OUTCOME, JSON.stringify(outcome));
+    else sessionStorage.removeItem(BRIDGE_OUTCOME);
+  } catch { /* Session storage can be unavailable in some contexts. */ }
+}
+function recentBridgeFailure(): string | undefined {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(BRIDGE_OUTCOME) || "null");
+    if (saved && typeof saved.error === "string" && Date.now() - saved.at < BRIDGE_OUTCOME_TTL) return saved.error;
+  } catch { /* ignore */ }
+  return undefined;
+}
+export function connectNative(fresh = false) {
   if (!isExtension) return;
   rejectRequests();
   const previous = nativePort;
   nativePort = undefined;
   previous?.disconnect();
   connectionAccount = store.account();
-  update({ status: "connecting", error: undefined, approvals: [], runs: {} });
+  const remembered = fresh ? undefined : recentBridgeFailure();
+  update(remembered
+    ? { status: "disconnected", error: remembered, approvals: [], runs: {} }
+    : { status: "connecting", error: undefined, approvals: [], runs: {} });
   const current = chrome.runtime.connect({ name: "canvasdoc:runtime" });
   nativePort = current;
   current.onMessage.addListener((message) => {
@@ -405,7 +513,9 @@ export async function sendMessage(
   const account = store.account();
   update({error:undefined});
   if (!text.trim() || text.length > 50000) throw new Error("Messages must contain between 1 and 50,000 characters.");
+  if (state.status === "connected" && state.signedIn === false) throw new Error("Sign in to Codex to send messages.");
   if (context.kind === "home") rememberHomeRequest(requestId);
+  reportEvent("send", { threadId: context.threadId, kind: context.kind, length: text.length, attachments: attachments?.length ?? 0, regenerate: Boolean(regenerate) });
   const command = {
     requestId,
     sourceThreadId: context.threadId,
@@ -474,6 +584,22 @@ export function useConnection() {
   return useSyncExternalStore(subscribeConnection, connectionState, connectionState);
 }
 
+/** Starts Codex sign-in on the computer. The companion opens the browser; the panel also links the URL. */
+export function signIn() {
+  update({ signInError: undefined });
+  reportEvent("sign-in-clicked");
+  send({ type: "login" });
+}
+/** True when the store extension is newer than the companion it reached. */
+export function companionOutdated(): boolean {
+  if (!state.version || typeof chrome === "undefined" || !chrome.runtime?.getManifest) return false;
+  const parse = (value: string) => value.split(".").map((part) => Number.parseInt(part, 10) || 0);
+  const [mine, theirs] = [parse(chrome.runtime.getManifest().version), parse(state.version)];
+  for (let i = 0; i < Math.max(mine.length, theirs.length); i++) {
+    if ((mine[i] ?? 0) !== (theirs[i] ?? 0)) return (mine[i] ?? 0) > (theirs[i] ?? 0);
+  }
+  return false;
+}
 export function reconnectAgent() {
   if (!connectionAccount || connectionAccount !== store.account()) throw new Error("Canvas account changed. Reconnect your computer.");
   const command = { type: "reconcile", account: connectionAccount };

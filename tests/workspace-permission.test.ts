@@ -36,7 +36,7 @@ test('workspace chat presents native access requests and delivers Allow/Decline 
     };
     (globalThis as any).permissionBridge=bridge;
     const mocks:Record<string,string>={
-      client:`import {useSyncExternalStore} from 'react';const b=globalThis.permissionBridge;export const useConnection=()=>useSyncExternalStore(b.subscribe,b.get);export const answerApproval=(id,decision)=>b.answer(id,decision);export const sendMessage=async()=>{};export const regenerateMessage=async()=>{};export const stopRun=async()=>{};export const reconnectAgent=()=>{};export const answerQuestions=async()=>{};export const uploadFile=async()=>'';`,
+      client:`import {useSyncExternalStore} from 'react';const b=globalThis.permissionBridge;export const useConnection=()=>useSyncExternalStore(b.subscribe,b.get);export const answerApproval=(id,decision)=>b.answer(id,decision);export const sendMessage=async()=>{};export const regenerateMessage=async()=>{};export const stopRun=async()=>{};export const reconnectAgent=()=>{};export const answerQuestions=async()=>{};export const uploadFile=async()=>'';export const signIn=()=>{};export const companionOutdated=()=>false;`,
       chat:`export function ChatGPT(props){return <div>Conversation content{props.footerSlot}</div>}`,
       materials:`export const materialContext=()=>'';`,catchup:`export const catchUp=async()=>{};`,
       link:`import {createContext} from 'react';export const FileLinkThread=createContext('');`,

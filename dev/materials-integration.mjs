@@ -43,7 +43,9 @@ try{
  const account=live ? `canvasdoc:v1:${origin}:2` : 'synthetic-student';
  let mirror=new MaterialMirror(temporary);
  if(live){
-   const token=(await readFile(path.join(liveRoot,'.canvasdoc/dev-connection-token'),'utf8')).trim();
+   const {workspaceId}=JSON.parse(await readFile(path.join(liveRoot,'.canvasdoc/config.json'),'utf8'));
+   const {workspaceStateDir}=await import('../companion/codex-home.ts');
+   const token=(await readFile(path.join(workspaceStateDir(workspaceId),'connection-token'),'utf8')).trim();
    socket=new WebSocket('ws://127.0.0.1:3218',{origin});
    await new Promise((resolve,reject)=>{socket.on('open',()=>socket.send(JSON.stringify({type:'connect',token})));socket.on('error',reject);socket.on('message',bytes=>{const message=JSON.parse(bytes);if(message.type==='connected'){assert.ok(message.capabilities.materials);resolve()}else if(message.type==='materials-result'){const item=pending.get(message.id);pending.delete(message.id);if(message.error)item?.reject(new Error(message.error));else item?.resolve(message.result)}})});
    mirror={handle:operation=>new Promise((resolve,reject)=>{const id=crypto.randomUUID();pending.set(id,{resolve,reject});socket.send(JSON.stringify({type:'materials',id,...operation}))})};

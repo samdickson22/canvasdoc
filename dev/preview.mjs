@@ -8,6 +8,9 @@ const port = Number(process.env.CANVASDOC_PREVIEW_PORT || 3240);
 const upstream = new URL(
   process.env.CANVASDOC_CANVAS_UPSTREAM || "http://127.0.0.1:3210",
 );
+// A remote preview hostname that Canvas's host allowlist rejects can present itself
+// as an allowed host; redirects back to that host are rewritten to the preview origin.
+const presentedHost = process.env.CANVASDOC_PREVIEW_HOST;
 if (
   upstream.protocol !== "http:" ||
   !["127.0.0.1", "localhost"].includes(upstream.hostname)
@@ -44,11 +47,20 @@ createServer(async (req, res) => {
   const target = new URL(upstream);
   target.pathname = incoming.pathname;
   target.search = incoming.search;
+  const headers = presentedHost ? { ...req.headers, host: presentedHost, "x-forwarded-host": presentedHost } : req.headers;
   const proxy = request(
     target,
-    { method: req.method, headers: req.headers },
+    { method: req.method, headers },
     (response) => {
-      res.writeHead(response.statusCode || 502, response.headers);
+      const responseHeaders = { ...response.headers };
+      if (presentedHost && typeof responseHeaders.location === "string") {
+        const proto = req.headers["x-forwarded-proto"] || "http";
+        responseHeaders.location = responseHeaders.location.replace(
+          new RegExp(`^https?://${presentedHost.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+          `${proto}://${req.headers.host}`,
+        );
+      }
+      res.writeHead(response.statusCode || 502, responseHeaders);
       response.pipe(res);
     },
   );

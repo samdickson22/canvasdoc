@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import { createInterface } from "node:readline";
 import { once } from "node:events";
 import net from "node:net";
@@ -20,6 +20,9 @@ export async function connector(
   await new Promise<void>((resolve) => reservation.close(() => resolve()));
   let child: ReturnType<typeof spawn> | undefined;
   const sockets: WebSocket[] = [];
+  // Private state stays beside the synthetic workspace, never in the developer's Application Support.
+  const stateDir = `${root}-state`;
+  let tokenFile = "";
 
   async function start() {
     child = spawn(
@@ -34,6 +37,9 @@ export async function connector(
           ]),
           CANVASDOC_DEV_ORIGIN: origin,
           CANVASDOC_CONNECTOR_PORT: String(port),
+          CANVASDOC_STATE_DIR: stateDir,
+          // Never let a test upload diagnostics to the real ingest server.
+          CANVASDOC_TELEMETRY_URL: process.env.CANVASDOC_TELEMETRY_URL || "http://127.0.0.1:9",
         },
         stdio: ["ignore", "pipe", "pipe"],
       },
@@ -50,7 +56,9 @@ export async function connector(
       processChild.once("exit", failed);
       processChild.once("error", reject);
       lines.on("line", (line) => {
-        if (JSON.parse(line).ready) {
+        const message = JSON.parse(line);
+        if (message.ready) {
+          tokenFile = message.tokenFile;
           lines.close();
           processChild.off("exit", failed);
           processChild.off("error", reject);
@@ -123,12 +131,7 @@ export async function connector(
     send({
       type: "connect",
       workspaceId,
-      token: (
-        await readFile(
-          path.join(root, ".canvasdoc/dev-connection-token"),
-          "utf8",
-        )
-      ).trim(),
+      token: (await readFile(tokenFile, "utf8")).trim(),
     });
     const hello = await wait(
       (message) => message.type === "connected" || message.type === "error",
@@ -143,6 +146,7 @@ export async function connector(
     async close() {
       for (const socket of sockets) socket.terminate();
       await stop();
+      await rm(stateDir, { recursive: true, force: true });
     },
   };
 }

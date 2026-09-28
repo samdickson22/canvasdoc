@@ -1,5 +1,5 @@
 import { canvasResponseError } from "./canvas-error.ts";
-import type { Assignment, Course, Todo, PlannerOverride } from "./types";
+import type { PageContext, Assignment, Course, Todo, PlannerOverride } from "./types";
 
 export async function canvasRead<T>(
   path: string,
@@ -90,6 +90,19 @@ export async function readDashboardWork(
           o.plannable_id === todo.assignment.id,
       ) ?? null,
   }));
+}
+/** A graded quiz or discussion shares its assignment's thread no matter which Canvas page opened it. */
+export async function resolveCoursework(context: PageContext, signal?: AbortSignal): Promise<PageContext> {
+  if (context.kind !== "quiz" && context.kind !== "discussion") return context;
+  const endpoint = context.kind === "quiz"
+    ? `/api/v1/courses/${context.courseId}/quizzes/${context.quizId}`
+    : `/api/v1/courses/${context.courseId}/discussion_topics/${context.discussionId}`;
+  let detail: { assignment_id?: number | null; title?: string } | null = null;
+  try { detail = await canvasRead(endpoint, signal); } catch { return context; }
+  const title = typeof detail?.title === "string" && detail.title.trim() ? detail.title.trim() : context.title;
+  const assignmentId = typeof detail?.assignment_id === "number" ? detail.assignment_id : undefined;
+  if (assignmentId === undefined) return { ...context, title };
+  return { ...context, title, kind: "assignment", assignmentId, threadId: `assignment:${context.courseId}:${assignmentId}` };
 }
 export const readAssignment = (
   course: number,

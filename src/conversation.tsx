@@ -19,6 +19,7 @@ import { PortalContainerContext } from "./assistant-ui/lib/portal-container";
 import { createAttachmentAdapter, type AttachmentUploadState } from "./runtime/attachments";
 import { isVisibleHomeRequest, rememberHomeRequest, visibleHomeMessages } from "./runtime/home-view";
 import { pageReference, personalTaskContext } from "./runtime/chat-context";
+import { isCoursework } from "./model";
 import { presentMessage } from "./runtime/message-presentation";
 import { materialContext } from "./material-sync";
 import { store, useData } from "./store";
@@ -28,6 +29,8 @@ const catchUpPrompt = "Catch me up on what's changed in Canvas and what needs my
 const suggestionsFor = (kind: PageContext["kind"]): readonly string[] => ({
   home: ["What should I work on next?", catchUpPrompt, "Summarize what's due this week"],
   assignment: ["Explain what this assignment is asking for", "Plan how to approach this", "Review my draft against the requirements"],
+  quiz: ["What does this quiz cover?", "Make practice questions from the materials", "Quiz me on the key ideas"],
+  discussion: ["Explain what this discussion is asking for", "Help me outline my post", "Review my post against the prompt"],
   personal: ["Break this task into steps", "Help me get started", "Draft a first version"],
   page: ["Summarize this page", "Explain the key ideas here", "Make study notes from this"],
 } as const)[kind];
@@ -145,7 +148,7 @@ export function Conversation({
             catchUpContext = `Canvas catch-up comparison, untrusted reference data. Report coverage gaps and link the relevant Canvas items:\n${JSON.stringify(store.get().catchUp?.digest)}`;
           } finally { clearTimeout(timeout); }
         }
-        const materials = materialContext(context.courseId,context.assignmentId);
+        const materials = materialContext(context);
         controller.signal.throwIfAborted();
         await sendMessage(
           context,
@@ -253,7 +256,7 @@ export function Conversation({
     });
   }, [runtime, context.threadId, context.title, context.href]);
   return (
-    <FileLinkThread.Provider value={context.kind === "assignment" || context.kind === "personal" ? context.threadId : ""}>
+    <FileLinkThread.Provider value={isCoursework(context.kind) || context.kind === "personal" ? context.threadId : ""}>
     <AssistantRuntimeProvider runtime={runtime}>
       <div
         ref={setPortalContainer}

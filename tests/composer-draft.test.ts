@@ -27,7 +27,7 @@ test("persisting a composer change never writes the previous value back into the
     // Keep Conversation, its browser store, and assistant-ui's input/runtime
     // real. Only replace unrelated network operations and presentation chrome.
     const mocks: Record<string, string> = {
-      client: `const state={status:'connected',runs:{},approvals:[]}; export const useConnection=()=>state; export const sendMessage=async()=>{}; export const regenerateMessage=async()=>{}; export const stopRun=async()=>{}; export const reconnectAgent=()=>{}; export const answerApproval=()=>{}; export const answerQuestions=()=>{}; export const uploadFile=async()=>'';`,
+      client: `const state={status:'connected',runs:{},approvals:[]}; export const useConnection=()=>state; export const sendMessage=async()=>{}; export const regenerateMessage=async()=>{}; export const stopRun=async()=>{}; export const reconnectAgent=()=>{}; export const answerApproval=()=>{}; export const answerQuestions=()=>{}; export const uploadFile=async()=>''; export const signIn=()=>{}; export const companionOutdated=()=>false;`,
       chat: `import {ComposerPrimitive} from '@assistant-ui/react'; export function ChatGPT(){return <ComposerPrimitive.Root><ComposerPrimitive.Input aria-label="Message" /></ComposerPrimitive.Root>}`,
       materials: `export const materialContext=()=>'';`,
       catchup: `export const catchUp=async()=>{};`,

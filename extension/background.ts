@@ -3,6 +3,7 @@ import { nativeReceiver } from "../companion/native-framing.ts";
 import { mutate, parseSavedData, type Mutation } from "../src/storage/data.ts";
 import origins from "./origins.json" with { type: "json" };
 
+const noticeTabs = new Map<string, { tabId: number; windowId?: number }>();
 const pages = new Set([...origins.canvas.map((school) => school.origin), ...origins.development]);
 const supportedPage = (url: string) => {
   try { return pages.has(new URL(url).origin); } catch { return false; }
@@ -15,6 +16,18 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     !supportedPage(sender.url)
   )
     return;
+  if (message.type === "canvasdoc:notify") {
+    // A run finished while its tab was hidden; clicking the notice returns to that tab.
+    if (typeof message.title !== "string" || typeof message.message !== "string" || sender.tab?.id === undefined) return;
+    const id = `canvasdoc:${sender.tab.id}:${Date.now()}`;
+    noticeTabs.set(id, { tabId: sender.tab.id, windowId: sender.tab.windowId });
+    chrome.notifications.create(id, {
+      type: "basic", iconUrl: chrome.runtime.getURL("icon-128.png"),
+      title: message.title.slice(0, 120), message: message.message.slice(0, 200),
+    }, () => { if (chrome.runtime.lastError) console.warn("Canvasdoc notification:", chrome.runtime.lastError.message); });
+    respond({ ok: true });
+    return;
+  }
   if (message.type === "canvasdoc:material-download") {
     void materialDownload(message, sender.url).then(result=>respond({result}),error=>respond({error:error.message}));
     return true;
@@ -95,3 +108,14 @@ chrome.runtime.onConnect.addListener((port) => {
   });
   port.onDisconnect.addListener(() => native.disconnect());
 });
+
+// Absent when the manifest lacks the permission, as in tests of the relay alone.
+chrome.notifications?.onClicked.addListener((id) => {
+  const target = noticeTabs.get(id);
+  chrome.notifications.clear(id);
+  noticeTabs.delete(id);
+  if (!target) return;
+  void chrome.tabs.update(target.tabId, { active: true });
+  if (target.windowId !== undefined) void chrome.windows.update(target.windowId, { focused: true });
+});
+chrome.notifications?.onClosed.addListener((id) => noticeTabs.delete(id));

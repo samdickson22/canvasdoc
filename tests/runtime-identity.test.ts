@@ -165,8 +165,11 @@ test("native disconnect preserves the connector rejection and reconnect clears i
  port.receive({type:"native-disconnected",message:"Native host has exited."});
  assert.equal(b.client.connectionState().error,message);
  assert.equal(b.client.connectionState().status,"disconnected");
- b.client.connectNative();assert.equal(b.client.connectionState().error,undefined);
- b.sockets[1].receive(b.hello());assert.equal(b.client.connectionState().status,"connected");b.client.disconnect();
+ // A page load shows the remembered outcome while it retries; an explicit reconnect starts clean.
+ b.client.connectNative();assert.equal(b.client.connectionState().error,message);assert.equal(b.client.connectionState().status,"disconnected");
+ b.client.connectNative(true);assert.equal(b.client.connectionState().error,undefined);
+ b.sockets[2].receive(b.hello());assert.equal(b.client.connectionState().status,"connected");
+ b.client.connectNative();assert.equal(b.client.connectionState().status,"connecting");b.client.disconnect();
 });
 
 test("regeneration replaces only its reply, preserves the draft and attachments, and ignores old delivery", async () => {

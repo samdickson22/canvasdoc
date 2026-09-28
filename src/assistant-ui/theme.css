@@ -60,6 +60,8 @@
 .work-model-selector { margin-left:auto; }
 .codex-model-trigger { max-width:240px; font-size:11px; color:#6e7767; }
 .model-unavailable { font-size:11px; color:#8c9385; }
+.codex-usage { font-size:11px; color:#8c9385; margin-right:8px; white-space:nowrap; align-self:center; }
+.codex-usage[data-warning] { color:#b45309; }
 
 .chat-dropzone { position: relative; }
 .chat-dropzone[data-dragging="true"]::after { content: "Drop files to attach"; position: absolute; inset: 8px; z-index: 50; display: grid; place-items: center; border: 2px dashed #28765b; border-radius: 20px; background: #f2faf5f2; color: #245b47; pointer-events: none; font-size: 18px; }

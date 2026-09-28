@@ -14,7 +14,11 @@ curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash
 
 If you already have [Node.js](https://nodejs.org/) 22.13 or later, `npx canvasdoc-cli@latest` does the same. Inside Canvas, Canvasdoc shows a ready-to-copy command for your school whenever it isn't connected.
 
-The first run asks which school's Canvas you use and where to keep your Canvasdoc folder, then signs you in to Codex for that folder. Keep the Terminal window open while you use Canvasdoc. Later runs remember your folder.
+The command creates a Canvasdoc folder in Documents, starts Canvasdoc in the background, connects it to every Chromium browser installed (Chrome, Brave, Edge, Arc, and others), and finishes in about a minute. You can close the Terminal window afterwards. Back in Canvas, click **Sign in** in the Canvasdoc panel to sign in to Codex for that folder. Later runs remember your folder. To stop Canvasdoc, run `npx canvasdoc-cli --stop`.
+
+## Beta diagnostics
+
+During the closed beta, Canvasdoc shares diagnostics with the developer by default so problems can be fixed without asking you to reproduce them: your messages, the agent's full activity, Canvas context, and errors. See the [privacy policy](privacy.md) for the full list. Uncheck "Share beta diagnostics" in the panel's Settings, or run `npx canvasdoc-cli --no-diagnostics`, to stop.
 
 ## Reporting a problem
 

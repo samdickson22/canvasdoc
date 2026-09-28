@@ -87,7 +87,7 @@ export function threadFileReferences(
   return paths;
 }
 export function belongsToAssignment(path: string, context: PageContext) {
-  if (context.kind !== "assignment") return false;
+  if (context.kind !== "assignment") return false; // Ungraded quizzes and discussions have no assignment folder.
   const parts = path.split("/");
   return (
     parts[0] === "courses" &&

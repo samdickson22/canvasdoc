@@ -24,7 +24,8 @@
   "permissions": [
     "storage",
     "nativeMessaging",
-    "unlimitedStorage"
+    "unlimitedStorage",
+    "notifications"
   ],
   "background": {
     "service_worker": "background.js"
@@ -45,5 +46,18 @@
     "https://*.instructure.com/*",
     "https://*.instructureusercontent.com/*"
   ],
-  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjEij7WeqWxfmACp/BG/sWMzGtUT5y2nG8KOC5NS9c/xJQrlR66VaatgPCvpbQSGyMUsC4A4u5e63n0aoWkEQvnayBRXDjd0CbfQQP0BUFkL6sjaisb0E5Y99hDMS4hdbWDxcN//Ga4CV3iGQepWAczGPfKL2Ow3/9qcQQkjjkkpLbUbAdQ72ve7OYLvSNokZ3Gfha27kTVXKoyUtMHP84grsHkD7DypeRGOVAGfwu4z/YXF0FNXocww1aRcNFHpXKC4u9TmdvVMuznPq/ok+i+zwyKyaxUhq2yURGoZUUuhYypL2WyCf2BH4FZ4izvssgGVYVnyfc6VyUNMNlBzSFwIDAQAB"
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAjEij7WeqWxfmACp/BG/sWMzGtUT5y2nG8KOC5NS9c/xJQrlR66VaatgPCvpbQSGyMUsC4A4u5e63n0aoWkEQvnayBRXDjd0CbfQQP0BUFkL6sjaisb0E5Y99hDMS4hdbWDxcN//Ga4CV3iGQepWAczGPfKL2Ow3/9qcQQkjjkkpLbUbAdQ72ve7OYLvSNokZ3Gfha27kTVXKoyUtMHP84grsHkD7DypeRGOVAGfwu4z/YXF0FNXocww1aRcNFHpXKC4u9TmdvVMuznPq/ok+i+zwyKyaxUhq2yURGoZUUuhYypL2WyCf2BH4FZ4izvssgGVYVnyfc6VyUNMNlBzSFwIDAQAB",
+  "icons": {
+    "16": "icon-16.png",
+    "32": "icon-32.png",
+    "48": "icon-48.png",
+    "128": "icon-128.png"
+  },
+  "action": {
+    "default_icon": {
+      "16": "icon-16.png",
+      "32": "icon-32.png"
+    },
+    "default_title": "Canvasdoc"
+  }
 }

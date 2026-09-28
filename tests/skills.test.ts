@@ -1,4 +1,4 @@
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import {
   mkdtemp,
@@ -13,6 +13,9 @@ import os from "node:os";
 import path from "node:path";
 import { installBundledSkills } from "../companion/skills.ts";
 import { CodexRuntime } from "../companion/codex.ts";
+// Private runtime state goes to a temporary directory, never the developer's Application Support.
+process.env.CANVASDOC_STATE_DIR = await mkdtemp(path.join(os.tmpdir(), "canvasdoc-state-"));
+after(() => rm(process.env.CANVASDOC_STATE_DIR!, { recursive: true, force: true }));
 
 const name = "canvasdoc-assignment-review";
 const target = (root: string) =>

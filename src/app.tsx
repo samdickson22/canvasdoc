@@ -23,7 +23,7 @@ import { TodoList } from "./todo-panel";
 import { Conversation } from "./conversation";
 import { showDashboardGrades } from "./dashboard-grades";
 import { readAssignment, readCourses, readDashboardWork } from "./canvas";
-import { newTask, safeLink } from "./model";
+import { courseworkLabel, isCoursework, newTask, safeLink } from "./model";
 import { store, useData, useStorageError } from "./store";
 import type {
   Assignment,
@@ -39,9 +39,12 @@ import {
   reconnectAgent,
   connectNative,
   usesNativeConnection,
+  setDiagnostics,
 } from "./runtime/client";
 import { useTimeZone } from "./preferences";
 import { SetupCommand } from "./assistant-ui/components/assistant-ui/elements/setup-command";
+import { PlanNotice, SignInState } from "./assistant-ui/components/assistant-ui/elements/connection-state";
+import { planLabel } from "./runtime/plan";
 
 export type Mounts = {
   sidebar: HTMLElement;
@@ -223,7 +226,7 @@ export function App({
           <aside
             className="sidebar"
             aria-label={
-              context.kind === "home" ? "To-do list" : context.kind === "personal" ? "Task conversation" : context.kind === "assignment" ? "Assignment conversation" : "Page conversation"
+              context.kind === "home" ? "To-do list" : context.kind === "personal" ? "Task conversation" : isCoursework(context.kind) ? `${courseworkLabel(context.kind)} conversation` : "Page conversation"
             }
           >
             <header className="sidebar-header">
@@ -330,7 +333,7 @@ export function App({
           <div
             className="assignment-tabs"
             role="tablist"
-            aria-label={context.kind === "personal" ? "Task view" : "Assignment view"}
+            aria-label={context.kind === "personal" ? "Task view" : `${courseworkLabel(context.kind)} view`}
           >
             <button
               role="tab"
@@ -346,7 +349,7 @@ export function App({
                 }
               }}
             >
-              {context.kind === "personal" ? "Task" : "Assignment"}
+              {context.kind === "personal" ? "Task" : courseworkLabel(context.kind)}
             </button>
             <button
               role="tab"
@@ -591,14 +594,25 @@ function ConnectionSettings() {
   const [error, setError] = useState("");
   return (
     <div className="connection-content">
-      <p>Connect the Codex runtime started from your Canvasdoc folder.</p>
+      <p>Canvasdoc runs in the background on your computer from your Canvasdoc folder.</p>
       {state.status === "connected" ? (
         <>
           <div className="connection-detail">Connected · {state.root}</div>
+          {state.signedIn === false ? <SignInState /> : (
+            <>
+              <div className="connection-detail">Codex · {state.codexEmail ?? "signed in"}{planLabel(state.codexPlan) ? ` · ${planLabel(state.codexPlan)}` : ""}</div>
+              <PlanNotice />
+            </>
+          )}
           <p className="muted">
             Conversations load from this browser. Local history exports run in
             the background.
           </p>
+          <label className="diagnostics-toggle">
+            <input type="checkbox" checked={state.diagnostics !== false}
+              onChange={(event) => { try { setDiagnostics(event.currentTarget.checked); } catch (error) { setError((error as Error).message); } }} />
+            <span>Share beta diagnostics with the Canvasdoc developer: your messages, the agent's full activity and transcripts, Canvas context, and errors. On during the closed beta; uncheck to stop.</span>
+          </label>
           <button className="secondary-button" onClick={disconnect}>
             Disconnect
           </button>
@@ -608,7 +622,7 @@ function ConnectionSettings() {
       ) : usesNativeConnection ? (
         <>
           <SetupCommand />
-          <button className="primary-button" onClick={connectNative}>
+          <button className="primary-button" onClick={() => connectNative(true)}>
             Reconnect
           </button>
         </>

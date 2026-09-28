@@ -17,7 +17,7 @@ Canvasdoc is a local coursework agent inside Canvas. These instructions guide de
 - Canvas owns official course data and submission state. Personal tasks and local work must not masquerade as Canvas records.
 - One main agent works across courses. Each assignment and personal task has one attached conversation; assignment folders do not create separate main agents. Bounded runtime delegation remains part of the product's capability.
 - Home preserves Canvas’s native course dashboard with a compact bottom composer; sending switches the center pane to the Home conversation with a Back to dashboard control, plus a side to-do panel. Do not duplicate assignments in the center, expand assignment conversations inline in to-dos, or add a parallel Threads list.
-- An assignment to-do opens its real Canvas page with the attached conversation in the sidebar. Assignment is the default view; preserve Canvas's actual content and controls.
+- An assignment to-do opens its real Canvas page with the attached conversation in the sidebar. Assignment is the default view; preserve Canvas's actual content and controls. Quiz and discussion pages get the same treatment. A graded quiz or discussion is keyed to its assignment's conversation no matter which Canvas page opened it; ungraded ones have their own quiz or discussion conversation. There is still one agent; only the browser thread key and the context briefing differ.
 - Workspace expands that same conversation into the main area. Its resizable Outputs/Sources inspector starts collapsed. Keep one conversation instance and preserve drafts, history, approvals, and running work across layout changes.
 - Separate study workspaces are outside v1. Study work can use the conversation attached to the quiz listing.
 - Use ChatGPT Work/Codex/T3 as work-area references and BetterCanvas/BetterCampus for familiar Canvas interactions. Before implementing equivalent Canvas APIs, to-dos, or navigation, inspect those projects and reuse appropriately licensed work where useful.
@@ -30,10 +30,11 @@ Canvasdoc is a local coursework agent inside Canvas. These instructions guide de
 - Coursework-agent instructions live in `companion/AGENT.md`. Bundle lightweight Canvas assistance skills; keep agent-maintained writing, coding, class, and assignment-type skills as separate files in the selected workspace's `.agents/skills/`. Learned skills do not replace browser-owned application settings or modify bundled product defaults. Leave Codex memory configuration unchanged.
 - Let the coursework agent choose which skills and references to read. Its role instructions should explain where to find them; do not add application code that injects skill bodies, selects class preferences, or forces context loading on course switches.
 - The chosen Canvasdoc folder owns source downloads, working files, and outputs. Start/resume the main agent from that root. Relocate a missing or moved root explicitly instead of silently creating a replacement.
-- Run Codex with the workspace's private `.canvasdoc/codex-home/` for sign-in, sessions, settings, and SQLite state. Keep the working directory at the workspace root and skills in `.agents/skills/`. Do not inherit the desktop app's Codex home or copy its credentials.
+- Run Codex with the workspace's private home under `~/Library/Application Support/Canvasdoc/workspaces/<workspaceId>/codex-home/` for sign-in, sessions, settings, and SQLite state. The lock, delivery journal, connection token, and history exports live beside it. The workspace folder keeps only coursework files, `.agents/skills/`, and the small records that describe those files (`config.json`, `account.json`, `bundled-skills.json`, material receipts, extraction ledger), so Documents can sync to iCloud safely. Keep the working directory at the workspace root. Do not inherit the desktop app's Codex home or copy its credentials.
 - Local history exports are asynchronous recovery backups. Navigation, drafts, search, and local saves must not wait for the companion, disk, or exporter. Keep exports debounced, versioned, atomic, and retried after reconnect; restoring disk history is explicit.
 - Canvas reads use the signed-in browser session through same-origin requests. Do not introduce personal API-token setup by default. Use DOM interaction when it better matches the Canvas workflow.
 - V1 uses the user's machine for execution and provider access. Hosted sandboxes and Canvasdoc-hosted inference are outside scope.
+- Beta diagnostics are on by default and disclosed in the privacy policy. The companion is the only uploader: browser events are relayed to it, it queues records on disk, and it sends them to the ingest server in `telemetry/` running on Sam's Mac mini. Tests must point `CANVASDOC_TELEMETRY_URL` at a local or unreachable address, never the default.
 
 ## Commands and verification
 
@@ -46,7 +47,7 @@ Use npm and the committed lockfile. Run commands from the checkout you are chang
 | Watch extension sources | `npm run dev` |
 | Typecheck / build separately | `npm run typecheck` / `npm run build` |
 | Run a relevant existing test | `node --test tests/<name>.test.ts` |
-| Start the packaged companion | `./start.sh` |
+| Start the packaged companion | `./start.sh` (installs the launchd service for the real workspace; `--foreground` for a terminal run, `--stop` to remove) |
 
 - Choose verification for the change: typecheck/build for code integration, a focused behavior check for logic, or a T3 browser check for layout and interaction. Documentation-only changes need link and accuracy checks, not application tests.
 - `npm run check` runs typecheck, build, and the full test suite. It is available when explicitly requested, not a routine completion gate.
@@ -60,6 +61,7 @@ Use npm and the committed lockfile. Run commands from the checkout you are chang
 - Routine development and destructive checks use the self-hosted Canvas instance with synthetic accounts and data. Never copy production credentials or private course materials into fixtures or commits.
 - Preserve Sam's authenticated production Canvas login, tabs, storage, and settings. Production checks are read-only unless Sam explicitly authorizes the particular write. Never submit, grade, publish, delete, or message as an incidental test.
 - Preserve unrelated edits, worktrees, and processes. Stop only processes you started and tracked; do not kill by name or path pattern.
+- The launcher's background service, Chrome bridge, and log locations are shared with the developer's live install. Exercise them with the `CANVASDOC_SUPPORT_DIR`, `CANVASDOC_CHROME_HOSTS_DIR`, `CANVASDOC_LAUNCH_AGENTS_DIR`, `CANVASDOC_LAUNCH_LABEL`, `CANVASDOC_LOG_DIR`, `CANVASDOC_CONFIG_DIR`, and `CANVASDOC_CONNECTOR_PORT` overrides rather than the defaults.
 - Edit source rather than generated `dist/` or `release/` output. Preserve upstream license/attribution files. Keep application-specific Harness adaptations outside vendored code unless an upstream change is explicitly part of the task.
 
 ## Keep documentation useful

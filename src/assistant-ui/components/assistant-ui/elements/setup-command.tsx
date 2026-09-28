@@ -32,7 +32,7 @@ export function SetupCommand({ compact = false }: { compact?: boolean }) {
   const alternative = useCopy();
   return (
     <div data-slot="setup-command" className="flex min-w-0 flex-col gap-1.5">
-      {!compact && <p className="m-0 text-[13px]">Run this in Terminal on your Mac and keep the window open. It installs what Canvasdoc needs, signs you in to Codex, and starts the agent.</p>}
+      {!compact && <p className="m-0 text-[13px]">Paste this in Terminal on your Mac once. It installs what Canvasdoc needs and starts it in the background; you can close the window when it finishes, then sign in to Codex here.</p>}
       <div className={cn(field, "flex min-w-0 items-center gap-2 rounded-lg py-1.5 pl-2.5 pr-1")}>
         <code className={cn(mono, "min-w-0 flex-1 truncate")} title={full}>{full}</code>
         <button type="button" onClick={() => main.copy(full)} aria-label="Copy setup command" title="Copy setup command"
