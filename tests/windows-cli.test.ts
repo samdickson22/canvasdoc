@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, realpath, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import net from 'node:net';
@@ -36,10 +36,10 @@ test('packaged Windows CLI registers the store bridge and serves a private signe
       });
       const manifestPath = path.join(support,'com.canvasdoc.connector.json');
       const registry = execFileSync('reg.exe',['query',key,'/ve'],{encoding:'utf8',windowsHide:true});
-      assert.ok(registry.includes(manifestPath));
+      assert.ok(registry.includes(await realpath(manifestPath)));
       const manifest = JSON.parse(await readFile(manifestPath,'utf8'));
       assert.deepEqual(manifest.allowed_origins,['chrome-extension://pbibigofgbljlhhaadjgiikdkjiahhap/']);
-      assert.equal(manifest.path,path.join(support,'native-host.cmd'));
+      assert.equal(manifest.path,await realpath(path.join(support,'native-host.cmd')));
       const config = JSON.parse(await readFile(path.join(support,'connection.json'),'utf8'));
       ws = new WebSocket(`ws://127.0.0.1:${port}`,{origin:'http://localhost:3210'});
       await once(ws,'open');
@@ -56,10 +56,20 @@ test('packaged Windows CLI registers the store bridge and serves a private signe
       ws?.terminate();
       if(child?.pid && child.exitCode===null) {
         const exited=once(child,'exit');
-        execFileSync('taskkill.exe',['/PID',String(child.pid),'/T','/F'],{stdio:'ignore',windowsHide:true});
+        try {
+          execFileSync('taskkill.exe',['/PID',String(child.pid),'/T','/F'],{stdio:'pipe',windowsHide:true});
+        } catch (error) {
+          // A descendant can exit during taskkill's tree walk. Ignore that
+          // race only when the tracked CLI process is already gone.
+          let gone = false;
+          try { process.kill(child.pid,0); } catch (probe) {
+            gone = (probe as NodeJS.ErrnoException).code === 'ESRCH';
+          }
+          if (!gone) throw error;
+        }
         await exited;
       }
       try { execFileSync('reg.exe',['delete',key,'/f'],{stdio:'ignore',windowsHide:true}); } catch {}
-      await rm(temp,{recursive:true,force:true});
+      await rm(temp,{recursive:true,force:true,maxRetries:5,retryDelay:100});
     }
   });

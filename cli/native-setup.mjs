@@ -1,4 +1,4 @@
-import { access, mkdir, copyFile, writeFile, readFile, chmod, unlink } from 'node:fs/promises';
+import { access, mkdir, copyFile, writeFile, readFile, chmod, unlink, realpath } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
@@ -31,7 +31,10 @@ export async function registerNative(tokenFile, extensionIds, origin, port, chro
   if(!['darwin', 'win32'].includes(platform)) throw new Error('Native setup supports macOS and Windows.');
   const ids=[].concat(extensionIds);
   if(!ids.length||ids.some(id=>!/^[a-p]{32}$/.test(id))) throw new Error('Invalid Chrome extension ID.');
-  const directory=bridgeDirectory;await mkdir(directory,{recursive:true,mode:0o700});
+  await mkdir(bridgeDirectory,{recursive:true,mode:0o700});
+  // Packaged Windows terminals can virtualize AppData. The browser runs outside
+  // that package and needs the physical paths to the manifest and launcher.
+  const directory=platform === 'win32' ? await realpath(bridgeDirectory) : bridgeDirectory;
   const host=path.join(directory,'native-host.mjs');
   await copyFile(fileURLToPath(new URL('./native-host.mjs',import.meta.url)),host);
   const token=(await readFile(tokenFile,'utf8')).trim();
@@ -51,7 +54,8 @@ export async function registerNative(tokenFile, extensionIds, origin, port, chro
   for(const hosts of directories){await mkdir(hosts,{recursive:true});await writeFile(path.join(hosts,'com.canvasdoc.connector.json'),manifest,{mode:0o600});}
   if(platform === 'win32') {
     const key=process.env.CANVASDOC_NATIVE_REGISTRY_KEY || 'HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.canvasdoc.connector';
-    await run('reg.exe',['add',key,'/ve','/t','REG_SZ','/d',path.resolve(directories[0],'com.canvasdoc.connector.json'),'/f'],{windowsHide:true});
+    const manifestPath=await realpath(path.join(directories[0],'com.canvasdoc.connector.json'));
+    await run('reg.exe',['add',key,'/ve','/t','REG_SZ','/d',manifestPath,'/f'],{windowsHide:true});
   }
   return directories;
 }

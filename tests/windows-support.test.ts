@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -20,9 +20,13 @@ test('Windows registration writes a quoted launcher and registers its manifest p
     await writeFile(path.join(temp,'token'),'synthetic-token');
     const { registerNative } = await import(pathToFileURL(path.join(temp,'setup.mjs')).href);
     const calls: any[] = [];
-    const directory = path.join(temp, 'User %PATH% !name!');
+    const target = path.join(temp, 'User %PATH% !name!');
+    await mkdir(target);
+    const directory = await realpath(target);
+    const alias = path.join(temp, 'bridge-alias');
+    await symlink(directory, alias, process.platform === 'win32' ? 'junction' : 'dir');
     const ids = ['pbibigofgbljlhhaadjgiikdkjiahhap','oapolkgbmjlpnfeakajjgigbkikphdjj'];
-    await registerNative(path.join(temp,'token'), ids, 'http://localhost:3210', 3218, directory, directory, undefined, undefined,
+    await registerNative(path.join(temp,'token'), ids, 'http://localhost:3210', 3218, alias, alias, undefined, undefined,
       {platform:'win32',run:async (...args: any[]) => calls.push(args)});
     const manifestFile = path.join(directory,'com.canvasdoc.connector.json');
     const manifest = JSON.parse(await readFile(manifestFile,'utf8'));
