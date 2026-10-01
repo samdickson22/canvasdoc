@@ -49,8 +49,9 @@ export class CodexRuntime {
     efforts: string[];
     defaultEffort: string;
   }[] = [];
-  currentModel = "gpt-5.6-luna";
-  currentEffort = "medium";
+  /** Codex's default model and effort from model/list; turns without a browser selection use them. */
+  currentModel?: string;
+  currentEffort?: string;
   /** Codex sign-in state for the workspace's private home. Sign-in runs from the browser panel. */
   account: { signedIn: boolean; email?: string; plan?: string; usageAllowed?: boolean; usage?: UsageWindows; error?: string } = { signedIn: false };
   private usageRefresh?: ReturnType<typeof setTimeout>;
@@ -389,22 +390,26 @@ export class CodexRuntime {
     const models: CodexRuntime["models"] = [];
     try {
       let cursor: string | null = null;
+      let defaultId: string | undefined;
       do {
         const page = await this.rpc("model/list", { cursor, limit: 100, includeHidden: false });
-        models.push(
-          ...page.data
-            .filter((m: any) => !m.hidden)
-            .map((m: any) => ({
-              id: m.model,
-              name: m.displayName,
-              description: m.description,
-              efforts: m.supportedReasoningEfforts.map((e: any) => e.reasoningEffort),
-              defaultEffort: m.defaultReasoningEffort,
-            })),
-        );
+        for (const m of page.data) {
+          if (m.hidden) continue;
+          if (m.isDefault) defaultId ??= m.model;
+          models.push({
+            id: m.model,
+            name: m.displayName,
+            description: m.description,
+            efforts: m.supportedReasoningEfforts.map((e: any) => e.reasoningEffort),
+            defaultEffort: m.defaultReasoningEffort,
+          });
+        }
         cursor = page.nextCursor;
       } while (cursor && models.length < 1000);
       this.models = models;
+      const fallback = models.find((m) => m.id === defaultId) ?? models[0];
+      this.currentModel = fallback?.id;
+      this.currentEffort = fallback?.defaultEffort;
     } catch {
       /* Sending requires a discovered model; keep the connection available to retry. */
     }

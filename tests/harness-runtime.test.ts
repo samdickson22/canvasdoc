@@ -83,11 +83,11 @@ test(
     const approvalMethod = "item/commandExecution/requestApproval";
     try {
       const config = await runtime.start();
-      assert.equal(runtime.currentModel, "gpt-5.6-luna");
+      assert.equal(runtime.currentModel, "gpt-6-astra");
       assert.equal(runtime.currentEffort, "medium");
       const catalog = runtime.models;
-      runtime.models = catalog.filter(model => model.id !== "gpt-5.6-luna");
-      await assert.rejects(runtime.send("unavailable", "unavailable-default"), /gpt-5.6-luna.*not available/);
+      runtime.models = catalog.filter(model => model.id !== "gpt-6-astra");
+      await assert.rejects(runtime.send("unavailable", "unavailable-default"), /gpt-6-astra.*not available/);
       runtime.models = catalog;
       const pending = nextEvent(runtime, approvalMethod);
       await runtime.send("hello", "request-1");
@@ -111,7 +111,7 @@ test(
       );
       assert.equal(messages.filter((m) => m.method === "initialize").length, 1);
       const firstTurn = messages.find(m => m.method === "turn/start");
-      assert.equal(firstTurn.params.model, "gpt-5.6-luna");
+      assert.equal(firstTurn.params.model, "gpt-6-astra");
       assert.equal(firstTurn.params.effort, "medium");
       assert.equal(firstTurn.params.approvalPolicy, "never");
       assert.deepEqual(firstTurn.params.sandboxPolicy, { type: "dangerFullAccess" });
