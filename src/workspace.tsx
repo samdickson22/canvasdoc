@@ -11,7 +11,7 @@ import { MaterialStatus } from "./material-status";
 import ReactMarkdown from "react-markdown";
 import { MarkdownDocument, MarkdownImage, MarkdownLink, MarkdownStyles, markdownPlugins, markdownRehypePlugins, preprocessMarkdown } from "./markdown-rendering";
 import { MermaidDiagram } from "./assistant-ui/components/assistant-ui/elements/mermaid-diagram";
-import { useCallback, useEffect, useReducer, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import {
   Download,
   File,
@@ -64,6 +64,28 @@ export function Workspace({
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [fileActions, setFileActions] = useState<HTMLDivElement | null>(null);
   const [maximized, setMaximized] = useState(false);
+  // The file viewer takes the whole screen through the Fullscreen API; the
+  // in-viewport expansion remains for browsers that reject the request.
+  const [fullscreen, setFullscreen] = useState(false);
+  const filePane = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const pane = filePane.current;
+    if (!pane) return;
+    const root = pane.getRootNode() as Document | ShadowRoot;
+    const sync = () => setFullscreen(root.fullscreenElement === pane);
+    document.addEventListener("fullscreenchange", sync);
+    return () => document.removeEventListener("fullscreenchange", sync);
+  }, []);
+  const toggleFullscreen = () => {
+    const pane = filePane.current;
+    if (fullscreen || maximized) {
+      if (fullscreen) void document.exitFullscreen?.();
+      setMaximized(false);
+      return;
+    }
+    if (!pane?.requestFullscreen) return setMaximized(true);
+    pane.requestFullscreen().catch(() => setMaximized(true));
+  };
   const [narrow, setNarrow] = useState(() => window.matchMedia("(max-width: 760px)").matches);
   const [explorerOpen, setExplorerOpen] = useState(() => !window.matchMedia("(max-width: 760px)").matches);
   useEffect(() => {
@@ -101,6 +123,7 @@ export function Workspace({
   const hideViewer = () => {
     setInspectorOpen(false);
     setMaximized(false);
+    if (fullscreen) void document.exitFullscreen?.();
   };
   const refresh = useCallback(async () => {
     if (connection.status !== "connected" || !inspectorOpen || !active) return;
@@ -236,7 +259,7 @@ export function Workspace({
           onChange={(value) => setSplitSize(100 - value)}
           hidden={!inspectorOpen || viewerOnly}
         />
-        <div className="workspace-pane" id="workspace-file-pane">
+        <div className="workspace-pane" id="workspace-file-pane" ref={filePane}>
           <div
             className="workspace-files workspace-file-dock"
             hidden={!inspectorOpen}
@@ -314,17 +337,13 @@ export function Workspace({
               </div>
               <div className="workspace-view-controls">
                 <button
-                  hidden={narrow}
-                  aria-label={
-                    viewerOnly ? "Restore split view" : "Expand file viewer"
-                  }
-                  title={
-                    viewerOnly ? "Restore split view" : "Expand file viewer"
-                  }
-                  aria-pressed={viewerOnly}
-                  onClick={() => setMaximized((v) => !v)}
+                  hidden={narrow && !fullscreen}
+                  aria-label={fullscreen || maximized ? "Exit full screen" : "Full screen"}
+                  title={fullscreen || maximized ? "Exit full screen" : "Full screen"}
+                  aria-pressed={fullscreen || maximized}
+                  onClick={toggleFullscreen}
                 >
-                  {viewerOnly ? (
+                  {fullscreen || maximized ? (
                     <Minimize2 size={16} />
                   ) : (
                     <Maximize2 size={16} />
