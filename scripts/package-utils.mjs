@@ -8,7 +8,7 @@ export async function stageExtension(directory) {
   if (manifest.version !== metadata.version) throw new Error('Rebuild the extension before packaging this version.');
   await rm(directory, { recursive: true, force: true });
   await mkdir(directory, { recursive: true });
-  for (const name of ['canvasdoc.js', 'background.js', 'bootstrap.js', 'bootstrap.css', 'icon-16.png', 'icon-32.png', 'icon-48.png', 'icon-128.png', 'pdf', 'notices'])
+  for (const name of ['canvasdoc.js', 'background.js', 'bootstrap.js', 'bootstrap.css', 'icon-16.png', 'icon-32.png', 'icon-48.png', 'icon-128.png', 'mermaid.js', 'highlighter', 'pdf', 'notices'])
     await cp(`dist/${name}`, path.join(directory, name), { recursive: true });
   return manifest;
 }

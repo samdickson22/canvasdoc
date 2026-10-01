@@ -15,7 +15,7 @@ test("Markdown renders coursework math safely and resolves file-preview links", 
     await build({
       stdin: {
         contents:
-          'export * from "./src/markdown-rendering"; export {highlightMarkdownCode} from "./src/markdown-highlighter";',
+          'export * from "./src/markdown-rendering"; export {highlight as highlightMarkdownCode} from "./src/highlighter-entry";',
         resolveDir: process.cwd(),
       },
       outfile,

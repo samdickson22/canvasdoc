@@ -17,4 +17,6 @@ file-tree, and tool-error elements; unknown and MCP tools keep `ToolFallback`.
 `artifact-card.tsx`, and `mermaid-diagram.tsx` are adapted from the same elements
 registry (`r.assistant-ui.com`) with local imports and Canvasdoc's palette. Mermaid
 renders through `beautiful-mermaid`, built separately as `dist/mermaid.js` and
-imported on demand. Conversation behavior stays with assistant-ui primitives.
+imported on demand. Code fences highlight through Shiki as in the registry's
+shiki-highlighter element, built separately as `dist/highlighter/` with one chunk
+per grammar and imported on demand. Conversation behavior stays with assistant-ui primitives.

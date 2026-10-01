@@ -37,7 +37,8 @@
     {
       "resources": [
         "pdf/viewer.html",
-        "mermaid.js"
+        "mermaid.js",
+        "highlighter/*"
       ],
       "matches": []
     }

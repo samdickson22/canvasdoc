@@ -44,26 +44,39 @@ function MermaidFence({ code }: SyntaxHighlighterProps) {
 }
 const componentsByLanguage = { mermaid: { SyntaxHighlighter: MermaidFence } };
 
+// Fences without a real language (none, text, plaintext, txt) read as plain code
+// blocks: no language bar, just the copy control inside the block.
+const plainLanguage = (language: string | undefined) =>
+  !language || /^(text|plaintext|plain|txt|none)$/i.test(language);
+
 const CodeHeader: FC<CodeHeaderProps> = ({ language, code }) => {
   const { isCopied, copyToClipboard } = useCopyToClipboard();
   const onCopy = () => {
     if (!code || isCopied) return;
     copyToClipboard(code);
   };
-
+  const copy = (
+    <TooltipIconButton tooltip="Copy" onClick={onCopy}>
+      {!isCopied && (
+        <CopyIcon className="animate-in zoom-in-75 fade-in duration-150" />
+      )}
+      {isCopied && (
+        <CheckIcon className="animate-in zoom-in-50 fade-in duration-200 ease-out" />
+      )}
+    </TooltipIconButton>
+  );
+  if (plainLanguage(language))
+    return (
+      <div className="aui-code-header-root relative z-10 mt-3 h-0 [&+pre]:rounded-t-xl [&+pre]:border-t [&+pre]:pe-12">
+        <div className="absolute end-1.5 top-1.5">{copy}</div>
+      </div>
+    );
   return (
     <div className="aui-code-header-root border-border/50 bg-muted/50 mt-3 flex items-center justify-between rounded-t-xl border border-b-0 px-3.5 py-1.5 text-xs">
       <span className="aui-code-header-language text-muted-foreground font-medium lowercase">
         {language}
       </span>
-      <TooltipIconButton tooltip="Copy" onClick={onCopy}>
-        {!isCopied && (
-          <CopyIcon className="animate-in zoom-in-75 fade-in duration-150" />
-        )}
-        {isCopied && (
-          <CheckIcon className="animate-in zoom-in-50 fade-in duration-200 ease-out" />
-        )}
-      </TooltipIconButton>
+      {copy}
     </div>
   );
 };

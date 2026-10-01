@@ -47,6 +47,8 @@ const build = await context({
           await bundle({entryPoints:["src/pdf-viewer.ts"],outfile:`${output}/pdf/viewer.js`,bundle:true,format:"iife",target:"chrome120",minify:true});
           await copyFile("extension/pdf-viewer.html", `${output}/pdf/viewer.html`);
           await bundle({entryPoints:["src/mermaid-entry.ts"],outfile:`${output}/mermaid.js`,bundle:true,format:"esm",target:"chrome120",minify:true});
+          await rm(`${output}/highlighter`, { recursive: true, force: true });
+          await bundle({entryPoints:{index:"src/highlighter-entry.ts"},outdir:`${output}/highlighter`,chunkNames:"[name]-[hash]",bundle:true,splitting:true,format:"esm",target:"chrome120",minify:true});
           await copyFile("node_modules/pdfjs-dist/build/pdf.worker.mjs", `${output}/pdf/pdf.worker.js`);
           await copyFile("node_modules/pdfjs-dist/LICENSE", `${output}/pdf/LICENSE`);
           for (const directory of ["cmaps", "standard_fonts", "wasm"])
@@ -84,8 +86,10 @@ const build = await context({
             for (const file of ["bootstrap.js", "bootstrap.css", "canvasdoc.js", "mermaid.js", "version.json"]) {
               await copyFile(`${output}/${file}`, `${devOutput}/${file}`);
             }
-            await rm(`${devOutput}/pdf`, { recursive:true, force:true });
-            await cp(`${output}/pdf`, `${devOutput}/pdf`, { recursive:true });
+            for (const directory of ["pdf", "highlighter"]) {
+              await rm(`${devOutput}/${directory}`, { recursive:true, force:true });
+              await cp(`${output}/${directory}`, `${devOutput}/${directory}`, { recursive:true });
+            }
           }
           console.log(`Canvasdoc built ${new Date().toLocaleTimeString()}`);
         });

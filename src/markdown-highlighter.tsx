@@ -1,25 +1,15 @@
 import { useEffect, useState } from "react";
 import { useAuiState } from "@assistant-ui/react";
 import type { SyntaxHighlighterProps } from "@assistant-ui/react-markdown";
-import { createHighlighterCore, type ThemedToken } from "shiki/core";
-import { createJavaScriptRegexEngine } from "shiki/engine/javascript";
-import javascript from "shiki/langs/javascript.mjs";
-import typescript from "shiki/langs/typescript.mjs";
-import python from "shiki/langs/python.mjs";
-import json from "shiki/langs/json.mjs";
-import githubLight from "shiki/themes/github-light.mjs";
+import type { ThemedToken } from "./highlighter-entry";
 
-let highlighter: ReturnType<typeof createHighlighterCore> | undefined;
-export async function highlightMarkdownCode(code: string, language: string) {
-  const instance = await (highlighter ??= createHighlighterCore({
-    themes: [githubLight],
-    langs: [javascript, typescript, python, json],
-    engine: createJavaScriptRegexEngine(),
-  }));
-  if (!instance.getLoadedLanguages().includes(language)) return null;
-  return instance.codeToTokens(code, { lang: language, theme: "github-light" })
-    .tokens;
-}
+type Highlighter = typeof import("./highlighter-entry");
+let loader: Promise<Highlighter> | undefined;
+// The grammars ship as a separate bundle so Canvas pages do not pay for them until a code block appears.
+const loadHighlighter = () => loader ??= import(/* webpackIgnore: true */ typeof chrome !== "undefined" && chrome.runtime?.id
+  ? chrome.runtime.getURL("highlighter/index.js") : "/canvasdoc/highlighter/index.js").catch(error => { loader = undefined; throw error; });
+export const highlightMarkdownCode = (code: string, language: string) =>
+  loadHighlighter().then(({ highlight }) => highlight(code, language));
 export function MarkdownHighlighter({
   code,
   language,
