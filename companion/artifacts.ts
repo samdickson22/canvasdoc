@@ -31,7 +31,9 @@ export async function bundleArtifact(root: string, relative: string): Promise<Ar
   const cached = cache.get(entry);
   if (cached && cached.key === await inputsKey(root, cached.result.inputs)) return cached.result;
   const esbuild = await import("esbuild");
-  const nodePaths = [path.dirname(path.dirname(require.resolve("react/package.json")))];
+  // The companion's node_modules. React resolves only from here, never from a node_modules above
+  // the workspace (such as a stray ~/node_modules), so the artifact cannot mix two React copies.
+  const companionModules = path.dirname(path.dirname(require.resolve("react/package.json")));
   const mount = `import * as artifact from ${JSON.stringify("./" + path.basename(entry))};
 import { createElement, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
@@ -45,12 +47,13 @@ else container.textContent = "Export a default React component from this file to
     setup(build) {
       build.onResolve({ filter: /.*/ }, async args => {
         if (args.kind === "entry-point" || args.pluginData?.sandboxed) return undefined;
+        const spec = args.path;
+        if (allowedPackages.test(spec))
+          return build.resolve(spec, { kind: args.kind, resolveDir: companionModules, pluginData: { sandboxed: true } });
         // Files inside the allowed packages resolve their own internals normally.
         if (args.importer && !args.importer.startsWith(root + path.sep)) return undefined;
-        const spec = args.path;
         if (/^(node:|https?:|data:|\/)/.test(spec)) return { errors: [{ text: `"${spec}" cannot be imported in an artifact. Use files inside the Canvasdoc folder.` }] };
         if (!spec.startsWith(".")) {
-          if (allowedPackages.test(spec)) return undefined;
           return { errors: [{ text: `Package "${spec}" is not available. Artifacts can import react, react-dom, and files inside the Canvasdoc folder.` }] };
         }
         const resolved = await build.resolve(spec, { kind: args.kind, resolveDir: args.resolveDir, importer: args.importer, pluginData: { sandboxed: true } });
@@ -71,7 +74,7 @@ else container.textContent = "Export a default React component from this file to
       jsx: "automatic", minify: false, sourcemap: false, legalComments: "none", logLevel: "silent",
       define: { "process.env.NODE_ENV": '"production"' },
       loader: { ".png": "dataurl", ".jpg": "dataurl", ".jpeg": "dataurl", ".gif": "dataurl", ".webp": "dataurl", ".svg": "dataurl", ".md": "text", ".txt": "text", ".csv": "text" },
-      absWorkingDir: root, nodePaths, plugins: [sandbox],
+      absWorkingDir: root, plugins: [sandbox],
     });
   } catch (error) {
     const failure = error as { errors?: Parameters<typeof format>[0]; warnings?: Parameters<typeof format>[0] };
