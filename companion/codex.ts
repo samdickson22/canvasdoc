@@ -49,7 +49,7 @@ export class CodexRuntime {
     efforts: string[];
     defaultEffort: string;
   }[] = [];
-  /** Codex's default model and effort from model/list; turns without a browser selection use them. */
+  /** Default model and effort from model/list; turns without a browser selection use them. */
   currentModel?: string;
   currentEffort?: string;
   /** Codex sign-in state for the workspace's private home. Sign-in runs from the browser panel. */
@@ -407,9 +407,10 @@ export class CodexRuntime {
         cursor = page.nextCursor;
       } while (cursor && models.length < 1000);
       this.models = models;
-      const fallback = models.find((m) => m.id === defaultId) ?? models[0];
-      this.currentModel = fallback?.id;
-      this.currentEffort = fallback?.defaultEffort;
+      // Coursework defaults to the newest Luna model (Codex lists newest first), then Codex's own default.
+      const preferred = models.find((m) => /-luna$/.test(m.id)) ?? models.find((m) => m.id === defaultId) ?? models[0];
+      this.currentModel = preferred?.id;
+      this.currentEffort = preferred?.defaultEffort;
     } catch {
       /* Sending requires a discovered model; keep the connection available to retry. */
     }
