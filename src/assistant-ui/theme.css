@@ -5,6 +5,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 @source "./components";
 @source "../conversation.tsx";
+@source "../model-selector.tsx";
 @theme {
   /* Base UI exposes a different measured height than the animation defaults. */
   @keyframes collapsible-down {
