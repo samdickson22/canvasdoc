@@ -1,6 +1,6 @@
 # Canvasdoc privacy policy
 
-Updated September 25, 2026.
+Updated October 1, 2026.
 
 Canvasdoc is developed by Sam Dickson. It connects Canvas to a coursework agent running on your computer through a local companion and Codex. It currently supports Cal Poly and UCLA (BruinLearn) Canvas. Local execution does not mean offline processing: the agent sends information to its model provider to respond to your requests.
 
@@ -34,7 +34,7 @@ Canvasdoc is in a closed beta with testers who have agreed to share how it works
 
 This information is used only to improve Canvasdoc during the beta. It is stored on the developer's own computer, is not sold or shared with anyone else, and is deleted when the beta ends or on request. Uploads are queued on your computer and sent over HTTPS.
 
-To stop sharing, uncheck "Share beta diagnostics" in the Canvasdoc panel's Settings, or run `npx canvasdoc-cli --no-diagnostics`. Turning it off also discards anything queued but not yet sent. The choice is stored on your computer and survives updates.
+To stop sharing, uncheck "Share beta diagnostics" in the Canvasdoc panel's Settings, or run `curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash -s -- --no-diagnostics`. Turning it off also discards anything queued but not yet sent. The choice is stored on your computer and survives updates.
 
 ## Use of your information
 
@@ -50,7 +50,7 @@ Course-material synchronization does not automatically submit coursework or chan
 
 Local information remains until you remove it. Removing the extension removes its browser-managed storage, but does not remove your workspace files, recovery exports, Codex sign-in, or runtime session records. Deleting a conversation from the browser does not by itself erase local recovery exports or provider-side records.
 
-The companion runs in the background from login. Run `npx canvasdoc-cli --stop` to stop agent execution and the browser's connection to it. Disable or remove the extension to stop its Canvas access. To remove local workspace data, delete the selected Canvasdoc folder and any copies or backups you keep. Launcher settings, native-bridge configuration, the companion copy, and logs remain separately in your user configuration and Library directories. Contact support if you need help locating them.
+The companion runs in the background from login. Run `curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash -s -- --stop` to stop agent execution and the browser's connection to it. Disable or remove the extension to stop its Canvas access. To remove local workspace data, delete the selected Canvasdoc folder and any copies or backups you keep. Launcher settings, native-bridge configuration, the companion copy, and logs remain separately in your user configuration and Library directories. Contact support if you need help locating them.
 
 Use the model provider's controls for information it retains. To request deletion of information you sent to Canvasdoc support, email the address below. Support correspondence is kept as needed to resolve requests and maintain necessary support records.
 

@@ -1,6 +1,6 @@
 # Canvasdoc support
 
-Updated September 25, 2026.
+Updated October 1, 2026.
 
 Email [sjedickson+canvasdoc@gmail.com](mailto:sjedickson+canvasdoc@gmail.com) for installation help, bug reports, or privacy requests. Canvasdoc is developed by Sam Dickson and currently supports Cal Poly and UCLA (BruinLearn) Canvas with a local companion and a Codex account.
 
@@ -12,13 +12,15 @@ Canvasdoc needs a companion running on your Mac. Install the [Chrome extension](
 curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash
 ```
 
-If you already have [Node.js](https://nodejs.org/) 22.13 or later, `npx canvasdoc-cli@latest` does the same. Inside Canvas, Canvasdoc shows a ready-to-copy command for your school whenever it isn't connected.
+If you already have [Node.js](https://nodejs.org/) 22.13 or later, the command uses it. Inside Canvas, Canvasdoc shows a ready-to-copy command for your school whenever it isn't connected.
 
-The command creates a Canvasdoc folder in Documents, starts Canvasdoc in the background, connects it to every Chromium browser installed (Chrome, Brave, Edge, Arc, and others), and finishes in about a minute. You can close the Terminal window afterwards. Back in Canvas, click **Sign in** in the Canvasdoc panel to sign in to Codex for that folder. Later runs remember your folder. To stop Canvasdoc, run `npx canvasdoc-cli --stop`.
+The command creates a Canvasdoc folder in Documents, starts Canvasdoc in the background, connects it to every Chromium browser installed (Chrome, Brave, Edge, Arc, and others), and finishes in about a minute. You can close the Terminal window afterwards. Back in Canvas, click **Sign in** in the Canvasdoc panel to sign in to Codex for that folder. Later runs remember your folder. To stop Canvasdoc, run `curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash -s -- --stop`.
+
+Setup prints each step with the time as it goes and saves a copy to `~/Library/Logs/Canvasdoc/install.log`. If it stalls or fails, email that file and `~/Library/Logs/Canvasdoc/connector.log`.
 
 ## Beta diagnostics
 
-During the closed beta, Canvasdoc shares diagnostics with the developer by default so problems can be fixed without asking you to reproduce them: your messages, the agent's full activity, Canvas context, and errors. See the [privacy policy](privacy.md) for the full list. Uncheck "Share beta diagnostics" in the panel's Settings, or run `npx canvasdoc-cli --no-diagnostics`, to stop.
+During the closed beta, Canvasdoc shares diagnostics with the developer by default so problems can be fixed without asking you to reproduce them: your messages, the agent's full activity, Canvas context, and errors. See the [privacy policy](privacy.md) for the full list. Uncheck "Share beta diagnostics" in the panel's Settings, or run `curl -fsSL https://canvasdoc-public.vercel.app/install.sh | bash -s -- --no-diagnostics`, to stop.
 
 ## Reporting a problem
 

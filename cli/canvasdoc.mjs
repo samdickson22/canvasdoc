@@ -3,7 +3,7 @@ import { registerNative, installLaunchAgent, removeLaunchAgent, restartLaunchAge
 import { setupComputerUse } from './computer-use.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
-import { access, cp, mkdir, readFile, readdir, rename, rm, stat, symlink, writeFile } from 'node:fs/promises';
+import { access, cp, mkdir, readFile, readdir, realpath, rename, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -271,5 +271,6 @@ async function relocateWorkspace(root) {
   await rename(temp, file);
 }
 
-const invoked = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+// npx runs the bin through a node_modules/.bin symlink, while import.meta.url is the real file.
+const invoked = process.argv[1] && await realpath(process.argv[1]).catch(() => path.resolve(process.argv[1])) === fileURLToPath(import.meta.url);
 if (invoked) main().catch(error => { console.error(`Canvasdoc: ${error.message}`); process.exitCode = 1; });
