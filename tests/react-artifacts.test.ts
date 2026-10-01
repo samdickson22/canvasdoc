@@ -62,6 +62,7 @@ test("the companion answers files-bundle over the connector socket", { timeout: 
     assert.ok(rejected.error);
   } finally {
     await fixture.close();
-    await rm(workspace, { recursive: true, force: true });
+    // Windows may retain the just-stopped esbuild process's working-directory handle briefly.
+    await rm(workspace, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
   }
 });

@@ -15,23 +15,23 @@ test('native registration copies a durable host and authorizes only the selected
   await mkdir(path.join(temp,'.canvasdoc'));
   await writeFile(path.join(temp,'.canvasdoc/dev-connection-token'),'synthetic-test-token');
   const id='oapolkgbmjlpnfeakajjgigbkikphdjj';
-  await registerNative(path.join(temp,'.canvasdoc/dev-connection-token'),id,'https://calpoly.instructure.com',3218,path.join(temp,'chrome'),path.join(temp,'Canvasdoc'));
+  await registerNative(path.join(temp,'.canvasdoc/dev-connection-token'),id,'https://calpoly.instructure.com',3218,path.join(temp,'chrome'),path.join(temp,'Canvasdoc'),undefined,undefined,{platform:'darwin'});
   const manifest=JSON.parse(await readFile(path.join(temp,'chrome/com.canvasdoc.connector.json'),'utf8'));
   assert.deepEqual(manifest.allowed_origins,[`chrome-extension://${id}/`]);
   const store='pbibigofgbljlhhaadjgiikdkjiahhap';
-  await registerNative(path.join(temp,'.canvasdoc/dev-connection-token'),[id,store],'https://calpoly.instructure.com',3218,path.join(temp,'chrome'),path.join(temp,'Canvasdoc'));
+  await registerNative(path.join(temp,'.canvasdoc/dev-connection-token'),[id,store],'https://calpoly.instructure.com',3218,path.join(temp,'chrome'),path.join(temp,'Canvasdoc'),undefined,undefined,{platform:'darwin'});
   assert.deepEqual(JSON.parse(await readFile(path.join(temp,'chrome/com.canvasdoc.connector.json'),'utf8')).allowed_origins,[`chrome-extension://${id}/`,`chrome-extension://${store}/`]);
   assert.equal(await readFile(path.join(temp,'Canvasdoc/native-host.mjs'),'utf8'),'// synthetic native host');
   assert.ok(!(await readFile(manifest.path,'utf8')).includes(path.join(temp,'.canvasdoc')));
   const config=JSON.parse(await readFile(path.join(temp,'Canvasdoc/connection.json'),'utf8'));
   assert.equal(config.origin,'https://calpoly.instructure.com');
   assert.equal(config.token,'synthetic-test-token');
-  await assert.rejects(registerNative(path.join(temp,'.canvasdoc/dev-connection-token'),'invalid','https://calpoly.instructure.com',3218,path.join(temp,'chrome')));
-  await assert.rejects(registerNative(path.join(temp,'.canvasdoc/dev-connection-token'),[],'https://calpoly.instructure.com',3218,path.join(temp,'chrome')));
+  await assert.rejects(registerNative(path.join(temp,'.canvasdoc/dev-connection-token'),'invalid','https://calpoly.instructure.com',3218,path.join(temp,'chrome'),undefined,undefined,undefined,{platform:'darwin'}));
+  await assert.rejects(registerNative(path.join(temp,'.canvasdoc/dev-connection-token'),[],'https://calpoly.instructure.com',3218,path.join(temp,'chrome'),undefined,undefined,undefined,{platform:'darwin'}));
  }finally{await rm(temp,{recursive:true,force:true})}
 });
 
-test('launch agent job runs the connector from its folder with the connection settings and restarts after failure',async()=>{
+test('launch agent job runs the connector from its folder with the connection settings and restarts after failure',{skip:process.platform!=='darwin'},async()=>{
  const temp=await mkdtemp(path.join(os.tmpdir(),'canvasdoc-launchd-'));
  try{
   await build({entryPoints:['cli/native-setup.mjs'],outfile:path.join(temp,'setup.mjs'),bundle:true,platform:'node',format:'esm'});
@@ -68,7 +68,7 @@ test('native registration records the service kickstart for the bridge',async()=
   const {registerNative}=await import(pathToFileURL(path.join(temp,'setup.mjs')).href);
   await mkdir(path.join(temp,'.canvasdoc'));
   await writeFile(path.join(temp,'.canvasdoc/dev-connection-token'),'synthetic-test-token');
-  await registerNative(path.join(temp,'.canvasdoc/dev-connection-token'),'oapolkgbmjlpnfeakajjgigbkikphdjj','https://canvas.calpoly.edu',3218,path.join(temp,'chrome'),path.join(temp,'Canvasdoc'),['/bin/launchctl','kickstart','gui/501/com.canvasdoc.test']);
+  await registerNative(path.join(temp,'.canvasdoc/dev-connection-token'),'oapolkgbmjlpnfeakajjgigbkikphdjj','https://canvas.calpoly.edu',3218,path.join(temp,'chrome'),path.join(temp,'Canvasdoc'),['/bin/launchctl','kickstart','gui/501/com.canvasdoc.test'],undefined,{platform:'darwin'});
   const config=JSON.parse(await readFile(path.join(temp,'Canvasdoc/connection.json'),'utf8'));
   assert.deepEqual(config.kickstart,['/bin/launchctl','kickstart','gui/501/com.canvasdoc.test']);
  }finally{await rm(temp,{recursive:true,force:true})}
@@ -86,7 +86,7 @@ test('native registration reaches every installed Chromium browser and records t
   const directories=await nativeHostDirectories(support);
   assert.deepEqual(directories,['Google/Chrome','BraveSoftware/Brave-Browser','Microsoft Edge','Arc/User Data'].map(b=>path.join(support,b,'NativeMessagingHosts')));
   await writeFile(path.join(temp,'token'),'synthetic-test-token');
-  const written=await registerNative(path.join(temp,'token'),'oapolkgbmjlpnfeakajjgigbkikphdjj','https://canvas.calpoly.edu',3218,directories,path.join(temp,'Canvasdoc'),undefined,path.join(temp,'connector.log'));
+  const written=await registerNative(path.join(temp,'token'),'oapolkgbmjlpnfeakajjgigbkikphdjj','https://canvas.calpoly.edu',3218,directories,path.join(temp,'Canvasdoc'),undefined,path.join(temp,'connector.log'),{platform:'darwin'});
   assert.deepEqual(written,directories);
   for(const dir of directories)assert.equal(JSON.parse(await readFile(path.join(dir,'com.canvasdoc.connector.json'),'utf8')).name,'com.canvasdoc.connector');
   assert.equal(JSON.parse(await readFile(path.join(temp,'Canvasdoc/connection.json'),'utf8')).log,path.join(temp,'connector.log'));

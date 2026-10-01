@@ -3,6 +3,7 @@ import path from "node:path";
 
 export async function within(root: string, relative: string) {
   if (typeof relative !== "string" || path.isAbsolute(relative) || relative.split(/[\\/]/).some(p => p.startsWith("."))) throw new Error("Choose a workspace file.");
+  if (process.platform === "win32" && /[:<>"|?*]/.test(relative)) throw new Error("Choose a workspace file.");
   const target = await realpath(path.join(root, relative));
   if (!target.startsWith(root + path.sep)) throw new Error("File is outside the Canvasdoc folder.");
   if (path.relative(root, target).split(path.sep).some(p => p.startsWith("."))) throw new Error("Choose a workspace file.");
@@ -20,7 +21,7 @@ export async function listWorkspaceFiles(root: string) {
       if (entry.isDirectory()) await walk(next, depth + 1);
       else if (entry.isFile()) {
         const info = await stat(await within(root, next));
-        files.push({ path: next, size: info.size, modified: info.mtimeMs });
+        files.push({ path: next.split(path.sep).join('/'), size: info.size, modified: info.mtimeMs });
       }
     }
   }

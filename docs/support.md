@@ -1,10 +1,14 @@
 # Canvasdoc support
 
-Updated September 25, 2026.
+Updated October 1, 2026.
 
 Email [sjedickson+canvasdoc@gmail.com](mailto:sjedickson+canvasdoc@gmail.com) for installation help, bug reports, or privacy requests. Canvasdoc is developed by Sam Dickson and currently supports Cal Poly and UCLA (BruinLearn) Canvas with a local companion and a Codex account.
 
 ## Installing and starting the companion
+
+On Windows, install [Node.js 24 LTS](https://nodejs.org/) and the [Chrome extension](https://chromewebstore.google.com/detail/pbibigofgbljlhhaadjgiikdkjiahhap), then run `npx.cmd canvasdoc-cli@latest` in PowerShell. Keep that window open while using Canvasdoc. Press Ctrl+C to stop; run the command again to restart. Sign in from the Canvasdoc panel. Private state and the browser bridge live under `%LOCALAPPDATA%\Canvasdoc`. Native Computer Use is currently macOS-only.
+
+The following installer and background service instructions apply to macOS.
 
 Canvasdoc needs a companion running on your Mac. Install the [Chrome extension](https://chromewebstore.google.com/detail/pbibigofgbljlhhaadjgiikdkjiahhap), then run this in Terminal. It installs Node.js privately if your Mac doesn't have it, then starts the companion, which includes Codex.
 

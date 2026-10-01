@@ -7,7 +7,7 @@ export function markdownWorkspacePath(
   documentPath?: string,
 ): string | null {
   if (!isLocalFileLink(href)) return null;
-  if (href.startsWith("/")) return localFilePath(href, root);
+  if (href.startsWith("/") || /^[a-z]:[\\/]|^file:/i.test(href)) return localFilePath(href, root);
   let decoded: string;
   try {
     decoded = decodeURIComponent(
@@ -16,6 +16,7 @@ export function markdownWorkspacePath(
   } catch {
     return null;
   }
+  if (root && /^(?:[a-z]:[\\/]|\\\\)/i.test(root)) decoded = decoded.replaceAll("\\", "/");
   if (
     /^[a-z][a-z\d+.-]*:/i.test(decoded) ||
     /[\\\x00-\x1f]/.test(decoded) ||

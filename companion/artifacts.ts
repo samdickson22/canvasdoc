@@ -79,11 +79,11 @@ else container.textContent = "Export a default React component from this file to
   } catch (error) {
     const failure = error as { errors?: Parameters<typeof format>[0]; warnings?: Parameters<typeof format>[0] };
     if (!failure.errors) throw error;
-    return { js: "", css: "", errors: format(failure.errors), warnings: format(failure.warnings ?? []), inputs: [path.relative(root, entry)] };
+    return { js: "", css: "", errors: format(failure.errors), warnings: format(failure.warnings ?? []), inputs: [path.relative(root, entry).split(path.sep).join("/")] };
   }
   const js = result.outputFiles?.find(f => f.path.endsWith(".js"))?.text ?? "";
   const css = result.outputFiles?.filter(f => f.path.endsWith(".css")).map(f => f.text).join("\n") ?? "";
-  if (js.length + css.length > OUTPUT_LIMIT) return { js: "", css: "", errors: [{ text: "The bundled artifact exceeds 8 MB. Reduce embedded data or images." }], warnings: [], inputs: [path.relative(root, entry)] };
+  if (js.length + css.length > OUTPUT_LIMIT) return { js: "", css: "", errors: [{ text: "The bundled artifact exceeds 8 MB. Reduce embedded data or images." }], warnings: [], inputs: [path.relative(root, entry).split(path.sep).join("/")] };
   const inputs = Object.keys(result.metafile?.inputs ?? {}).filter(file => !file.startsWith("..") && !file.startsWith("<"));
   const bundle: ArtifactBundle = { js, css, errors: [], warnings: format(result.warnings), inputs };
   cache.set(entry, { key: await inputsKey(root, inputs), result: bundle });

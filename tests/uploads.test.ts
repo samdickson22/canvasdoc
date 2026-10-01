@@ -16,7 +16,7 @@ test('uploads preserve bytes and cannot escape the selected root', async () => {
     await assert.rejects(saveUpload(root, 'huge', Buffer.alloc(5 * 1024 * 1024 + 1).toString('base64')));
     await rm(path.join(root, 'uploads'), { recursive: true });
     await mkdir(path.join(root, 'elsewhere'));
-    await symlink(path.join(root, 'elsewhere'), path.join(root, 'uploads'));
+    await symlink(path.join(root, 'elsewhere'), path.join(root, 'uploads'), process.platform === 'win32' ? 'junction' : 'dir');
     await assert.rejects(saveUpload(root, 'notes', 'YQ=='), /symlink/);
   } finally { await rm(root, { recursive: true, force: true }); }
 });

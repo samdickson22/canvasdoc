@@ -1,14 +1,14 @@
 import { lstat, mkdir, readFile, realpath } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import os from "node:os";
 import path from "node:path";
 import { atomicJson } from "./atomic-json.ts";
+import { supportDirectory } from "./platform.ts";
 
 export type WorkspaceConfig = { version: 1; workspaceId: string; root: string };
 
 /** Private app state lives outside the workspace so Documents can sync to iCloud without SQLite, locks, or credentials. */
 export const stateRoot = () =>
-  process.env.CANVASDOC_STATE_DIR || path.join(os.homedir(), "Library/Application Support/Canvasdoc/workspaces");
+  process.env.CANVASDOC_STATE_DIR || path.join(supportDirectory(), "workspaces");
 export const workspaceStateDir = (workspaceId: string) => path.join(stateRoot(), workspaceId);
 const validId = (value: unknown): value is string => typeof value === "string" && /^[A-Za-z0-9._-]{1,80}$/.test(value);
 
