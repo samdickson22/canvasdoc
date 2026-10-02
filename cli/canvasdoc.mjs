@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { registerNative, installLaunchAgent, removeLaunchAgent, restartLaunchAgent, kickstartCommand, launchLabel, supportDirectory, logDirectory } from './native-setup.mjs';
+import { openBrowser } from '../companion/platform.ts';
 import { setupComputerUse } from './computer-use.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import { createInterface } from 'node:readline/promises';
@@ -18,8 +19,8 @@ import origins from '../extension/origins.json' with { type: 'json' };
 const args = process.argv.slice(2);
 // The Chrome Web Store build. An unpacked development build has its own ID and is passed with --extension-id.
 const STORE_EXTENSION_ID = 'pbibigofgbljlhhaadjgiikdkjiahhap';
-const help = `Canvasdoc\n\nUsage: npx canvasdoc-cli [--folder PATH] [--origin URL] [--no-open] [--relocate]\n\nSets up Canvasdoc as a background service on this Mac, then exits. Sign in to Codex from the Canvasdoc panel in Canvas.\nThe first run creates ~/Documents/Canvasdoc unless --folder is given. Later runs update the service and resume the same agent.\nChat attachments support files up to 5 MB. Node.js 22.13 or later is required.\nThe Canvasdoc browser extension or development UI must already be installed.
-\n--folder PATH  Select or create a Canvasdoc folder\n--origin URL   Canvas site allowed to connect (asked on first run otherwise)\n--extension-id ID  Also register an unpacked extension ID (the store build is registered by default on macOS)\n--no-extension  Skip Chrome registration and pair the development UI with a token\n--relocate     Resume an existing agent from its moved folder (requires --folder)\n--stop         Stop and remove the background service\n--foreground   Run the connector in this terminal instead of as a service (development)
+const help = `Canvasdoc\n\nUsage: npx canvasdoc-cli [--folder PATH] [--origin URL] [--no-open] [--relocate]\n\nOn macOS, installs a background service and exits. On Windows, runs in this terminal; keep it open. Sign in to Codex from the Canvasdoc panel in Canvas.\nThe first run creates ~/Documents/Canvasdoc unless --folder is given. Later runs update the service and resume the same agent.\nChat attachments support files up to 5 MB. Node.js 22.13 or later is required.\nThe Canvasdoc browser extension or development UI must already be installed.
+\n--folder PATH  Select or create a Canvasdoc folder\n--origin URL   Canvas site allowed to connect (asked on first run otherwise)\n--extension-id ID  Also register an unpacked extension ID (the store build is registered by default on macOS and Windows)\n--no-extension  Skip Chrome registration and pair the development UI with a token\n--relocate     Resume an existing agent from its moved folder (requires --folder)\n--stop         Stop and remove the background service\n--foreground   Run the connector in this terminal instead of as a service (development)
 --no-diagnostics  Turn off beta diagnostics sharing for this computer (--share-diagnostics turns it back on)\n--setup-browser  Configure Chrome tab control and native Mac app tools, then exit\n--setup-computer-use  Configure native Mac app tools for this workspace and exit\n--no-open      Finish without opening a browser\n--help         Show this help\n--version      Show version`;
 
 const packageDirectory = fileURLToPath(new URL('.', import.meta.url));
@@ -142,7 +143,7 @@ async function main() {
   const port = Number(process.env.CANVASDOC_CONNECTOR_PORT || 3218);
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid connector port.');
   const extensionId = options['extension-id'] || saved?.extensionId;
-  const extensionIds = options.noExtension ? [] : [...new Set([extensionId, process.platform === 'darwin' ? STORE_EXTENSION_ID : undefined].filter(Boolean))];
+  const extensionIds = options.noExtension ? [] : [...new Set([extensionId, ['darwin', 'win32'].includes(process.platform) ? STORE_EXTENSION_ID : undefined].filter(Boolean))];
   const remember = () => saveSettings(settingsFile, { version: 1, root, origin, ...(extensionId ? {extensionId} : {}) })
     .catch(error => console.error(`Could not remember this folder: ${error.message}`));
   async function openCanvas(tokenFile) {
@@ -153,9 +154,7 @@ async function main() {
         const token = (await readFile(tokenFile, 'utf8')).trim();
         url.hash = new URLSearchParams({ canvasdoc_connect: `ws://127.0.0.1:${port}`, canvasdoc_token: token }).toString();
       }
-      const opener = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? null : 'xdg-open';
-      if (!opener) return console.log('Open Canvasdoc and connect to ws://127.0.0.1:' + port);
-      spawn(opener, [url.href], { stdio: 'ignore' }).on('error', () => console.error('Could not open your browser. Open your Canvasdoc page manually.'));
+      openBrowser(url.href, () => console.error('Could not open your browser. Open your Canvasdoc page manually.'));
     } catch { console.error('Could not open Canvasdoc. The connector is still running.'); }
   }
   const tokenFile = path.join(codexHome.stateDir, 'connection-token');
@@ -254,7 +253,7 @@ async function adoptWorkspaceState(root) {
       await rm(source, { recursive: true, force: true });
     }
     // Codex's thread index records absolute rollout paths, so the old home keeps resolving.
-    if (from === 'codex-home') await symlink(destination, source);
+    if (from === 'codex-home') await symlink(destination, source, process.platform === 'win32' ? 'junction' : 'dir');
     moved = true;
   }
   if (moved) console.log(`Moved Canvasdoc's private state out of ${root} into ${target}.`);

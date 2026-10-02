@@ -44,7 +44,12 @@ await copyFile('cli/README.md', `${out}/README.md`);
 if(process.argv.includes('--no-pack')) { console.log(`Built Canvasdoc CLI ${version} from this checkout.`); process.exit(0); }
 const artifacts = path.resolve('release/artifacts');
 await mkdir(artifacts, { recursive: true });
-const packed = JSON.parse(execFileSync('npm', ['pack', path.resolve(out), '--pack-destination', artifacts, '--json'], { encoding: 'utf8' }));
+// npm.cmd cannot be launched by execFile on Windows; run npm's JS entry directly.
+const packArgs = ['pack', path.resolve(out), '--pack-destination', artifacts, '--json'];
+const npm = process.env.npm_execpath || path.join(path.dirname(process.execPath), 'node_modules/npm/bin/npm-cli.js');
+const packed = JSON.parse(process.platform === 'win32'
+  ? execFileSync(process.execPath, [npm, ...packArgs], { encoding: 'utf8' })
+  : execFileSync('npm', packArgs, { encoding: 'utf8' }));
 const expected = ['AGENT.md', 'HARNESS-LICENSE', 'LICENSE', 'README.md', 'canvasdoc.mjs', 'connector.mjs', 'extract-worker.mjs', 'native-host.mjs', 'package.json'];
 for (const name of await readdir('companion/bundled-skills')) expected.push(`bundled-skills/${name}/SKILL.md`);
 expected.sort();

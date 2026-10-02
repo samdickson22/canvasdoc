@@ -15,7 +15,7 @@ export function isLocalFileLink(value: string): boolean {
     !/^\/files\/\d+(?:[/?#]|$)/.test(value) &&
     !/^\/(?:courses(?:\/\d+)?|calendar|profile|conversations|dashboard)(?:[/?#]|$)/.test(value) &&
     value !== "/" &&
-    (!/^[a-z][a-z\d+.-]*:/i.test(value) || value.startsWith("file:"));
+    (!/^[a-z][a-z\d+.-]*:/i.test(value) || /^[a-z]:[\\/]/i.test(value) || value.startsWith("file:"));
 }
 
 export function markdownFileLinks(text: string): string[] {
@@ -33,13 +33,20 @@ export function localFilePath(value: string, root?: string, literal = false): st
   } catch {
     return null;
   }
-  if (root && path.startsWith(root + "/")) path = path.slice(root.length + 1);
+  const windows = !!root && /^(?:[a-z]:[\\/]|\\\\)/i.test(root);
+  if (windows) {
+    path = path.replaceAll("\\", "/");
+    root = root!.replaceAll("\\", "/");
+    if (/^file:\/\/\/[a-z]:\//i.test(path)) path = path.slice(8);
+  }
+  if (root && (windows ? path.toLowerCase().startsWith(root.toLowerCase() + "/") : path.startsWith(root + "/"))) path = path.slice(root.length + 1);
   path = path.replace(/^\.\//, "");
   if (
     !path ||
     path.startsWith("/") ||
     /^[a-z][a-z\d+.-]*:/i.test(path) ||
     /[\\\x00-\x1f]/.test(path) ||
+    (windows && /[:<>"|?*]/.test(path)) ||
     path.split("/").some((p) => !p || p.startsWith("."))
   )
     return null;

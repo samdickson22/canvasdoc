@@ -1,11 +1,13 @@
-import { access, mkdir, copyFile, writeFile, readFile, chmod, unlink } from 'node:fs/promises';
+import { access, mkdir, copyFile, writeFile, readFile, chmod, unlink, realpath } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+import { supportDirectory } from '../companion/platform.ts';
+export { supportDirectory };
 
 // Test overrides keep a developer's live Chrome bridge and background service untouched.
-export const supportDirectory = () => process.env.CANVASDOC_SUPPORT_DIR || path.join(os.homedir(), 'Library/Application Support/Canvasdoc');
 export const chromeHostsDirectory = () => process.env.CANVASDOC_CHROME_HOSTS_DIR || path.join(os.homedir(), 'Library/Application Support/Google/Chrome/NativeMessagingHosts');
 // Chromium browsers install the same store extension; each reads native hosts from its own profile folder.
 const browserFolders = ['Google/Chrome', 'Google/Chrome Beta', 'Google/Chrome Canary', 'Chromium', 'BraveSoftware/Brave-Browser', 'Microsoft Edge', 'Arc/User Data', 'Vivaldi', 'com.operasoftware.Opera'];
@@ -25,23 +27,36 @@ const serviceTarget = (label) => `gui/${process.getuid()}/${label}`;
 /** Command the Chrome bridge runs when the connector socket is refused. */
 export const kickstartCommand = (label = launchLabel()) => ['/bin/launchctl', 'kickstart', serviceTarget(label)];
 
-export async function registerNative(tokenFile, extensionIds, origin, port, chromeDirectory, bridgeDirectory = supportDirectory(), kickstart, log) {
-  if(process.platform !== 'darwin') throw new Error('Native setup currently supports macOS.');
+export async function registerNative(tokenFile, extensionIds, origin, port, chromeDirectory, bridgeDirectory = supportDirectory(), kickstart, log, { platform = process.platform, run = promisify(execFile) } = {}) {
+  if(!['darwin', 'win32'].includes(platform)) throw new Error('Native setup supports macOS and Windows.');
   const ids=[].concat(extensionIds);
   if(!ids.length||ids.some(id=>!/^[a-p]{32}$/.test(id))) throw new Error('Invalid Chrome extension ID.');
-  const directory=bridgeDirectory;await mkdir(directory,{recursive:true,mode:0o700});
+  await mkdir(bridgeDirectory,{recursive:true,mode:0o700});
+  // Packaged Windows terminals can virtualize AppData. The browser runs outside
+  // that package and needs the physical paths to the manifest and launcher.
+  const directory=platform === 'win32' ? await realpath(bridgeDirectory) : bridgeDirectory;
   const host=path.join(directory,'native-host.mjs');
   await copyFile(fileURLToPath(new URL('./native-host.mjs',import.meta.url)),host);
   const token=(await readFile(tokenFile,'utf8')).trim();
   const configuration=path.join(directory,'connection.json');
   await writeFile(configuration,JSON.stringify({origin,port,token,...(kickstart?{kickstart}:{}),...(log?{log}:{})}),{mode:0o600});
   const quote=value=>"'"+value.replaceAll("'","'\\''")+"'";
-  const launcher=path.join(directory,'native-host.sh');
-  await writeFile(launcher,`#!/bin/sh\nexec ${quote(process.execPath)} ${quote(host)} --connection-config ${quote(configuration)}\n`,{mode:0o700});
+  const launcher=path.join(directory,platform === 'win32' ? 'native-host.cmd' : 'native-host.sh');
+  // Disable delayed expansion and escape percent signs in batch literals, including profile paths.
+  const batchQuote=value=>'"'+value.replaceAll('%','%%')+'"';
+  const script=platform === 'win32'
+    ? `@echo off\r\nsetlocal DisableDelayedExpansion\r\nchcp 65001 >nul\r\n${batchQuote(process.execPath)} ${batchQuote(host)} --connection-config ${batchQuote(configuration)}\r\n`
+    : `#!/bin/sh\nexec ${quote(process.execPath)} ${quote(host)} --connection-config ${quote(configuration)}\n`;
+  await writeFile(launcher,script,{mode:0o700});
   await chmod(launcher,0o700);
   const manifest=JSON.stringify({name:'com.canvasdoc.connector',description:'Canvasdoc local agent connection',path:launcher,type:'stdio',allowed_origins:ids.map(id=>`chrome-extension://${id}/`)},null,2);
-  const directories=chromeDirectory?[].concat(chromeDirectory):await nativeHostDirectories();
+  const directories=chromeDirectory?[].concat(chromeDirectory):platform === 'win32' ? [process.env.CANVASDOC_CHROME_HOSTS_DIR || directory] : await nativeHostDirectories();
   for(const hosts of directories){await mkdir(hosts,{recursive:true});await writeFile(path.join(hosts,'com.canvasdoc.connector.json'),manifest,{mode:0o600});}
+  if(platform === 'win32') {
+    const key=process.env.CANVASDOC_NATIVE_REGISTRY_KEY || 'HKCU\\Software\\Google\\Chrome\\NativeMessagingHosts\\com.canvasdoc.connector';
+    const manifestPath=await realpath(path.join(directories[0],'com.canvasdoc.connector.json'));
+    await run('reg.exe',['add',key,'/ve','/t','REG_SZ','/d',manifestPath,'/f'],{windowsHide:true});
+  }
   return directories;
 }
 

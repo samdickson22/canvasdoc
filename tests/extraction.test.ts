@@ -163,7 +163,7 @@ test(
         await readFile(path.join(root, "scan.pdf.txt"), "utf8"),
         /Status: needs-ocr/,
       );
-      await symlink(os.tmpdir(), path.join(root, "escape"));
+      await symlink(os.tmpdir(), path.join(root, "escape"), process.platform === 'win32' ? 'junction' : 'dir');
       await assert.rejects(ex.safe("escape/anything.pdf"));
       await assert.rejects(ex.safe("../outside.pdf"));
     } finally {

@@ -6,7 +6,7 @@ import {spawn} from 'node:child_process';import {build} from 'esbuild';import {W
 import {nativeReceiver} from '../companion/native-framing.ts';
 
 test('Chrome bridge connects without access to the workspace directory',async()=>{
- const temp=await mkdtemp(path.join(os.tmpdir(),'canvasdoc-native-transport-'));
+ const temp=await mkdtemp(path.join(os.tmpdir(),'canvasdoc native & ü !name! transport-'));
  const root=path.join(temp,'Documents/Canvasdoc');await mkdir(path.join(root,'.canvasdoc'),{recursive:true});
  await writeFile(path.join(root,'.canvasdoc/dev-connection-token'),'synthetic-token');
  const server=new WebSocketServer({host:'127.0.0.1',port:0});await new Promise<void>(r=>server.on('listening',r));
@@ -18,10 +18,12 @@ test('Chrome bridge connects without access to the workspace directory',async()=
   await build({entryPoints:['cli/native-setup.mjs'],outfile:path.join(temp,'setup.mjs'),bundle:true,platform:'node',format:'esm'});
   const {registerNative}=await import(pathToFileURL(path.join(temp,'setup.mjs')).href);
   const chrome=path.join(temp,'Application Support/Chrome/NativeMessagingHosts');
-  await registerNative(path.join(root,'.canvasdoc/dev-connection-token'),'oapolkgbmjlpnfeakajjgigbkikphdjj','https://canvas.calpoly.edu',port,chrome,path.join(temp,'Application Support/Canvasdoc'));
+  await registerNative(path.join(root,'.canvasdoc/dev-connection-token'),'oapolkgbmjlpnfeakajjgigbkikphdjj','https://canvas.calpoly.edu',port,chrome,path.join(temp,'Application Support/Canvasdoc'),undefined,undefined,{run:async()=>{}});
   const manifest=JSON.parse(await readFile(path.join(chrome,'com.canvasdoc.connector.json'),'utf8'));
   await rename(path.join(temp,'Documents'),path.join(temp,'Documents-unavailable'));
-  child=spawn(manifest.path,[],{stdio:['pipe','pipe','pipe']});
+  child=process.platform === 'win32'
+   ? spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', '""' + manifest.path + '""'], {stdio:['pipe','pipe','pipe'], windowsHide:true,windowsVerbatimArguments:true})
+   : spawn(manifest.path,[],{stdio:['pipe','pipe','pipe']});
   const hello=Buffer.from(JSON.stringify({type:'connect',account:'canvasdoc:v1:https://canvas.calpoly.edu:synthetic'}));const header=Buffer.alloc(4);header.writeUInt32LE(hello.length);child.stdin!.write(Buffer.concat([header,hello]));
   const packet=await new Promise<any>((resolve,reject)=>{
    const timer=setTimeout(()=>reject(new Error('Native handshake timed out')),3000);let buffer=Buffer.alloc(0);

@@ -1,3 +1,4 @@
+import { openBrowser } from './platform.ts';
 import { mcpConfirmationAnswer } from "../src/runtime/elicitation.ts";
 import type { ArtifactEvidence } from "../src/workspace-files.ts";
 import { verifyArtifacts } from "./artifact-evidence.ts";
@@ -5,7 +6,6 @@ import { WorkspaceAccount, IdentityError } from "./account-identity.ts";
 import type { DisplayPart } from "./message-parts.ts";
 import { displayParts } from "./harness-parts.ts";
 import { createServer } from "node:http";
-import { spawn } from "node:child_process";
 import { WebSocketServer, WebSocket } from "ws";
 import { readFile, writeFile } from "node:fs/promises";
 import { randomBytes, createHash } from "node:crypto";
@@ -301,7 +301,7 @@ wss.on("connection", (socket, request) => {
           if (!runtimeAvailable) throw new Error("Codex stopped. Restart the companion to sign in.");
           const { authUrl } = await runtime.login();
           // The panel also links the URL in case the system browser is not Chrome or popups are blocked.
-          if (process.platform === "darwin") spawn("open", [authUrl], { stdio: "ignore" }).on("error", () => {});
+          openBrowser(authUrl);
           socket.send(JSON.stringify({ type: "login-started", authUrl }));
           return;
         }

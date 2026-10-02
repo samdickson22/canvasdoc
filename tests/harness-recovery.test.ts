@@ -80,7 +80,7 @@ test("a snapshot write failure blocks execution and still releases the process a
   await mkdir(snapshot);
   await assert.rejects(
     runtime.send("do not execute", "persistence-test"),
-    /directory|EISDIR|Persistence/i,
+    /directory|EISDIR|EPERM|Persistence/i,
   );
   await assert.rejects(readFile(path.join(root, "executions.jsonl")), {
     code: "ENOENT",

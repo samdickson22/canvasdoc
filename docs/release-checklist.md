@@ -37,7 +37,7 @@ Internal React components and helper functions are not public APIs. Future forma
 
 ## Store configuration and verification
 
-- The store extension ID (`pbibigofgbljlhhaadjgiikdkjiahhap`) is the CLI's default on macOS. `start.sh` adds the unpacked build's ID alongside it, so one native host serves both. If the store item is ever re-created under a new ID, update `STORE_EXTENSION_ID` in `cli/canvasdoc.mjs`.
+- The store extension ID (`pbibigofgbljlhhaadjgiikdkjiahhap`) is the CLI's default on macOS and Windows. `start.sh` adds the unpacked build's ID alongside it, so one native host serves both. If the store item is ever re-created under a new ID, update `STORE_EXTENSION_ID` in `cli/canvasdoc.mjs`.
 - Enter https://canvasdoc-public.vercel.app/privacy/ in the developer dashboard's privacy field and https://canvasdoc-public.vercel.app/support/ as the support URL. The public support/privacy contact is sjedickson+canvasdoc@gmail.com. Keep the [policy source](privacy.md) and [public site](public-site.md) current and verify both URLs without authentication before submission.
 - Capture actual, current product screenshots for the listing. Do not submit mockups as product screenshots.
 - Suggested description: “A local coursework agent inside Canvas, with assignment conversations, course materials, and a persistent workspace on your computer.” State clearly that a local companion and Codex account are required and current support is Cal Poly and UCLA (BruinLearn).
@@ -45,6 +45,14 @@ Internal React components and helper functions are not public APIs. Future forma
 - Provide reviewer instructions and synthetic test access; never provide a student's real credentials.
 - Verify the packaged third-party notices match the code included in the release; rebuild the notices directory when dependencies or reused code change.
 - Verify the native bridge with the store-issued ID before rollout. On a separate Chrome profile and synthetic workspace, verify installation from npm, workspace selection, private Codex sign-in, browser pairing, send/stream/stop, reconnect after companion restart, file preview/download, and uninstall. Confirm existing workspace data is preserved when updating the CLI.
+
+## Windows verification
+
+Before a Windows rollout, use Node.js 24 or later to run `npm.cmd ci`, `npm.cmd run typecheck`, `npm.cmd run build`, and `node scripts/package-cli.mjs`. Start the packaged companion with the unpacked extension ID from `start.sh`; keep its terminal open.
+
+With a synthetic workspace and separate Chrome profile, verify the per-user `HKCU\Software\Google\Chrome\NativeMessagingHosts\com.canvasdoc.connector` value points to the manifest, then check connection, sign-in, send/stream/stop, restart/reconnect, nested file previews/downloads, and PDF/PowerPoint text sidecars. Check the store ID without `--extension-id` before release; it is registered by default on both platforms. The Windows bridge and private state belong in `%LOCALAPPDATA%\Canvasdoc`. Windows does not install a background service, and native Computer Use remains macOS-only.
+
+Isolate registry tests with `CANVASDOC_NATIVE_REGISTRY_KEY` as well as the support, state, configuration, Chrome-host directory, and connector-port overrides. Tests must use synthetic data and a local or unreachable telemetry endpoint.
 
 ## Permissions and purpose
 
